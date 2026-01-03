@@ -16,24 +16,16 @@ You should have received a copy of the GNU General Public License along
 with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
-#include <obs-module.h>
-#include <plugin-support.h>
+#pragma once
 
-#include "plugin-text-source.h"
-#include "plugin-image-source.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-OBS_DECLARE_MODULE()
-OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
+/* Registers the custom PNG image source type with OBS. */
+void register_my_plugin_image_source(void);
 
-bool obs_module_load(void)
-{
-	obs_log(LOG_INFO, "[my-plugin] plugin loaded successfully (version %s)", PLUGIN_VERSION);
-	register_my_plugin_text_source();
-	register_my_plugin_image_source();
-	return true;
+#ifdef __cplusplus
 }
+#endif
 
-void obs_module_unload(void)
-{
-	obs_log(LOG_INFO, "[my-plugin] plugin unloaded");
-}
