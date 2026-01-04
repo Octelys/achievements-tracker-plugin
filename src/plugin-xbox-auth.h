@@ -24,7 +24,6 @@ extern "C" {
  * Returns:
  *  - true on success, false otherwise.
  */
-
 bool xbox_auth_interactive_get_xsts(
 	const char *client_id,
 	const char *scope,

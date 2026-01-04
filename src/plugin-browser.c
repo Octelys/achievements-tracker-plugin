@@ -3,10 +3,8 @@
 #include <obs-module.h>
 #include <plugin-support.h>
 
-#ifdef __APPLE__
 #include <stdlib.h>
 #include <stdio.h>
-#endif
 
 bool plugin_open_url_in_browser(const char *url)
 {
