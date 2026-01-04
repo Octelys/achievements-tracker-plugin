@@ -12,3 +12,4 @@
 
 - Switch between Gamer points / Achievements? 
  
+Share feature (will require a server)
