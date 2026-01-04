@@ -12,6 +12,7 @@ struct image_src {
 
 	gs_image_file_t image;
 	bool loaded;
+	bool texture_ready;
 };
 
 static const char *image_src_get_name(void *unused)
@@ -37,9 +38,11 @@ static void image_src_unload(struct image_src *s)
 	if (!s)
 		return;
 
-	if (s->loaded) {
+	if (s->loaded || s->texture_ready) {
 		gs_image_file_free(&s->image);
+		memset(&s->image, 0, sizeof(s->image));
 		s->loaded = false;
+		s->texture_ready = false;
 	}
 }
 
@@ -50,15 +53,20 @@ static void image_src_load(struct image_src *s)
 
 	image_src_unload(s);
 
-	if (!s->path || !*s->path)
+	if (!s->path || !*s->path) {
+		obs_log(LOG_INFO, "[my-plugin] PNG image source: no path set");
 		return;
+	}
 
-	/* gs_image_file_init loads common image formats (including PNG) and preserves alpha */
+	/* Decode image on CPU now; create GPU texture later on the render thread. */
 	gs_image_file_init(&s->image, s->path);
-	gs_image_file_init_texture(&s->image);
 
 	if (s->image.loaded) {
 		s->loaded = true;
+		s->texture_ready = false;
+		obs_log(LOG_INFO,
+			"[my-plugin] Loaded image file: %s (%ux%u)",
+			s->path, s->image.cx, s->image.cy);
 	} else {
 		obs_log(LOG_WARNING, "[my-plugin] Failed to load image: %s", s->path);
 	}
@@ -116,17 +124,42 @@ static uint32_t image_src_get_height(void *data)
 
 static void image_src_video_render(void *data, gs_effect_t *effect)
 {
-	UNUSED_PARAMETER(effect);
 	struct image_src *s = data;
-	if (!s || !s->loaded || !s->image.texture)
+	if (!s || !s->loaded)
 		return;
 
-	gs_effect_t *e = obs_get_base_effect(OBS_EFFECT_DEFAULT);
-	gs_eparam_t *image = gs_effect_get_param_by_name(e, "image");
-	gs_effect_set_texture(image, s->image.texture);
+	/* Must be done on the graphics thread */
+	if (!s->texture_ready) {
+		gs_image_file_init_texture(&s->image);
+		if (!s->image.texture) {
+			obs_log(LOG_WARNING,
+				"[my-plugin] Image texture creation failed for: %s",
+				s->path ? s->path : "(null)");
+			return;
+		}
+		s->texture_ready = true;
+	}
 
-	while (gs_effect_loop(e, "Draw")) {
+	/*
+	 * OBS may already have an effect active when it calls video_render.
+	 * Starting a new gs_effect_loop in that case triggers:
+	 *   gs_effect_loop: An effect is already active
+	 */
+	gs_effect_t *e = effect ? effect : obs_get_base_effect(OBS_EFFECT_DEFAULT);
+	if (!e)
+		return;
+
+	gs_eparam_t *image = gs_effect_get_param_by_name(e, "image");
+	if (image)
+		gs_effect_set_texture(image, s->image.texture);
+
+	if (effect) {
+		/* Effect is already active; just draw. */
 		gs_draw_sprite(s->image.texture, 0, s->image.cx, s->image.cy);
+	} else {
+		while (gs_effect_loop(e, "Draw")) {
+			gs_draw_sprite(s->image.texture, 0, s->image.cx, s->image.cy);
+		}
 	}
 }
 
