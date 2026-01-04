@@ -4,6 +4,8 @@
 
 #include "plugin-text-source.h"
 #include "plugin-properties.h"
+#include "plugin-browser.h"
+#include "plugin-xbox-auth.h"
 
 struct text_src {
 	obs_source_t *source;
@@ -29,7 +31,21 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(property);
 	UNUSED_PARAMETER(data);
-	obs_log(LOG_INFO, "Sign in to Xbox button clicked");
+
+	/* TODO: move to OBS settings UI */
+	const char *client_id = "YOUR_CLIENT_ID_HERE";
+	const char *scope = "XboxLive.signin offline_access";
+
+	char *uhs = NULL;
+	char *xsts_token = NULL;
+	if (!xbox_auth_interactive_get_xsts(client_id, scope, &uhs, &xsts_token)) {
+		obs_log(LOG_WARNING, "Xbox sign-in failed");
+		return true;
+	}
+
+	obs_log(LOG_INFO, "Use for Xbox APIs: Authorization: XBL3.0 x=%s;%s", uhs, xsts_token);
+	bfree(uhs);
+	bfree(xsts_token);
 	return true;
 }
 
