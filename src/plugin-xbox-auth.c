@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "plugin-browser.h"
 #include "plugin-http.h"
+#include "plugin-oauth-util.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -35,8 +36,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <CommonCrypto/CommonDigest.h>
 
 #define OAUTH_CODE_MAX 4096
 #define OAUTH_STATE_MAX 128
@@ -65,63 +64,6 @@ static bool oauth_open_and_wait_for_code(
 	const char *client_id,
 	const char *scope,
 	char redirect_uri[256]);
-
-static void oauth_random_state(char out[OAUTH_STATE_MAX])
-{
-	static const char alphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-	srand((unsigned)time(NULL) ^ (unsigned)getpid());
-	for (size_t i = 0; i < 32; i++)
-		out[i] = alphabet[(size_t)(rand() % (sizeof(alphabet) - 1))];
-	out[32] = '\0';
-}
-
-static void oauth_pkce_verifier(char out[OAUTH_VERIFIER_MAX])
-{
-	static const char alphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
-	for (size_t i = 0; i < 64; i++)
-		out[i] = alphabet[(size_t)(rand() % (sizeof(alphabet) - 1))];
-	out[64] = '\0';
-}
-
-static void base64url_encode_sha256(const uint8_t digest[CC_SHA256_DIGEST_LENGTH], char out[OAUTH_CHALLENGE_MAX])
-{
-	static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-	char tmp[128];
-	size_t j = 0;
-
-	for (size_t i = 0; i < CC_SHA256_DIGEST_LENGTH; i += 3) {
-		uint32_t v = ((uint32_t)digest[i]) << 16;
-		if (i + 1 < CC_SHA256_DIGEST_LENGTH)
-			v |= ((uint32_t)digest[i + 1]) << 8;
-		if (i + 2 < CC_SHA256_DIGEST_LENGTH)
-			v |= (uint32_t)digest[i + 2];
-
-		tmp[j++] = b64[(v >> 18) & 63];
-		tmp[j++] = b64[(v >> 12) & 63];
-		if (i + 1 < CC_SHA256_DIGEST_LENGTH)
-			tmp[j++] = b64[(v >> 6) & 63];
-		if (i + 2 < CC_SHA256_DIGEST_LENGTH)
-			tmp[j++] = b64[v & 63];
-	}
-
-	size_t k = 0;
-	for (size_t i = 0; i < j && k + 1 < OAUTH_CHALLENGE_MAX; i++) {
-		char c = tmp[i];
-		if (c == '+')
-			c = '-';
-		else if (c == '/')
-			c = '_';
-		out[k++] = c;
-	}
-	out[k] = '\0';
-}
-
-static void oauth_pkce_challenge_s256(const char *verifier, char out[OAUTH_CHALLENGE_MAX])
-{
-	uint8_t digest[CC_SHA256_DIGEST_LENGTH];
-	CC_SHA256((const unsigned char *)verifier, (CC_LONG)strlen(verifier), digest);
-	base64url_encode_sha256(digest, out);
-}
 
 static void http_send_response(int client_fd, const char *body)
 {
@@ -260,9 +202,9 @@ static bool oauth_loopback_start(struct oauth_loopback_ctx *ctx)
 
 	ctx->port = (int)kFixedPort;
 
-	oauth_random_state(ctx->state);
-	oauth_pkce_verifier(ctx->code_verifier);
-	oauth_pkce_challenge_s256(ctx->code_verifier, ctx->code_challenge);
+	oauth_random_state(ctx->state, sizeof(ctx->state));
+	oauth_pkce_verifier(ctx->code_verifier, sizeof(ctx->code_verifier));
+	oauth_pkce_challenge_s256(ctx->code_verifier, ctx->code_challenge, sizeof(ctx->code_challenge));
 
 	if (pthread_create(&ctx->thread, NULL, oauth_loopback_thread, ctx) != 0) {
 		obs_log(LOG_WARNING, "OAuth loopback: pthread_create() failed");

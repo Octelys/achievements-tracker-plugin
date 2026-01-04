@@ -44,6 +44,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
   src/plugin-properties.c
   src/plugin-browser.c
   src/plugin-http.c
+  src/plugin-oauth-util.c
   src/plugin-xbox-auth.c
 )
 
