@@ -19,4 +19,3 @@ bool plugin_open_url_in_browser(const char *url);
 #ifdef __cplusplus
 }
 #endif
-

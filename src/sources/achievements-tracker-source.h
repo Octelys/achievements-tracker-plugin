@@ -10,4 +10,3 @@ void register_my_plugin_text_source(void);
 #ifdef __cplusplus
 }
 #endif
-
