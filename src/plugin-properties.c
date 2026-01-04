@@ -11,7 +11,7 @@
  * structure itself isolated in this file.
  */
 const char *text_src_get_name(void *unused);
-obs_properties_t *text_src_properties(void *data);
+obs_properties_t *get_properties(void *data);
 void *text_src_create(obs_data_t *settings, obs_source_t *source);
 void text_src_destroy(void *data);
 void text_src_update(void *data, obs_data_t *settings);
@@ -27,7 +27,7 @@ static struct obs_source_info text_src_info = {
 	.create = text_src_create,
 	.destroy = text_src_destroy,
 	.update = text_src_update,
-	.get_properties = text_src_properties,
+	.get_properties = get_properties,
 	.get_width = text_src_get_width,
 	.get_height = text_src_get_height,
 	.video_tick = NULL,

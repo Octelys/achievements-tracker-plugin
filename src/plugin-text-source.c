@@ -1,5 +1,6 @@
 #include <obs-module.h>
 #include <graphics/graphics.h>
+#include <plugin-support.h>
 
 #include "plugin-text-source.h"
 #include "plugin-properties.h"
@@ -23,14 +24,24 @@ const char *text_src_get_name(
 	return "Achievements Tracker";
 }
 
+static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(props);
+	UNUSED_PARAMETER(property);
+	UNUSED_PARAMETER(data);
+	obs_log(LOG_INFO, "Sign in to Xbox button clicked");
+	return true;
+}
+
 /* Gets the properties of the source */
-obs_properties_t *text_src_properties(
+obs_properties_t *get_properties(
     void *data
 )
 {
 	UNUSED_PARAMETER(data);
 	obs_properties_t *p = obs_properties_create();
 	obs_properties_add_text(p, "text", "Text", OBS_TEXT_DEFAULT);
+	obs_properties_add_button(p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
 	return p;
 }
 
