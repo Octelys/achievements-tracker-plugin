@@ -14,9 +14,7 @@ extern "C" {
  * Note: "success" here means the OS command was invoked; it doesn't guarantee
  * the user completed authentication.
  */
-bool open_url(
-	const char *url
-);
+bool open_url(const char *url);
 
 #ifdef __cplusplus
 }

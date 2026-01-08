@@ -7,31 +7,25 @@
 #include <string.h>
 
 struct http_buf {
-		char *ptr;
-		size_t len;
+	char *ptr;
+	size_t len;
 };
 
-static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *userp)
-{
-		size_t realsize = size * nmemb;
-		struct http_buf *mem = (struct http_buf *)userp;
+static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *userp) {
+	size_t realsize = size * nmemb;
+	struct http_buf *mem = (struct http_buf *)userp;
 
-		char *p = brealloc(mem->ptr, mem->len + realsize + 1);
-		if (!p)
-				return 0;
-		mem->ptr = p;
-		memcpy(&(mem->ptr[mem->len]), contents, realsize);
-		mem->len += realsize;
-		mem->ptr[mem->len] = 0;
-		return realsize;
+	char *p = brealloc(mem->ptr, mem->len + realsize + 1);
+	if (!p)
+		return 0;
+	mem->ptr = p;
+	memcpy(&(mem->ptr[mem->len]), contents, realsize);
+	mem->len += realsize;
+	mem->ptr[mem->len] = 0;
+	return realsize;
 }
 
-char *http_post_form(
-	const char *url,
-	const char *postfields,
-	long *out_http_code
-)
-{
+char *http_post_form(const char *url, const char *postfields, long *out_http_code) {
 	if (out_http_code)
 		*out_http_code = 0;
 
@@ -80,13 +74,7 @@ char *http_post_form(
 	return chunk.ptr;
 }
 
-char *http_post_json(
-	const char *url,
-	const char *json_body,
-	const char *extra_header,
-	long *out_http_code
-)
-{
+char *http_post_json(const char *url, const char *json_body, const char *extra_header, long *out_http_code) {
 	if (out_http_code)
 		*out_http_code = 0;
 
@@ -139,13 +127,7 @@ char *http_post_json(
 	return chunk.ptr;
 }
 
-char *http_get(
-	const char *url,
-	const char *extra_headers,
-	const char *postfields,
-	long *out_http_code
-)
-{
+char *http_get(const char *url, const char *extra_headers, const char *postfields, long *out_http_code) {
 	if (out_http_code)
 		*out_http_code = 0;
 
@@ -176,7 +158,7 @@ char *http_get(
 				/* Skip consecutive line breaks */
 				char *p = next + 1;
 				while (*p == '\r' || *p == '\n')
-						p++;
+					p++;
 				next = p;
 			} else {
 				next = NULL;
@@ -223,10 +205,7 @@ char *http_get(
 	return chunk.ptr;
 }
 
-char *http_urlencode(
-	const char *in
-)
-{
+char *http_urlencode(const char *in) {
 	if (!in)
 		return NULL;
 

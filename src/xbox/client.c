@@ -6,95 +6,92 @@
 #include "io/state.h"
 #include "net/http/http.h"
 
-void get_presence(void)
-{
-		/* TODO: implement presence retrieval. */
-		const char *xid = get_xid();
-		obs_log(LOG_DEBUG, "xid=%s", xid ? xid : "(null)");
+void get_presence(void) {
+	/* TODO: implement presence retrieval. */
+	const char *xid = get_xid();
+	obs_log(LOG_DEBUG, "xid=%s", xid ? xid : "(null)");
 }
 
-char *xbox_fetch_achievements_json(long *out_http_code)
-{
-		if (out_http_code)
-				*out_http_code = 0;
+char *xbox_fetch_achievements_json(long *out_http_code) {
+	if (out_http_code)
+		*out_http_code = 0;
 
-		const char *xid = get_xid();
-		const char *auth = get_xsts_token();
-		if (!xid || !*xid || !auth || !*auth) {
-				obs_log(LOG_WARNING, "Missing XUID/XSTS token; user not signed in?");
-				return NULL;
-		}
+	const char *xid = get_xid();
+	const char *auth = get_xsts_token();
+	if (!xid || !*xid || !auth || !*auth) {
+		obs_log(LOG_WARNING, "Missing XUID/XSTS token; user not signed in?");
+		return NULL;
+	}
 
-		char url[512];
-		snprintf(url, sizeof(url),
-				 "https://achievements.xboxlive.com/users/xuid(%s)/achievements?titleId=1879711255&maxItems=1000", xid);
+	char url[512];
+	snprintf(url, sizeof(url),
+			 "https://achievements.xboxlive.com/users/xuid(%s)/achievements?titleId=1879711255&maxItems=1000", xid);
 
-		char headers[2048];
-		snprintf(headers, sizeof(headers),
-				 "Authorization: %s\n"
-				 "Accept: application/json\n"
-				 "Accept-Language: en-CA\n"
-				 "Content-Type: application/json\n"
-				 "x-xbl-contract-version: 2\n",
-				 auth);
+	char headers[2048];
+	snprintf(headers, sizeof(headers),
+			 "Authorization: %s\n"
+			 "Accept: application/json\n"
+			 "Accept-Language: en-CA\n"
+			 "Content-Type: application/json\n"
+			 "x-xbl-contract-version: 2\n",
+			 auth);
 
-		long code = 0;
-		char *json = http_get(url, headers, NULL, &code);
-		if (out_http_code)
-				*out_http_code = code;
+	long code = 0;
+	char *json = http_get(url, headers, NULL, &code);
+	if (out_http_code)
+		*out_http_code = code;
 
-		if (!json) {
-				obs_log(LOG_WARNING, "Achievements GET failed (no response)");
-				return NULL;
-		}
-		if (code < 200 || code >= 300) {
-				obs_log(LOG_WARNING, "Achievements GET HTTP %ld: %s", code, json);
-				/* Return body to caller anyway for debugging */
-		}
+	if (!json) {
+		obs_log(LOG_WARNING, "Achievements GET failed (no response)");
+		return NULL;
+	}
+	if (code < 200 || code >= 300) {
+		obs_log(LOG_WARNING, "Achievements GET HTTP %ld: %s", code, json);
+		/* Return body to caller anyway for debugging */
+	}
 
-		return json;
+	return json;
 }
 
-char *xbox_fetch_presence_json(long *out_http_code)
-{
-		if (out_http_code)
-				*out_http_code = 0;
+char *xbox_fetch_presence_json(long *out_http_code) {
+	if (out_http_code)
+		*out_http_code = 0;
 
-		const char *xid = get_xid();
-		const char *auth = get_xsts_token();
+	const char *xid = get_xid();
+	const char *auth = get_xsts_token();
 
-		if (!xid || !*xid || !auth || !*auth) {
-				obs_log(LOG_WARNING, "Missing XUID/XSTS token; user not signed in?");
-				return NULL;
-		}
+	if (!xid || !*xid || !auth || !*auth) {
+		obs_log(LOG_WARNING, "Missing XUID/XSTS token; user not signed in?");
+		return NULL;
+	}
 
-		char url[512];
-		snprintf(url, sizeof(url), "https://userpresence.xboxlive.com/users/xuid(%s)/richpresence", xid);
+	char url[512];
+	snprintf(url, sizeof(url), "https://userpresence.xboxlive.com/users/xuid(%s)/richpresence", xid);
 
-		char headers[2048];
-		snprintf(headers, sizeof(headers),
-				 "Authorization: %s\n"
-				 "Accept: application/json\n"
-				 "Accept-Language: en-CA\n"
-				 "Content-Type: application/json\n"
-				 "x-xbl-contract-version: 2\n",
-				 auth);
+	char headers[2048];
+	snprintf(headers, sizeof(headers),
+			 "Authorization: %s\n"
+			 "Accept: application/json\n"
+			 "Accept-Language: en-CA\n"
+			 "Content-Type: application/json\n"
+			 "x-xbl-contract-version: 2\n",
+			 auth);
 
-		long code = 0;
-		char *json = http_get(url, headers, NULL, &code);
-		if (out_http_code)
-				*out_http_code = code;
+	long code = 0;
+	char *json = http_get(url, headers, NULL, &code);
+	if (out_http_code)
+		*out_http_code = code;
 
-		obs_log(LOG_WARNING, "Presence %s", json);
+	obs_log(LOG_WARNING, "Presence %s", json);
 
-		if (!json) {
-				obs_log(LOG_WARNING, "Presence GET failed (no response)");
-				return NULL;
-		}
+	if (!json) {
+		obs_log(LOG_WARNING, "Presence GET failed (no response)");
+		return NULL;
+	}
 
-		if (code < 200 || code >= 300)
-				obs_log(LOG_WARNING, "Presence GET HTTP %ld: %s", code, json);
-		return json;
+	if (code < 200 || code >= 300)
+		obs_log(LOG_WARNING, "Presence GET HTTP %ld: %s", code, json);
+	return json;
 }
 
 /*

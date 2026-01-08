@@ -11,93 +11,85 @@
 
 static obs_data_t *g_state = NULL;
 
-static char *get_state_path(void)
-{
-		/* Put state under: <OBS config dir>/plugins/<plugin_name>/ */
-		char *dir = obs_module_config_path("");
+static char *get_state_path(void) {
+	/* Put state under: <OBS config dir>/plugins/<plugin_name>/ */
+	char *dir = obs_module_config_path("");
 
-		if (!dir)
-				return NULL;
+	if (!dir)
+		return NULL;
 
-		/* Ensure directory exists */
-		os_mkdirs(dir);
+	/* Ensure directory exists */
+	os_mkdirs(dir);
 
-		char *path = (char *)bzalloc(1024);
-		snprintf(path, 1024, "%s/%s", dir, PERSIST_FILE);
-		bfree(dir);
+	char *path = (char *)bzalloc(1024);
+	snprintf(path, 1024, "%s/%s", dir, PERSIST_FILE);
+	bfree(dir);
 
-		return path;
+	return path;
 }
 
-static obs_data_t *load_state(void)
-{
-		char *path = get_state_path();
+static obs_data_t *load_state(void) {
+	char *path = get_state_path();
 
-		if (!path)
-				return NULL;
+	if (!path)
+		return NULL;
 
-		obs_data_t *data = obs_data_create_from_json_file(path);
-		bfree(path);
+	obs_data_t *data = obs_data_create_from_json_file(path);
+	bfree(path);
 
-		/* If file doesn’t exist yet, return an empty object */
-		if (!data) {
-				obs_log(LOG_INFO, "no state found: creating a new one");
-				data = obs_data_create();
-		}
+	/* If file doesn’t exist yet, return an empty object */
+	if (!data) {
+		obs_log(LOG_INFO, "no state found: creating a new one");
+		data = obs_data_create();
+	}
 
-		return data;
+	return data;
 }
 
-static void save_state(obs_data_t *data)
-{
-		if (!data)
-				return;
+static void save_state(obs_data_t *data) {
+	if (!data)
+		return;
 
-		char *path = get_state_path();
+	char *path = get_state_path();
 
-		if (!path)
-				return;
+	if (!path)
+		return;
 
-		obs_data_save_json_safe(data, path, ".tmp", ".bak");
-		bfree(path);
+	obs_data_save_json_safe(data, path, ".tmp", ".bak");
+	bfree(path);
 }
 
-void io_load(void)
-{
-		g_state = load_state();
+void io_load(void) {
+	g_state = load_state();
 
-		/* Read values */
-		const char *token = obs_data_get_string(g_state, "oauth_token");
-		int64_t last_sync = obs_data_get_int(g_state, "last_sync_unix");
+	/* Read values */
+	const char *token = obs_data_get_string(g_state, "oauth_token");
+	int64_t last_sync = obs_data_get_int(g_state, "last_sync_unix");
 
-		(void)token;
-		(void)last_sync;
+	(void)token;
+	(void)last_sync;
 }
 
-const char *get_xsts_token(void)
-{
-		return obs_data_get_string(g_state, XSTS_TOKEN_KEY);
+const char *get_xsts_token(void) {
+	return obs_data_get_string(g_state, XSTS_TOKEN_KEY);
 }
 
-const char *get_xid(void)
-{
-		return obs_data_get_string(g_state, XID_KEY);
+const char *get_xid(void) {
+	return obs_data_get_string(g_state, XID_KEY);
 }
 
-void clear_xid_xsts_token(void)
-{
-		obs_data_set_string(g_state, XID_KEY, "");
-		obs_data_set_string(g_state, XSTS_TOKEN_KEY, "");
+void clear_xid_xsts_token(void) {
+	obs_data_set_string(g_state, XID_KEY, "");
+	obs_data_set_string(g_state, XSTS_TOKEN_KEY, "");
 
-		/* Immediately save the state to disk */
-		save_state(g_state);
+	/* Immediately save the state to disk */
+	save_state(g_state);
 }
 
-void set_xid_xsts_token(const char *xid, const char *token)
-{
-		obs_data_set_string(g_state, XID_KEY, xid);
-		obs_data_set_string(g_state, XSTS_TOKEN_KEY, token);
+void set_xid_xsts_token(const char *xid, const char *token) {
+	obs_data_set_string(g_state, XID_KEY, xid);
+	obs_data_set_string(g_state, XSTS_TOKEN_KEY, token);
 
-		/* Immediately save the state to disk */
-		save_state(g_state);
+	/* Immediately save the state to disk */
+	save_state(g_state);
 }

@@ -4,11 +4,7 @@
 #include <curl/curl.h>
 #include <string.h>
 
-char *json_get_string_value(
-	const char *json,
-	const char *key
-)
-{
+char *json_get_string_value(const char *json, const char *key) {
 	if (!json || !key)
 		return NULL;
 
@@ -53,11 +49,7 @@ char *json_get_string_value(
 	return out;
 }
 
-long *json_get_long_value(
-	const char *json,
-	const char *key
-)
-{
+long *json_get_long_value(const char *json, const char *key) {
 	if (!json || !key)
 		return NULL;
 

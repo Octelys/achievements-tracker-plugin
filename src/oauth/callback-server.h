@@ -13,17 +13,17 @@ extern "C" {
 #define OAUTH_CHALLENGE_MAX 128
 
 struct oauth_loopback_ctx {
-		int server_fd;
-		int port;
-		void *thread; /* pthread_t, kept opaque to avoid pthread include in header */
-		bool thread_started;
+	int server_fd;
+	int port;
+	void *thread; /* pthread_t, kept opaque to avoid pthread include in header */
+	bool thread_started;
 
-		char state[OAUTH_STATE_MAX];
-		char code_verifier[OAUTH_VERIFIER_MAX];
-		char code_challenge[OAUTH_CHALLENGE_MAX];
+	char state[OAUTH_STATE_MAX];
+	char code_verifier[OAUTH_VERIFIER_MAX];
+	char code_challenge[OAUTH_CHALLENGE_MAX];
 
-		char auth_code[OAUTH_CODE_MAX];
-		bool got_code;
+	char auth_code[OAUTH_CODE_MAX];
+	bool got_code;
 };
 
 bool oauth_loopback_start(struct oauth_loopback_ctx *ctx, uint16_t fixed_port);

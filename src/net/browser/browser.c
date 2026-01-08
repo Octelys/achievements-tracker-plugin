@@ -6,10 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-bool open_url(
-	const char *url
-)
-{
+bool open_url(const char *url) {
 	if (!url || !*url)
 		return false;
 

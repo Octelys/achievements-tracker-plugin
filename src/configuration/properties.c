@@ -5,6 +5,7 @@
 #include "sources/achievements-tracker-source.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
+#include "crypto/crypto.h"
 #include "diagnostics/log.h"
 #include "xbox/client.h"
 
@@ -21,20 +22,12 @@ uint32_t text_src_get_width(void *data);
 uint32_t text_src_get_height(void *data);
 void text_src_video_render(void *data, gs_effect_t *effect);
 
-static void refresh_page(
-	obs_source_t *source
-)
-{
+static void refresh_page(obs_source_t *source) {
 	if (source)
 		obs_source_update_properties(source);
 }
 
-static bool on_sign_out_clicked(
-	obs_properties_t *props,
-	obs_property_t *property,
-	void *data
-)
-{
+static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(property);
 
@@ -45,14 +38,13 @@ static bool on_sign_out_clicked(
 	return true;
 }
 
-static bool on_sign_in_xbox_clicked(
-	obs_properties_t *props,
-	obs_property_t *property,
-	void *data
-)
-{
+static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(property);
+
+	EVP_PKEY *pkey = crypto_generate_p256_keypair();
+	if (pkey)
+		EVP_PKEY_free(pkey);
 
 	char *xid = NULL;
 	char *uhs = NULL;
@@ -79,17 +71,16 @@ static bool on_sign_in_xbox_clicked(
 	return true;
 }
 
-obs_properties_t *get_properties(
-	void *data
-)
-{
+obs_properties_t *get_properties(void *data) {
 	UNUSED_PARAMETER(data);
 
 	/* Lists all the UI components of the properties page */
 	obs_properties_t *p = obs_properties_create();
 	obs_properties_add_text(p, "text", "Text", OBS_TEXT_DEFAULT);
-	obs_property_t *xboxSignInButton = obs_properties_add_button(p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
-	obs_property_t *xboxSignOutButton = obs_properties_add_button(p, "sign-out-xbox", "Sign out from Xbox", &on_sign_out_clicked);
+	obs_property_t *xboxSignInButton =
+		obs_properties_add_button(p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
+	obs_property_t *xboxSignOutButton =
+		obs_properties_add_button(p, "sign-out-xbox", "Sign out from Xbox", &on_sign_out_clicked);
 
 	/* Finds out if there is a token available already */
 	const char *token = get_xsts_token();
@@ -107,28 +98,26 @@ obs_properties_t *get_properties(
 }
 
 /* Gets the name of the source */
-const char *text_src_get_name(void *unused)
-{
+const char *text_src_get_name(void *unused) {
 	UNUSED_PARAMETER(unused);
 	return "Achievements Tracker";
 }
 
 static struct obs_source_info text_src_info = {
-		.id = "template_text_source",
-		.type = OBS_SOURCE_TYPE_INPUT,
-		.output_flags = OBS_SOURCE_VIDEO,
-		.get_name = text_src_get_name,
-		.create = text_src_create,
-		.destroy = text_src_destroy,
-		.update = text_src_update,
-		.get_properties = get_properties,
-		.get_width = text_src_get_width,
-		.get_height = text_src_get_height,
-		.video_tick = NULL,
-		.video_render = text_src_video_render,
+	.id = "template_text_source",
+	.type = OBS_SOURCE_TYPE_INPUT,
+	.output_flags = OBS_SOURCE_VIDEO,
+	.get_name = text_src_get_name,
+	.create = text_src_create,
+	.destroy = text_src_destroy,
+	.update = text_src_update,
+	.get_properties = get_properties,
+	.get_width = text_src_get_width,
+	.get_height = text_src_get_height,
+	.video_tick = NULL,
+	.video_render = text_src_video_render,
 };
 
-const struct obs_source_info *get_plugin_properties(void)
-{
+const struct obs_source_info *get_plugin_properties(void) {
 	return &text_src_info;
 }

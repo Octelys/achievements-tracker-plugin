@@ -23,33 +23,32 @@
 #define REGISTER_ENDPOINT "https://login.live.com/oauth20_remoteconnect.srf?otc="
 #define GRANT_TYPE "urn:ietf:params:oauth:grant-type:device_code"
 #define XBOX_LIVE_AUTHENTICATE "https://user.auth.xboxlive.com/user/authenticate"
+#define SISU_AUTHORIZE_AUTHENTICATE "https://sisu.xboxlive.com/authorize"
 
 #define CLIENT_ID "000000004c12ae6f"
 #define SCOPE "service::user.auth.xboxlive.com::MBI_SSL"
 
 #if defined(_WIN32)
 #include <windows.h>
-static void sleep_ms(unsigned int ms)
-{
+static void sleep_ms(unsigned int ms) {
 	Sleep(ms);
 }
 #else
 #include <unistd.h>
-static void sleep_ms(unsigned int ms)
-{
+static void sleep_ms(unsigned int ms) {
 	usleep(ms * 1000);
 }
 #endif
 
 #define CLEAR(p)	\
 	if (p)			\
-		p = NULL;	\
+		p = NULL;
 
 #define COPY_OR_FREE(src, dst)	\
 	if (dst)					\
 		*dst = src;				\
 	else						\
-		bfree(src);				\
+		bfree(src);
 
 /* */
 struct device_flow_ctx {
@@ -66,12 +65,15 @@ struct device_flow_ctx {
 	bool got_access_token;
 
 	char xbox_live_token[4096];
+	char sisu_token[4096];
 };
 
 /*	********************************************************************************************************************
-	Continues the device registration flow by retrieve an xbox live token
+	Finally retrieve the xsts token
 	*******************************************************************************************************************/
-static void retrieve_xbox_token(
+
+/*
+static void retrieve_xsts_token(
 	struct device_flow_ctx *ctx
 )
 {
@@ -80,23 +82,139 @@ static void retrieve_xbox_token(
 		json_body,
 		sizeof(json_body),
 		"{"
-		"\"RelyingParty\":\"http://auth.xboxlive.com\","
-		"\"TokenType\":\"JWT\","
-		"\"Properties\":{"
-		"\"AuthMethod\":\"RPS\","
+		"\"AccessToken\":\"t=%s\","
+		"\"AppId\":\"%s\","
+		"\"DeviceToken\":\"%s\","
+		"\"Sandbox\":\"RETAIL\","
+		"\"UseModernGamertag\":true,"
 		"\"SiteName\":\"user.auth.xboxlive.com\","
-		"\"RpsTicket\":\"t=%s\"}"
+		"\"RelyingParty\":\"http://xboxlive.com\"}"
 		"}",
-		ctx->access_token
+		ctx->xbox_live_token,
+		CLIENT_ID,
+		ctx->device_token,
 	);
 
 	long http_code = 0;
-	char *xbl_json = http_post_json(
-		XBOX_LIVE_AUTHENTICATE,
+	char *xsts_json = http_post_json(
+		SISU_AUTHORIZE,
 		json_body,
 		NULL,
 		&http_code
 	);
+
+	if (http_code < 200 || http_code >= 300) {
+		obs_log(LOG_WARNING, "SISU authentication failed. Received status code: %sd", http_code);
+		bfree(xbl_json);
+		return;
+	}
+
+	if (!xsts_json) {
+		obs_log(LOG_WARNING, "SISU authentication failed (no response)");
+		return;
+	}
+
+	char *sisu_token = json_get_string_value(xsts_json, "Token");
+
+	if (!sisu_token) {
+		obs_log(LOG_WARNING, "Could not parse XBL token");
+		obs_log(LOG_DEBUG, "XBL response: %s", xsts_json);
+		bfree(xsts_json);
+		bfree(sisu_token);
+		return;
+	}
+
+	obs_log(LOG_INFO, "SISU authentication succeeded");
+
+	strncpy(ctx->sisu_token, sisu_token, sizeof(ctx->sisu_token) - 1);
+	ctx->sisu_token[sizeof(ctx->sisu_token) - 1] = '\0';
+	bfree(sisu_token);
+}
+*/
+
+/*	********************************************************************************************************************
+
+	*******************************************************************************************************************/
+/*
+static void retrieve_device_token(
+	struct device_flow_ctx *ctx
+)
+{
+	char json_body[8192];
+	snprintf(
+		json_body,
+		sizeof(json_body),
+		"{"
+		"\"Properties\": {"
+		"\"AuthMethod\":\"ProofOfPossession\","
+		"\"Id\":\"??\","
+		"\"DeviceType\":\"??\","
+		"\"SerialNumber\":\"??\","
+		"\"Version\":\"1.0.0\""
+		"},"
+		"\"RelyingParty\":\"http://auth.xboxlive.com\"}"
+		"\"TokenType\":\"JWT\"}"
+		"}",
+		ctx->xbox_live_token,
+		CLIENT_ID,
+		ctx->device_token,
+	);
+
+
+	long http_code = 0;
+	char *xsts_json = http_post_json(
+		SISU_AUTHORIZE,
+		json_body,
+		NULL,
+		&http_code
+	);
+
+	if (http_code < 200 || http_code >= 300) {
+		obs_log(LOG_WARNING, "SISU authentication failed. Received status code: %sd", http_code);
+		bfree(xbl_json);
+		return;
+	}
+
+	if (!xsts_json) {
+		obs_log(LOG_WARNING, "SISU authentication failed (no response)");
+		return;
+	}
+
+	char *sisu_token = json_get_string_value(xsts_json, "Token");
+
+	if (!sisu_token) {
+		obs_log(LOG_WARNING, "Could not parse XBL token");
+		obs_log(LOG_DEBUG, "XBL response: %s", xsts_json);
+		bfree(xsts_json);
+		bfree(sisu_token);
+		return;
+	}
+
+	obs_log(LOG_INFO, "SISU authentication succeeded");
+
+	strncpy(ctx->sisu_token, sisu_token, sizeof(ctx->sisu_token) - 1);
+	ctx->sisu_token[sizeof(ctx->sisu_token) - 1] = '\0';
+	bfree(sisu_token);
+}
+*/
+/*	********************************************************************************************************************
+	Continues the device registration flow by retrieve an xbox live token
+	*******************************************************************************************************************/
+static void retrieve_xbox_token(struct device_flow_ctx *ctx) {
+	char json_body[8192];
+	snprintf(json_body, sizeof(json_body),
+			 "{"
+			 "\"RelyingParty\":\"http://auth.xboxlive.com\","
+			 "\"TokenType\":\"JWT\","
+			 "\"Properties\":{"
+			 "\"AuthMethod\":\"RPS\","
+			 "\"SiteName\":\"user.auth.xboxlive.com\","
+			 "\"RpsTicket\":\"t=%s\"}"
+			 "}",
+			 ctx->access_token);
+
+	long http_code = 0;
+	char *xbl_json = http_post_json(XBOX_LIVE_AUTHENTICATE, json_body, NULL, &http_code);
 
 	if (http_code < 200 || http_code >= 300) {
 		obs_log(LOG_WARNING, "Xbox live authentication failed. Received status code: %sd", http_code);
@@ -129,21 +247,12 @@ static void retrieve_xbox_token(
 /*	********************************************************************************************************************
  	Polls for an access token until the user has approved the device.
 	*******************************************************************************************************************/
-static void *check_access_token_loop(
-	void *param
-)
-{
+static void *check_access_token_loop(void *param) {
 	struct device_flow_ctx *ctx = (struct device_flow_ctx *)param;
 
 	char get_token_form_url_encoded[8192];
-	snprintf(
-		get_token_form_url_encoded,
-		sizeof(get_token_form_url_encoded),
-		"client_id=%s&device_code=%s&grant_type=%s",
-		CLIENT_ID,
-		ctx->device_code,
-		GRANT_TYPE
-	);
+	snprintf(get_token_form_url_encoded, sizeof(get_token_form_url_encoded),
+			 "client_id=%s&device_code=%s&grant_type=%s", CLIENT_ID, ctx->device_code, GRANT_TYPE);
 
 	obs_log(LOG_INFO, "Waiting for the user to validate the code");
 
@@ -156,14 +265,11 @@ static void *check_access_token_loop(
 
 		sleep_ms(interval);
 
-		char *json = http_get(
-			TOKEN_ENDPOINT,
-			NULL,
-			get_token_form_url_encoded,
-			&code);
+		char *json = http_get(TOKEN_ENDPOINT, NULL, get_token_form_url_encoded, &code);
 
 		if (code != 200) {
-			obs_log(LOG_INFO, "Device not validated yet. Received code %d, Waiting %d second before retrying...", code, interval);
+			obs_log(LOG_INFO, "Device not validated yet. Received code %d, Waiting %d second before retrying...", code,
+					interval);
 		} else {
 			ctx->got_access_token = true;
 
@@ -196,8 +302,7 @@ static void *check_access_token_loop(
 /*	********************************************************************************************************************
 	Starts the device registration flow.
 	*******************************************************************************************************************/
-static bool start_device_registration()
-{
+static bool start_device_registration() {
 	obs_log(LOG_INFO, "Starting Xbox sign-in in browser");
 
 	/* ******************************* */
@@ -212,13 +317,8 @@ static bool start_device_registration()
 	}
 
 	char form_url_encoded[8192];
-	snprintf(
-		form_url_encoded,
-		sizeof(form_url_encoded),
-		"client_id=%s&response_type=device_code&scope=%s",
-		CLIENT_ID,
-		scope_enc
-	);
+	snprintf(form_url_encoded, sizeof(form_url_encoded), "client_id=%s&response_type=device_code&scope=%s", CLIENT_ID,
+			 scope_enc);
 
 	bfree(scope_enc);
 
@@ -227,11 +327,7 @@ static bool start_device_registration()
 	/* ************************************************ */
 	long http_code = 0;
 
-	char *token_json = http_post_form(
-		CONNECT_ENDPOINT,
-		form_url_encoded,
-		&http_code
-	);
+	char *token_json = http_post_form(CONNECT_ENDPOINT, form_url_encoded, &http_code);
 
 	if (!token_json) {
 		obs_log(LOG_WARNING, "Device code retrieval failed (no response)");
@@ -285,13 +381,7 @@ static bool start_device_registration()
 	/* Open the browser to the verification URL. */
 	/* ***************************************** */
 	char verification_uri[4096];
-	snprintf(
-		verification_uri,
-		sizeof(verification_uri),
-		"%s%s",
-		REGISTER_ENDPOINT,
-		user_code
-	);
+	snprintf(verification_uri, sizeof(verification_uri), "%s%s", REGISTER_ENDPOINT, user_code);
 
 	obs_log(LOG_INFO, "Open browser for OAuth verification at URL: %s", verification_uri);
 
@@ -344,8 +434,8 @@ static char *oauth_exchange_code_for_access_token(
 	 */
 	char postfields[8192];
 	snprintf(postfields, sizeof(postfields),
-			 "client_id=%s&grant_type=authorization_code&code=%s&redirect_uri=%s&code_verifier=%s", client_id,
-			 code_enc, redir_enc, verifier_enc);
+			 "client_id=%s&grant_type=authorization_code&code=%s&redirect_uri=%s&code_verifier=%s", client_id, code_enc,
+			 redir_enc, verifier_enc);
 	bfree(code_enc);
 	bfree(redir_enc);
 	bfree(verifier_enc);
@@ -367,11 +457,13 @@ static char *oauth_exchange_code_for_access_token(
 	if (http_code < 200 || http_code >= 300) {
 		obs_log(LOG_WARNING, "Token exchange HTTP %ld: %s", http_code, token_json);
 		if (strstr(token_json, "AADSTS70002"))
-				obs_log(LOG_WARNING,
-						"Token exchange indicates client_secret is required. Configure your Azure app as a Public client (no secret) and enable the loopback redirect URI.");
+			obs_log(
+				LOG_WARNING,
+				"Token exchange indicates client_secret is required. Configure your Azure app as a Public client (no secret) and enable the loopback redirect URI.");
 		if (strstr(token_json, "AADSTS9002331"))
-				obs_log(LOG_WARNING,
-						"Token exchange endpoint mismatch: this app is configured for Microsoft Accounts only; use the /consumers endpoint for both authorize and token.");
+			obs_log(
+				LOG_WARNING,
+				"Token exchange endpoint mismatch: this app is configured for Microsoft Accounts only; use the /consumers endpoint for both authorize and token.");
 		bfree(token_json);
 		return NULL;
 	}
@@ -386,25 +478,20 @@ static char *oauth_exchange_code_for_access_token(
 	return access_token;
 }
 
-static bool xbl_authenticate(
-	const char *ms_access_token,
-	char **out_xbl_token
-)
-{
+static bool xbl_authenticate(const char *ms_access_token, char **out_xbl_token) {
 	if (out_xbl_token)
 		*out_xbl_token = NULL;
 
 	obs_log(LOG_WARNING, "XBL authenticate using MSAL '%s'", ms_access_token);
 
 	char body[8192];
-	snprintf(
-		body, sizeof(body),
-		"{"
-		"\"RelyingParty\":\"http://auth.xboxlive.com\","
-		"\"TokenType\":\"JWT\","
-		"\"Properties\":{\"AuthMethod\":\"RPS\",\"SiteName\":\"user.auth.xboxlive.com\",\"RpsTicket\":\"d=%s\"}"
-		"}",
-		ms_access_token);
+	snprintf(body, sizeof(body),
+			 "{"
+			 "\"RelyingParty\":\"http://auth.xboxlive.com\","
+			 "\"TokenType\":\"JWT\","
+			 "\"Properties\":{\"AuthMethod\":\"RPS\",\"SiteName\":\"user.auth.xboxlive.com\",\"RpsTicket\":\"d=%s\"}"
+			 "}",
+			 ms_access_token);
 
 	long http_code = 0;
 	char *xbl_json = http_post_json("https://user.auth.xboxlive.com/user/authenticate", body, NULL, &http_code);
@@ -443,13 +530,7 @@ static bool xbl_authenticate(
 	return true;
 }
 
-static void xsts_authorize(
-	const char *xbl_token,
-	char **out_xsts_token,
-	char **out_uhs,
-	char **out_xid
-)
-{
+static void xsts_authorize(const char *xbl_token, char **out_xsts_token, char **out_uhs, char **out_xid) {
 	if (out_xsts_token)
 		*out_xsts_token = NULL;
 	if (out_uhs)
@@ -459,12 +540,12 @@ static void xsts_authorize(
 
 	char body[8192];
 	snprintf(body, sizeof(body),
-		 "{"
-		 "\"Properties\":{\"SandboxId\":\"RETAIL\",\"UserTokens\":[\"%s\"]},"
-		 "\"RelyingParty\":\"http://xboxlive.com\","
-		 "\"TokenType\":\"JWT\""
-		 "}",
-		 xbl_token);
+			 "{"
+			 "\"Properties\":{\"SandboxId\":\"RETAIL\",\"UserTokens\":[\"%s\"]},"
+			 "\"RelyingParty\":\"http://xboxlive.com\","
+			 "\"TokenType\":\"JWT\""
+			 "}",
+			 xbl_token);
 
 	long http_code = 0;
 	char *xsts_json = http_post_json("https://xsts.auth.xboxlive.com/xsts/authorize", body, NULL, &http_code);
@@ -480,11 +561,10 @@ static void xsts_authorize(
 		 */
 		char *message = json_get_string_value(xsts_json, "Message");
 		xbl_token = xbl_token; /* silence unused in some builds */
-		obs_log(LOG_WARNING, "XSTS authorize HTTP %ld: %s", http_code,
-				xsts_json[0] ? xsts_json : "<empty body>");
+		obs_log(LOG_WARNING, "XSTS authorize HTTP %ld: %s", http_code, xsts_json[0] ? xsts_json : "<empty body>");
 		if (message) {
-				obs_log(LOG_WARNING, "XSTS error message: %s", message);
-				bfree(message);
+			obs_log(LOG_WARNING, "XSTS error message: %s", message);
+			bfree(message);
 		}
 		bfree(xsts_json);
 		return;
@@ -526,12 +606,7 @@ static void xsts_authorize(
 	bfree(xsts_json);
 }
 
-bool xbox_auth_interactive_get_xsts(
-	char **out_uhs,
-	char **out_xid,
-	char **out_xsts_token
-)
-{
+bool xbox_auth_interactive_get_xsts(char **out_uhs, char **out_xid, char **out_xsts_token) {
 	CLEAR(out_uhs);
 	CLEAR(out_xsts_token);
 	CLEAR(out_xid);
