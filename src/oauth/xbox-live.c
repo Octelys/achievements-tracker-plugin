@@ -10,6 +10,7 @@
 #include "oauth/callback-server.h"
 #include "oauth/util.h"
 #include "crypto/crypto.h"
+#include "text/base64.h"
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -166,6 +167,38 @@ static void retrieve_device_token(
 		crypto_key_to_string(ctx->device_key)
 	);
 
+	size_t signature_len = 0;
+	uint8_t *signature = crypto_sign_policy_header(
+		ctx->device_key,
+		SISU_AUTHENTICATE,
+		"",
+		json_body,
+		&signature_len
+	);
+
+	if (!signature) {
+		obs_log(LOG_WARNING, "Unable to sign the request for a device token");
+		bfree(json_body);
+		return;
+	}
+
+	/*
+	char *signature_b64 = base64_encode(
+		signature,
+		signature_len
+	);
+
+	bfree(signature);
+
+	if (!signature_b64) {
+		obs_log(LOG_WARNING, "Unable to base64-encode the request signature");
+		bfree(json_body);
+		return;
+	}
+
+	obs_log(LOG_DEBUG, "Signature (base64): %s", signature_b64);
+	//bfree(signature_b64);
+	*/
 	obs_log(LOG_WARNING, "Sending request for device token: %s", json_body);
 
 	long http_code = 0;
@@ -179,11 +212,15 @@ static void retrieve_device_token(
 	if (http_code < 200 || http_code >= 300) {
 		obs_log(LOG_WARNING, "SISU authentication failed. Received status code: %sd", http_code);
 		bfree(json_body);
+		if (xsts_json) {
+			bfree(xsts_json);
+		}
 		return;
 	}
 
 	if (!xsts_json) {
 		obs_log(LOG_WARNING, "SISU authentication failed (no response)");
+		bfree(json_body);
 		return;
 	}
 
@@ -562,6 +599,7 @@ static void xsts_authorize(const char *xbl_token, char **out_xsts_token, char **
 
 	long http_code = 0;
 	char *xsts_json = http_post_json("https://xsts.auth.xboxlive.com/xsts/authorize", body, NULL, &http_code);
+
 	if (!xsts_json) {
 		obs_log(LOG_WARNING, "XSTS authorize failed (no response)");
 		return;

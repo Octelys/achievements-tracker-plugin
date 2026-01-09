@@ -74,6 +74,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
   src/net/json/json.c
   src/oauth/callback-server.c
   src/oauth/util.c
+  src/text/base64.c
   src/oauth/xbox-live.c
   src/xbox/client.c
   src/io/state.c
