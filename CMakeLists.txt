@@ -57,11 +57,15 @@ if(NOT TARGET OpenSSL::Crypto)
   # Use module mode (FindOpenSSL.cmake)
   if(APPLE)
     # On macOS, only search in CMAKE_PREFIX_PATH (not system paths or Homebrew)
-    # NO_SYSTEM_ENVIRONMENT_PATH: Don't use PKG_CONFIG or other env vars
-    # NO_CMAKE_SYSTEM_PATH: Don't search /usr/local, /usr, etc.
-    find_package(OpenSSL REQUIRED
-      NO_SYSTEM_ENVIRONMENT_PATH
-      NO_CMAKE_SYSTEM_PATH)
+    # using CMAKE_FIND_USE_... variables to restrict FindOpenSSL search paths
+    # instead of find_package options which would force Config mode.
+    set(CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH OFF)
+    set(CMAKE_FIND_USE_CMAKE_SYSTEM_PATH OFF)
+
+    find_package(OpenSSL REQUIRED)
+
+    set(CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH ON)
+    set(CMAKE_FIND_USE_CMAKE_SYSTEM_PATH ON)
   else()
     find_package(OpenSSL REQUIRED)
   endif()
