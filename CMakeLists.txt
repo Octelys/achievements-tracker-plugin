@@ -24,12 +24,15 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 # OpenSSL
 #
-# IMPORTANT (macOS universal): do NOT prefer Homebrew's OpenSSL here.
-# Homebrew bottles are typically single-arch (arm64 on macos-*-arm64 runners),
-# which will break universal (arm64+x86_64) linking.
+# IMPORTANT (macOS universal): do NOT link against Homebrew's OpenSSL.
+# On arm64 runners, Homebrew's openssl bottle is arm64-only, which breaks
+# universal (arm64+x86_64) linking.
 #
 # obs-deps provides a universal OpenSSL and is already added to CMAKE_PREFIX_PATH
 # by the buildspec dependency bootstrap.
+if(APPLE)
+  list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local" )
+endif()
 
 # Prefer config mode so OpenSSL::Crypto exists
 find_package(OpenSSL CONFIG QUIET)
