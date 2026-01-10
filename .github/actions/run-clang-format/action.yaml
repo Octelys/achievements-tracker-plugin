@@ -50,7 +50,7 @@ runs:
         : Run clang-format 🐉
         if (( ${+RUNNER_DEBUG} )) setopt XTRACE
 
-        print ::group::Install clang-format-21å
+        print ::group::Install clang-format-21
         brew install --quiet obsproject/tools/clang-format@21
         print ::endgroup::
 
