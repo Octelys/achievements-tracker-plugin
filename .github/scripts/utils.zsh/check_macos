@@ -1,4 +1,4 @@
-autoload -Uz is-at-least log_group log_info log_error log_status
+autoload -Uz is-at-least log_group log_info log_error log_status mkcd
 
 log_info 'Checking for Homebrew...'
 if (( ! ${+commands[brew]} )) {
@@ -10,10 +10,83 @@ brew bundle --file ${SCRIPT_HOME}/.Brewfile
 rehash
 
 # Remove Homebrew's OpenSSL to prevent architecture conflicts with universal builds
-# obs-deps provides a universal OpenSSL that will be used instead
 if [[ -d ${HOMEBREW_PREFIX}/Cellar/openssl@3 ]] {
-  log_info 'Removing Homebrew OpenSSL (universal build will use obs-deps OpenSSL)...'
+  log_info 'Removing Homebrew OpenSSL to avoid architecture conflicts...'
   brew uninstall --ignore-dependencies openssl@3 || true
+}
+if [[ -d ${HOMEBREW_PREFIX}/Cellar/openssl@1.1 ]] {
+  brew uninstall --ignore-dependencies openssl@1.1 || true
+}
+
+# Derive project_root from SCRIPT_HOME (same as build-macos does)
+local project_root=${SCRIPT_HOME:A:h:h}
+
+# Download and install universal OpenSSL for macOS (obs-deps 2024+ no longer includes it)
+local openssl_version="3.4.0"
+local openssl_install_dir="${project_root}/.deps/openssl-universal"
+
+if [[ ! -f "${openssl_install_dir}/lib/libcrypto.a" ]] {
+  log_info "Downloading and building OpenSSL ${openssl_version} as universal binary..."
+
+  local openssl_src_dir="${project_root}/.deps/openssl-src"
+  local openssl_url="https://www.openssl.org/source/openssl-${openssl_version}.tar.gz"
+
+  mkcd "${project_root}/.deps"
+
+  if [[ ! -d "${openssl_src_dir}" ]] {
+    log_info "Downloading OpenSSL source..."
+    curl -L -o "openssl-${openssl_version}.tar.gz" "${openssl_url}"
+    tar xzf "openssl-${openssl_version}.tar.gz"
+    mv "openssl-${openssl_version}" openssl-src
+    rm "openssl-${openssl_version}.tar.gz"
+  }
+
+  # Build for arm64
+  log_info "Building OpenSSL for arm64..."
+  pushd "${openssl_src_dir}"
+  make clean 2>/dev/null || true
+  ./Configure darwin64-arm64-cc \
+    --prefix="${openssl_install_dir}-arm64" \
+    no-shared \
+    no-tests \
+    -mmacosx-version-min=12.0
+  make -j$(sysctl -n hw.ncpu)
+  make install_sw
+  popd
+
+  # Build for x86_64
+  log_info "Building OpenSSL for x86_64..."
+  pushd "${openssl_src_dir}"
+  make clean
+  ./Configure darwin64-x86_64-cc \
+    --prefix="${openssl_install_dir}-x86_64" \
+    no-shared \
+    no-tests \
+    -mmacosx-version-min=12.0
+  make -j$(sysctl -n hw.ncpu)
+  make install_sw
+  popd
+
+  # Create universal binaries using lipo
+  log_info "Creating universal OpenSSL libraries..."
+  mkdir -p "${openssl_install_dir}/lib"
+  mkdir -p "${openssl_install_dir}/include"
+
+  # Copy headers (same for both architectures)
+  cp -R "${openssl_install_dir}-arm64/include/openssl" "${openssl_install_dir}/include/"
+
+  # Create universal static libraries
+  for lib in libcrypto.a libssl.a; do
+    lipo -create \
+      "${openssl_install_dir}-arm64/lib/${lib}" \
+      "${openssl_install_dir}-x86_64/lib/${lib}" \
+      -output "${openssl_install_dir}/lib/${lib}"
+  done
+
+  # Cleanup architecture-specific builds
+  rm -rf "${openssl_install_dir}-arm64" "${openssl_install_dir}-x86_64" "${openssl_src_dir}"
+
+  log_info "Universal OpenSSL installed to ${openssl_install_dir}"
 }
 
 log_group

@@ -28,9 +28,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 # On arm64 runners, Homebrew's openssl bottle is arm64-only, which breaks
 # universal (arm64+x86_64) linking.
 #
-# obs-deps provides a universal OpenSSL under `.deps`, and buildspec bootstrap
-# will download it and add it to CMAKE_PREFIX_PATH. We prevent CMake from
-# searching in Homebrew paths.
+# obs-deps 2024+ no longer includes OpenSSL. We build a universal OpenSSL
+# in .deps/openssl-universal during the CI build. We prevent CMake from
+# searching in Homebrew paths to avoid arm64-only libraries.
 if(APPLE)
   # Ignore typical Homebrew prefixes to prevent finding arm64-only OpenSSL
   list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local")
@@ -38,34 +38,52 @@ if(APPLE)
   # For debugging: show CMAKE_PREFIX_PATH
   message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
 
-  # Set OPENSSL_ROOT_DIR to the obs-deps prefix
-  foreach(_prefix ${CMAKE_PREFIX_PATH})
-    if(_prefix MATCHES "obs-deps" AND NOT _prefix MATCHES "qt")
-      set(OPENSSL_ROOT_DIR "${_prefix}")
-      message(STATUS "Setting OPENSSL_ROOT_DIR to obs-deps: ${_prefix}")
-      break()
-    endif()
-  endforeach()
-
-  # Search for OpenSSL logic:
-  # 1. Try to find openssl/ssl.h in CMAKE_PREFIX_PATH/include to locate OpenSSL root.
-  # 2. If found, set OPENSSL_ROOT_DIR accordingly.
-  # 3. If not found, do NOT set OPENSSL_ROOT_DIR to a missing path, let find_package search.
-
   set(_found_openssl_root "")
-  find_path(_openssl_include_dir openssl/ssl.h PATHS ${CMAKE_PREFIX_PATH} PATH_SUFFIXES include NO_DEFAULT_PATH)
-  if(_openssl_include_dir)
-    get_filename_component(_root "${_openssl_include_dir}" DIRECTORY)
-    set(_found_openssl_root "${_root}")
-    message(STATUS "Found OpenSSL root via find_path: ${_found_openssl_root}")
-  else()
-    message(STATUS "OpenSSL headers not found in obs-deps. Relying on default search (skipping Homebrew).")
-  endif()
 
-  if(_found_openssl_root)
-    set(OPENSSL_ROOT_DIR "${_found_openssl_root}")
+  # First, check for our custom-built universal OpenSSL in .deps/openssl-universal
+  set(_openssl_universal_dir "${CMAKE_CURRENT_SOURCE_DIR}/.deps/openssl-universal")
+  if(EXISTS "${_openssl_universal_dir}/include/openssl/ssl.h")
+    message(STATUS "Found universal OpenSSL at: ${_openssl_universal_dir}")
+    set(OPENSSL_ROOT_DIR "${_openssl_universal_dir}")
+    set(_found_openssl_root "${_openssl_universal_dir}")
   else()
-    # Do NOT prevent find_package from searching by setting an invalid OPENSSL_ROOT_DIR
+    # Try to find openssl/ssl.h in various locations within CMAKE_PREFIX_PATH
+    find_path(_openssl_include_dir openssl/ssl.h
+      PATHS ${CMAKE_PREFIX_PATH}
+      PATH_SUFFIXES include ssl/include openssl/include
+      NO_DEFAULT_PATH
+    )
+
+    if(_openssl_include_dir)
+      get_filename_component(_root "${_openssl_include_dir}" DIRECTORY)
+      set(_found_openssl_root "${_root}")
+      message(STATUS "Found OpenSSL root via find_path: ${_found_openssl_root}")
+      set(OPENSSL_ROOT_DIR "${_found_openssl_root}")
+    else()
+      message(STATUS "OpenSSL headers not found in obs-deps or .deps/openssl-universal.")
+
+      # Debug: list contents of obs-deps directories to help diagnose
+      foreach(_prefix ${CMAKE_PREFIX_PATH})
+        if(_prefix MATCHES "obs-deps" AND NOT _prefix MATCHES "qt")
+          message(STATUS "Checking obs-deps directory: ${_prefix}")
+          if(EXISTS "${_prefix}/include")
+            message(STATUS "  include/ exists")
+          endif()
+          if(EXISTS "${_prefix}/lib")
+            message(STATUS "  lib/ exists")
+          endif()
+          if(EXISTS "${_prefix}/include/openssl")
+            message(STATUS "  include/openssl/ exists - OpenSSL headers found!")
+            set(OPENSSL_ROOT_DIR "${_prefix}")
+            set(_found_openssl_root "${_prefix}")
+          endif()
+        endif()
+      endforeach()
+
+      if(NOT _found_openssl_root)
+        message(STATUS "OpenSSL not found. Will search system paths (excluding Homebrew).")
+      endif()
+    endif()
   endif()
 endif()
 
