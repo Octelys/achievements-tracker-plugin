@@ -199,10 +199,10 @@ static void retrieve_device_token(struct device_flow_ctx *ctx) {
 
 	if (http_code < 200 || http_code >= 300) {
 		obs_log(LOG_WARNING, "Device authentication failed. Received status code: %d", http_code);
-		//bfree(json_body);
-		//if (device_token_json) {
+		// bfree(json_body);
+		// if (device_token_json) {
 		//	bfree(device_token_json);
-		//}
+		// }
 		return;
 	}
 
@@ -274,7 +274,7 @@ static void retrieve_xbox_token(struct device_flow_ctx *ctx) {
 }
 
 /*	********************************************************************************************************************
- 	Polls for an access token until the user has approved the device.
+	Polls for an access token until the user has approved the device.
 	*******************************************************************************************************************/
 static void *check_access_token_loop(void *param) {
 	struct device_flow_ctx *ctx = (struct device_flow_ctx *)param;

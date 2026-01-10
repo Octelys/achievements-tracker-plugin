@@ -394,19 +394,19 @@ static int write_pem_files(EVP_PKEY *pkey) {
 /*
 int main(void)
 {
-    EVP_PKEY *pkey = crypto_generate_p256_keypair();
-    if (!pkey) {
-        fprintf(stderr, "Failed to generate P-256 keypair\n");
-        return 1;
-    }
+	EVP_PKEY *pkey = crypto_generate_p256_keypair();
+	if (!pkey) {
+		fprintf(stderr, "Failed to generate P-256 keypair\n");
+		return 1;
+	}
 
-    if (!write_pem_files(pkey)) {
-        fprintf(stderr, "Failed to write PEM files\n");
-        EVP_PKEY_free(pkey);
-        return 1;
-    }
+	if (!write_pem_files(pkey)) {
+		fprintf(stderr, "Failed to write PEM files\n");
+		EVP_PKEY_free(pkey);
+		return 1;
+	}
 
-    EVP_PKEY_free(pkey);
-    return 0;
+	EVP_PKEY_free(pkey);
+	return 0;
 }
 */

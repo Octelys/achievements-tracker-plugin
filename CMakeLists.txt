@@ -154,20 +154,20 @@ if(BUILD_TESTING)
 
   add_executable(
     test_encoder
-    tests/test_encoder.c
+    test/test_encoder.c
     ${unity_SOURCE_DIR}/src/unity.c
     src/encoding/encoder.c
-    tests/stubs/bmem_stub.c
+    test/stubs/bmem_stub.c
   )
 
   target_include_directories(
     test_encoder
     PRIVATE
       # Use stub headers instead of real OBS headers for unit tests
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
       ${CMAKE_CURRENT_SOURCE_DIR}/src
       ${unity_SOURCE_DIR}/src
-      ${CMAKE_CURRENT_SOURCE_DIR}/tests
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
   )
 
   # Unity uses UNITY_INCLUDE_CONFIG_H to include a project-specific config header.

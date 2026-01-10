@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build_macos_dev"
 TEST_BINARY="$BUILD_DIR/RelWithDebInfo/test_encoder"
-ENTITLEMENTS="$PROJECT_ROOT/tests/test_entitlements.plist"
+ENTITLEMENTS="$PROJECT_ROOT/test/test_entitlements.plist"
 
 if [[ ! -f "$TEST_BINARY" ]]; then
     echo "Error: Test binary not found at $TEST_BINARY"
