@@ -47,17 +47,28 @@ if(NOT TARGET OpenSSL::Crypto)
   find_package(OpenSSL REQUIRED)
 endif()
 
-# If OpenSSL resolves to Homebrew on macOS, fail early: Homebrew bottles are often single-arch.
+# If OpenSSL resolves to Homebrew on macOS, fail early ONLY for universal builds.
+# Homebrew bottles are often single-arch (arm64 on Apple Silicon Macs), which
+# breaks universal (arm64+x86_64) builds. For single-arch dev builds, allow it.
 if(APPLE)
-  if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
-    message(
-      FATAL_ERROR
-      "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is often single-arch.\n"
-      "This breaks universal (arm64+x86_64) builds.\n"
-      "Install/use a universal OpenSSL (CI builds one at .deps/openssl-universal).\n"
-      "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
-      "Note: BUILD_TESTING links OpenSSL too, so this must be fixed rather than ignored."
-    )
+  list(LENGTH CMAKE_OSX_ARCHITECTURES _arch_count)
+  if(_arch_count GREATER 1)
+    # Universal build - require non-Homebrew OpenSSL
+    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+      message(
+        FATAL_ERROR
+        "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is often single-arch.\n"
+        "This breaks universal (arm64+x86_64) builds.\n"
+        "Install/use a universal OpenSSL (CI builds one at .deps/openssl-universal).\n"
+        "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
+        "For local testing, use the 'macos-dev' preset which builds for native arch only."
+      )
+    endif()
+  else()
+    # Single-arch build - Homebrew OpenSSL is fine
+    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+      message(STATUS "Using Homebrew OpenSSL for single-arch dev build: ${OPENSSL_CRYPTO_LIBRARY}")
+    endif()
   endif()
 endif()
 
@@ -67,18 +78,20 @@ if(TARGET OpenSSL::Crypto)
     message(STATUS "Successfully linked OpenSSL::Crypto target")
   endif()
 else()
-  # Module mode found it but didn't create imported target - verify and link manually
+  # Module mode found it but didn't create imported target - link manually
   if(APPLE)
     message(STATUS "Found OpenSSL at: ${OPENSSL_CRYPTO_LIBRARY}")
 
-    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+    # Only fail on Homebrew for universal builds
+    list(LENGTH CMAKE_OSX_ARCHITECTURES _arch_count2)
+    if(_arch_count2 GREATER 1 AND OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
       message(
         FATAL_ERROR
         "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is arm64-only.\n"
         "This breaks universal (arm64+x86_64) builds.\n"
         "The buildspec system should have downloaded universal OpenSSL from obs-deps.\n"
         "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
-        "If you see this error, Homebrew's OpenSSL may need to be uninstalled."
+        "For local testing, use the 'macos-dev' preset which builds for native arch only."
       )
     endif()
   endif()
@@ -139,11 +152,22 @@ if(BUILD_TESTING)
   # Unity test framework (vendored via FetchContent)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FetchUnity.cmake)
 
-  add_executable(test_encoder tests/test_encoder.c ${unity_SOURCE_DIR}/src/unity.c src/encoding/encoder.c)
+  add_executable(
+    test_encoder
+    tests/test_encoder.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/encoding/encoder.c
+    tests/stubs/bmem_stub.c
+  )
 
   target_include_directories(
     test_encoder
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${unity_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    PRIVATE
+      # Use stub headers instead of real OBS headers for unit tests
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests
   )
 
   # Unity uses UNITY_INCLUDE_CONFIG_H to include a project-specific config header.
@@ -168,9 +192,22 @@ if(BUILD_TESTING)
     endif()
   endif()
 
-  # OBS memory helpers (bzalloc/bfree)
-  # The unit under test uses bzalloc/bfree, so link libobs.
-  target_link_libraries(test_encoder PRIVATE OBS::libobs)
+  # Note: We use bmem_stub.c instead of linking OBS::libobs to avoid
+  # heavy runtime dependencies (FFmpeg, etc.) for simple unit tests.
 
-  add_test(NAME test_encoder COMMAND test_encoder)
+  # On macOS with dev builds (single-arch using Homebrew OpenSSL), we need to
+  # disable library validation. CI builds use universal OpenSSL which doesn't
+  # have this issue.
+  if(APPLE)
+    list(LENGTH CMAKE_OSX_ARCHITECTURES _test_arch_count)
+    if(_test_arch_count LESS_EQUAL 1)
+      # Single-arch dev build - use wrapper script that re-signs with entitlements
+      add_test(NAME test_encoder COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run-tests.sh")
+    else()
+      # Universal build (CI) - direct execution works fine
+      add_test(NAME test_encoder COMMAND test_encoder)
+    endif()
+  else()
+    add_test(NAME test_encoder COMMAND test_encoder)
+  endif()
 endif()

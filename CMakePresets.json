@@ -46,6 +46,24 @@
       }
     },
     {
+      "name": "macos-dev",
+      "displayName": "macOS Dev (native arch only)",
+      "description": "Build for macOS 12.0+ (native architecture only, for local dev/testing)",
+      "inherits": ["template"],
+      "binaryDir": "${sourceDir}/build_macos_dev",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "generator": "Xcode",
+      "warnings": {"dev": true, "deprecated": true},
+      "cacheVariables": {
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "12.0",
+        "BUILD_TESTING": true
+      }
+    },
+    {
       "name": "windows-x64",
       "displayName": "Windows x64",
       "description": "Build for Windows x64",
