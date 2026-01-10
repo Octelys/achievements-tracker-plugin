@@ -49,7 +49,8 @@ if(APPLE)
   else()
     # Try to find openssl/ssl.h in various locations within CMAKE_PREFIX_PATH
     find_path(
-      _openssl_include_dir openssl/ssl.h
+      _openssl_include_dir
+      openssl/ssl.h
       PATHS ${CMAKE_PREFIX_PATH}
       PATH_SUFFIXES include ssl/include openssl/include
       NO_DEFAULT_PATH
