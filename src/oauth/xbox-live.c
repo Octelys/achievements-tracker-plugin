@@ -149,21 +149,21 @@ static void retrieve_device_token(struct device_flow_ctx *ctx) {
 	char json_body[8192];
 	snprintf(json_body, sizeof(json_body),
 			 "{"
-			 "	\"Properties\": {"
-			 "		\"AuthMethod\":\"ProofOfPossession\","
-			 "		\"Id\":\"{%s}\","
-			 "		\"DeviceType\":\"%s\","
-			 "		\"SerialNumber\":\"{%s}\","
-			 "		\"Version\":\"0.0.0\","
-			 "		\"ProofKey\":%s"
-			 "	},"
-			 "	\"RelyingParty\":\"http://auth.xboxlive.com\","
-			 "	\"TokenType\":\"JWT\""
+			 "\"Properties\":{"
+			 "\"AuthMethod\":\"ProofOfPossession\","
+			 "\"Id\":\"{%s}\","
+			 "\"DeviceType\":\"%s\","
+			 "\"SerialNumber\":\"{%s}\","
+			 "\"Version\":\"0.0.0\","
+			 "\"ProofKey\":%s"
+			 "},"
+			 "\"RelyingParty\":\"http://auth.xboxlive.com\","
+			 "\"TokenType\":\"JWT\""
 			 "}",
 			 kRandomUuid, kDeviceType, kRandomSerialNumber, crypto_key_to_string(ctx->device_key));
 
 	size_t signature_len = 0;
-	uint8_t *signature = crypto_sign_policy_header(ctx->device_key, SISU_AUTHENTICATE, "", json_body, &signature_len);
+	uint8_t *signature = crypto_sign_policy_header(ctx->device_key, DEVICE_AUTHENTICATE, "", json_body, &signature_len);
 
 	if (!signature) {
 		obs_log(LOG_WARNING, "Unable to sign the request for a device token");
@@ -181,20 +181,19 @@ static void retrieve_device_token(struct device_flow_ctx *ctx) {
 
 	obs_log(LOG_WARNING, "Signature (base64): %s", signature_b64);
 
-	char *extra_headers = NULL;
-	if (signature_b64) {
-		extra_headers = bmalloc(strlen("Signature: ") + strlen(signature_b64) + 1);
-		if (extra_headers)
-			snprintf(extra_headers, strlen("Signature: ") + strlen(signature_b64) + 1, "Signature: %s", signature_b64);
-	}
+	char extra_headers[4096];
+	snprintf(extra_headers, sizeof(extra_headers),
+			 "Signature: %s\r\n"
+			 "Cache-Control: no-store, must-revalidate, no-cache\r\n"
+			 "x-xbl-contract-version: 1\r\n"
+			 "accept: application/json",
+			 signature_b64);
 
 	obs_log(LOG_WARNING, "Sending request for device token: %s", json_body);
 
 	long http_code = 0;
 	char *device_token_json = http_post_json(DEVICE_AUTHENTICATE, json_body, extra_headers, &http_code);
 
-	if (extra_headers)
-		bfree(extra_headers);
 
 	bfree(signature_b64);
 
