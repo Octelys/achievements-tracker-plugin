@@ -34,6 +34,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 if(APPLE)
   # Ignore typical Homebrew prefixes to prevent finding arm64-only OpenSSL
   list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+
+  # For debugging: show CMAKE_PREFIX_PATH
+  message(DEBUG "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
 endif()
 
 # Try config mode first (creates OpenSSL::Crypto target)
@@ -42,9 +45,12 @@ find_package(OpenSSL CONFIG QUIET)
 if(NOT TARGET OpenSSL::Crypto)
   # Fallback to module mode
   if(APPLE)
-    # On macOS, only search in CMAKE_PREFIX_PATH (set by buildspec to obs-deps)
-    # This prevents finding Homebrew's OpenSSL
-    find_package(OpenSSL REQUIRED NO_DEFAULT_PATH)
+    # On macOS, search in CMAKE_PREFIX_PATH but not system environment paths
+    # NO_SYSTEM_ENVIRONMENT_PATH prevents finding Homebrew via PKG_CONFIG or other env vars
+    # NO_CMAKE_SYSTEM_PATH prevents searching /usr/local etc.
+    find_package(OpenSSL REQUIRED
+      NO_SYSTEM_ENVIRONMENT_PATH
+      NO_CMAKE_SYSTEM_PATH)
   else()
     find_package(OpenSSL REQUIRED)
   endif()
@@ -52,14 +58,21 @@ endif()
 
 if(TARGET OpenSSL::Crypto)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OpenSSL::Crypto)
+  if(APPLE)
+    message(STATUS "Using OpenSSL (CONFIG mode)")
+  endif()
 else()
   # Module mode found it - verify it's not from Homebrew on macOS
-  if(APPLE AND OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
-    message(FATAL_ERROR
-      "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is arm64-only.\n"
-      "This breaks universal (arm64+x86_64) builds.\n"
-      "The buildspec system should have downloaded universal OpenSSL from obs-deps.\n"
-      "If you see this error, Homebrew's OpenSSL may need to be uninstalled.")
+  if(APPLE)
+    message(STATUS "Using OpenSSL from: ${OPENSSL_CRYPTO_LIBRARY} (MODULE mode)")
+
+    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+      message(FATAL_ERROR
+        "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is arm64-only.\n"
+        "This breaks universal (arm64+x86_64) builds.\n"
+        "The buildspec system should have downloaded universal OpenSSL from obs-deps.\n"
+        "If you see this error, Homebrew's OpenSSL may need to be uninstalled.")
+    endif()
   endif()
 
   target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
