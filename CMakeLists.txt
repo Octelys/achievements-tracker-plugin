@@ -35,9 +35,31 @@ if(APPLE)
   list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local")
 
   set(_obs_deps_prefix "${CMAKE_CURRENT_SOURCE_DIR}/.deps")
+
+  # Set paths for both CONFIG and MODULE mode
+  set(OPENSSL_ROOT_DIR "${_obs_deps_prefix}")
+  set(OPENSSL_USE_STATIC_LIBS FALSE)
+
   if(EXISTS "${_obs_deps_prefix}/lib/cmake/OpenSSL")
     set(OpenSSL_DIR "${_obs_deps_prefix}/lib/cmake/OpenSSL")
-    set(OPENSSL_ROOT_DIR "${_obs_deps_prefix}")
+  endif()
+
+  # For module mode: set explicit paths to the universal OpenSSL
+  if(EXISTS "${_obs_deps_prefix}/include")
+    set(OPENSSL_INCLUDE_DIR "${_obs_deps_prefix}/include")
+  endif()
+
+  # Find the crypto library (try both .dylib and .a)
+  if(EXISTS "${_obs_deps_prefix}/lib/libcrypto.dylib")
+    set(OPENSSL_CRYPTO_LIBRARY "${_obs_deps_prefix}/lib/libcrypto.dylib")
+  elseif(EXISTS "${_obs_deps_prefix}/lib/libcrypto.a")
+    set(OPENSSL_CRYPTO_LIBRARY "${_obs_deps_prefix}/lib/libcrypto.a")
+  endif()
+
+  if(EXISTS "${_obs_deps_prefix}/lib/libssl.dylib")
+    set(OPENSSL_SSL_LIBRARY "${_obs_deps_prefix}/lib/libssl.dylib")
+  elseif(EXISTS "${_obs_deps_prefix}/lib/libssl.a")
+    set(OPENSSL_SSL_LIBRARY "${_obs_deps_prefix}/lib/libssl.a")
   endif()
 endif()
 
@@ -46,6 +68,7 @@ find_package(OpenSSL CONFIG QUIET)
 
 if(TARGET OpenSSL::Crypto)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OpenSSL::Crypto)
+  message(STATUS "Using OpenSSL from: ${OPENSSL_ROOT_DIR} (CONFIG mode)")
 else()
   # Fallback to module mode (no imported targets)
   find_package(OpenSSL REQUIRED)
@@ -56,6 +79,7 @@ else()
                         "Please ensure obs-deps is downloaded to .deps directory with universal OpenSSL.")
   endif()
 
+  message(STATUS "Using OpenSSL from: ${OPENSSL_CRYPTO_LIBRARY} (MODULE mode)")
   target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
 endif()
