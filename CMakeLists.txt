@@ -274,6 +274,24 @@ if(BUILD_TESTING)
     endif()
   endif()
 
+  # OpenSSL is required by test_crypto (EVP/BIO/BN/ECDSA helpers).
+  if(TARGET OpenSSL::Crypto)
+    target_link_libraries(test_crypto PRIVATE OpenSSL::Crypto)
+    if(TARGET OpenSSL::SSL)
+      target_link_libraries(test_crypto PRIVATE OpenSSL::SSL)
+    endif()
+
+    if(OPENSSL_INCLUDE_DIR)
+      target_include_directories(test_crypto PRIVATE ${OPENSSL_INCLUDE_DIR})
+    endif()
+  else()
+    target_include_directories(test_crypto PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(test_crypto PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+    if(OPENSSL_SSL_LIBRARY)
+      target_link_libraries(test_crypto PRIVATE ${OPENSSL_SSL_LIBRARY})
+    endif()
+  endif()
+
   # Note: We use bmem_stub.c instead of linking OBS::libobs to avoid
   # heavy runtime dependencies (FFmpeg, etc.) for simple unit tests.
 endif()
