@@ -6,12 +6,25 @@
 extern "C" {
 #endif
 
-typedef struct Device {
+#define FREE(p)	\
+if (p)			\
+    bfree(p);
+
+typedef struct device {
     /* unique identifier for the device */
     const char     *uuid;
+    const char     *serial_number;
     /* proof of ownership key pair */
     const EVP_PKEY *keys;
-} Device;
+} device_t;
+
+typedef struct device_token {
+    const char *token;
+} device_token_t;
+
+typedef struct xbox_live_authenticate_result {
+    const char *error_message;
+} xbox_live_authenticate_result_t;
 
 #ifdef __cplusplus
 }

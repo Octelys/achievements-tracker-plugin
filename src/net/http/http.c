@@ -36,7 +36,7 @@ static int curl_debug_cb(CURL *handle, curl_infotype type, char *data, size_t si
     case CURLINFO_TEXT:
     case CURLINFO_HEADER_IN:
     case CURLINFO_HEADER_OUT:
-        obs_log(LOG_WARNING, "curl: %.*s", (int)size, data);
+        obs_log(LOG_DEBUG, "curl: %.*s", (int)size, data);
         break;
     default:
         /* CURLINFO_DATA_IN/OUT can be noisy; omit by default */

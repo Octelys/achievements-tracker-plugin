@@ -398,7 +398,7 @@ void test_crypto_sign_policy_header_output_structure(void) {
  * Test: Verify that crypto_generate_p256_keypair creates a valid key.
  */
 void test_crypto_generate_p256_keypair(void) {
-    EVP_PKEY *pkey = crypto_generate_key();
+    EVP_PKEY *pkey = crypto_generate_keys();
     TEST_ASSERT_NOT_NULL(pkey);
 
     /* Verify it's an EC key */
@@ -411,10 +411,10 @@ void test_crypto_generate_p256_keypair(void) {
  * Test: Verify that crypto_key_to_string produces valid JSON.
  */
 void test_crypto_key_to_string(void) {
-    EVP_PKEY *pkey = crypto_generate_key();
+    EVP_PKEY *pkey = crypto_generate_keys();
     TEST_ASSERT_NOT_NULL(pkey);
 
-    char *json = crypto_to_string(pkey);
+    char *json = crypto_to_string(pkey, true);
     TEST_ASSERT_NOT_NULL(json);
 
     /* Verify JSON contains expected fields */
@@ -478,7 +478,7 @@ void test_crypto_verify_known_signature(void) {
  */
 void test_crypto_sign_and_verify_roundtrip(void) {
     /* Generate a fresh keypair */
-    EVP_PKEY *pkey = crypto_generate_key();
+    EVP_PKEY *pkey = crypto_generate_keys();
     TEST_ASSERT_NOT_NULL(pkey);
 
     const char *url        = "https://sisu.xboxlive.com/authorize";
@@ -593,7 +593,7 @@ void test_crypto_sign_and_verify_roundtrip(void) {
  * Test: crypto_sign_policy_header returns NULL for invalid inputs.
  */
 void test_crypto_sign_policy_header_null_inputs(void) {
-    EVP_PKEY *pkey = crypto_generate_key();
+    EVP_PKEY *pkey = crypto_generate_keys();
     TEST_ASSERT_NOT_NULL(pkey);
 
     size_t out_len = 0;
@@ -616,9 +616,24 @@ void test_crypto_sign_policy_header_null_inputs(void) {
     EVP_PKEY_free(pkey);
 }
 
+void test_crypto_to_from_roundtrip(void) {
+
+    //  Arrange.
+    EVP_PKEY *original_keys = crypto_generate_keys();
+
+    //  Act.
+    char *serialized_keys = crypto_to_string(original_keys, true);
+    EVP_PKEY *deserialized_keys = crypto_from_string(serialized_keys, true);
+    char *reserialized_keys = crypto_to_string(deserialized_keys, true);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_STRING(serialized_keys, reserialized_keys);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
+    RUN_TEST(test_crypto_to_from_roundtrip);
     RUN_TEST(test_crypto_generate_p256_keypair);
     RUN_TEST(test_crypto_key_to_string);
     RUN_TEST(test_crypto_sign_policy_header_output_structure);

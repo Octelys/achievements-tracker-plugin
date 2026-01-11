@@ -2,6 +2,7 @@
 #include <openssl/ec.h>
 #include <openssl/pem.h>
 #include <openssl/core_names.h>
+#include <openssl/param_build.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -11,9 +12,11 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "common/types.h"
 #include "net/json/json.h"
 
-static void crypto_print_key(EVP_PKEY *pkey) {
+void crypto_print_keys(const EVP_PKEY *pkey) {
+
     if (!pkey) {
         obs_log(LOG_ERROR, "[xbl] failed to export EC key pair for debug: pkey is NULL");
         return;
@@ -26,7 +29,8 @@ static void crypto_print_key(EVP_PKEY *pkey) {
     }
 
     /* Export public key (SPKI format) */
-    obs_log(LOG_DEBUG, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
+    obs_log(LOG_WARNING, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
+    printf("=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
     if (PEM_write_bio_PUBKEY(bio, pkey)) {
         char *pem_data = NULL;
         long  pem_len  = BIO_get_mem_data(bio, &pem_data);
@@ -34,6 +38,7 @@ static void crypto_print_key(EVP_PKEY *pkey) {
             char *pub_pem = bzalloc(pem_len + 1);
             memcpy(pub_pem, pem_data, pem_len);
             pub_pem[pem_len] = '\0';
+            obs_log(LOG_WARNING, "%s", pub_pem);
             printf("%s", pub_pem);
             bfree(pub_pem);
         }
@@ -45,7 +50,8 @@ static void crypto_print_key(EVP_PKEY *pkey) {
     BIO_reset(bio);
 
     /* Export private key (PKCS8 format) */
-    obs_log(LOG_DEBUG, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
+    obs_log(LOG_WARNING, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
+    printf("=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
     if (PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, NULL, NULL)) {
         char *pem_data = NULL;
         long  pem_len  = BIO_get_mem_data(bio, &pem_data);
@@ -53,6 +59,7 @@ static void crypto_print_key(EVP_PKEY *pkey) {
             char *priv_pem = bzalloc(pem_len + 1);
             memcpy(priv_pem, pem_data, pem_len);
             priv_pem[pem_len] = '\0';
+            obs_log(LOG_WARNING, "%s", priv_pem);
             printf("%s", priv_pem);
             bfree(priv_pem);
         }
@@ -103,7 +110,8 @@ static char *b64url_encode(const unsigned char *in, size_t inlen) {
 
 /* Extract uncompressed EC public point (04 || X || Y) from an EVP_PKEY using
  * OpenSSL 3 params API. */
-static int get_ec_public_point_uncompressed(EVP_PKEY *pkey, unsigned char *out, size_t out_size, size_t *out_len) {
+static int get_ec_public_point_uncompressed(const EVP_PKEY *pkey, unsigned char *out, size_t out_size,
+                                            size_t *out_len) {
     if (out_len)
         *out_len = 0;
 
@@ -127,17 +135,82 @@ static int get_ec_public_point_uncompressed(EVP_PKEY *pkey, unsigned char *out, 
     return 1;
 }
 
+/*
+ * Extract the P-256 private scalar as a fixed 32-byte big-endian value.
+ *
+ * Some OpenSSL builds/providers don't expose OSSL_PKEY_PARAM_PRIV_KEY via the params
+ * API for all EVP_PKEY instances, even if a private key is present. In that case,
+ * fall back to the legacy EC_KEY accessor.
+ */
+static int get_p256_private_scalar_32(const EVP_PKEY *pkey, unsigned char out32[32]) {
+    if (!pkey || !out32)
+        return 0;
+
+    /* Preferred (OpenSSL 3): params API */
+    size_t priv_len = 0;
+    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0, &priv_len) == 1 && priv_len > 0) {
+        unsigned char tmp[32];
+        if (priv_len > sizeof(tmp))
+            return 0;
+
+        memset(tmp, 0, sizeof(tmp));
+        if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, tmp, sizeof(tmp), &priv_len) != 1)
+            return 0;
+
+        memset(out32, 0, 32);
+        if (priv_len < 32) {
+            memcpy(out32 + (32 - priv_len), tmp, priv_len);
+        } else if (priv_len == 32) {
+            memcpy(out32, tmp, 32);
+        } else {
+            return 0;
+        }
+
+        return 1;
+    }
+
+#if defined(OPENSSL_VERSION_MAJOR) && OPENSSL_VERSION_MAJOR >= 3
+#if defined(__GNUC__) || defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
+
+    /* Fallback (legacy): EC_KEY private BIGNUM */
+    const EC_KEY *ec = EVP_PKEY_get0_EC_KEY((EVP_PKEY *)pkey);
+    if (!ec)
+        return 0;
+
+    const BIGNUM *d = EC_KEY_get0_private_key(ec);
+    if (!d)
+        return 0;
+
+    memset(out32, 0, 32);
+    /* BN_bn2binpad returns number of bytes written or -1 on error */
+    if (BN_bn2binpad(d, out32, 32) != 32)
+        return 0;
+
+#if defined(OPENSSL_VERSION_MAJOR) && OPENSSL_VERSION_MAJOR >= 3
+#if defined(__GNUC__) || defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+#endif
+
+    return 1;
+}
+
 /**
- * Converts an EC P-256 public key to a JWK JSON string.
  *
  * @param pkey
+ * @param include_private
  * @return
  */
-char *crypto_to_string(EVP_PKEY *pkey) {
+char *crypto_to_string(const EVP_PKEY *pkey, bool include_private) {
     unsigned char point[1 + 32 + 32];
     size_t        point_len         = 0;
     char         *x64               = NULL;
     char         *y64               = NULL;
+    char         *d64               = NULL;
     char         *returned_key_json = NULL;
 
     if (!pkey)
@@ -156,19 +229,40 @@ char *crypto_to_string(EVP_PKEY *pkey) {
     if (!x64 || !y64)
         goto done;
 
+    if (include_private) {
+        unsigned char priv32[32];
+
+        if (!get_p256_private_scalar_32(pkey, priv32))
+            goto done;
+
+        d64 = b64url_encode(priv32, sizeof(priv32));
+        if (!d64)
+            goto done;
+    }
+
     char key_json[4096];
 
-    snprintf(key_json,
-             sizeof(key_json),
-             "{\"kty\":\"EC\",\"x\":\"%s\",\"y\":\"%s\",\"crv\":\"P-256\",\"alg\":\"ES256\",\"use\":\"sig\"}",
-             x64,
-             y64);
+    if (include_private) {
+        snprintf(key_json,
+                 sizeof(key_json),
+                 "{\"kty\":\"EC\",\"x\":\"%s\",\"y\":\"%s\",\"d\":\"%s\",\"crv\":\"P-256\",\"alg\":\"ES256\",\"use\":\"sig\"}",
+                 x64,
+                 y64,
+                 d64);
+    } else {
+        snprintf(key_json,
+                 sizeof(key_json),
+                 "{\"kty\":\"EC\",\"x\":\"%s\",\"y\":\"%s\",\"crv\":\"P-256\",\"alg\":\"ES256\",\"use\":\"sig\"}",
+                 x64,
+                 y64);
+    }
 
     returned_key_json = bstrdup(key_json);
 
 done:
     free(x64);
     free(y64);
+    free(d64);
     return returned_key_json;
 }
 
@@ -223,63 +317,72 @@ static int b64url_decode_32(const char *in, uint8_t out[32]) {
 }
 
 /**
- * Converts a JWK JSON string to an EC P-256 public key.
+ * Parses an EC P-256 key from a JSON string and generates an EVP_PKEY structure.
  *
- * @param key_json
- * @return
+ * @param key_json A JSON string containing the key attributes. It must include at least "kty", "crv", "x", and "y".
+ *                 If `expect_private` is true, it must also contain "d".
+ * @param expect_private A boolean flag indicating whether to expect a private key ("d" attribute) in the JSON string.
+ * @return A pointer to an `EVP_PKEY` structure representing the parsed key if successful, or NULL on failure.
  */
-EVP_PKEY *crypto_from_string(const char *key_json) {
+EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
+
     if (!key_json)
         return NULL;
 
-    char *kty = json_get_string_value(key_json, "kty");
+    EVP_PKEY *pkey      = NULL;
+    char     *kty       = NULL;
+    char     *crv       = NULL;
+    char     *x64       = NULL;
+    char     *y64       = NULL;
+    char     *d64_local = NULL;
+
+    kty = json_read_string(key_json, "kty");
 
     if (!kty) {
         return NULL;
     }
 
     if (strcmp(kty, "EC") != 0) {
-        bfree(kty);
-        return NULL;
+        goto done;
     }
 
-    char *crv = json_get_string_value(key_json, "crv");
+    crv = json_read_string(key_json, "crv");
 
     if (!crv) {
-        bfree(kty);
-        return NULL;
+        goto done;
     }
 
     if (strcmp(crv, "P-256") != 0) {
-        bfree(crv);
-        bfree(kty);
-        return NULL;
+        goto done;
     }
 
-    char *x64 = json_get_string_value(key_json, "x");
+    x64 = json_read_string(key_json, "x");
 
     if (!x64) {
-        bfree(crv);
-        bfree(kty);
-        return NULL;
+        goto done;
     }
 
-    char *y64 = json_get_string_value(key_json, "y");
+    y64 = json_read_string(key_json, "y");
 
     if (!y64) {
-        bfree(x64);
-        bfree(crv);
-        bfree(kty);
-        return NULL;
+        goto done;
+    }
+
+    if (expect_private) {
+        d64_local = json_read_string(key_json, "d");
+
+        if (!d64_local) {
+            goto done;
+        }
     }
 
     uint8_t x[32], y[32];
     if (!b64url_decode_32(x64, x)) {
-        return NULL;
+        goto done;
     }
 
     if (!b64url_decode_32(y64, y)) {
-        return NULL;
+        goto done;
     }
 
     uint8_t pub[1 + 32 + 32];
@@ -287,29 +390,84 @@ EVP_PKEY *crypto_from_string(const char *key_json) {
     memcpy(pub + 1, x, 32);
     memcpy(pub + 1 + 32, y, 32);
 
-    EVP_PKEY     *pkey = NULL;
-    EVP_PKEY_CTX *ctx  = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
-    if (!ctx) {
-        return NULL;
+    uint8_t priv[32];
+    if (expect_private) {
+        if (!b64url_decode_32(d64_local, priv))
+            goto done;
     }
+
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    if (!ctx)
+        goto done;
 
     if (EVP_PKEY_fromdata_init(ctx) != 1) {
         EVP_PKEY_CTX_free(ctx);
-        return NULL;
+        goto done;
     }
 
-    OSSL_PARAM params[3];
-    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)"prime256v1", 0);
-    params[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub, sizeof(pub));
-    params[2] = OSSL_PARAM_construct_end();
+    if (expect_private) {
+        /* EC private key import: use OSSL_PARAM_BLD to properly construct the BIGNUM param. */
+        BIGNUM *d_bn = BN_bin2bn(priv, (int)sizeof(priv), NULL);
+        if (!d_bn) {
+            EVP_PKEY_CTX_free(ctx);
+            goto done;
+        }
 
-    if (EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_PUBLIC_KEY, params) != 1) {
-        EVP_PKEY_CTX_free(ctx);
-        return NULL;
+        OSSL_PARAM_BLD *bld = OSSL_PARAM_BLD_new();
+        if (!bld) {
+            BN_free(d_bn);
+            EVP_PKEY_CTX_free(ctx);
+            goto done;
+        }
+
+        if (!OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, "prime256v1", 0) ||
+            !OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pub, sizeof(pub)) ||
+            !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, d_bn)) {
+            OSSL_PARAM_BLD_free(bld);
+            BN_free(d_bn);
+            EVP_PKEY_CTX_free(ctx);
+            goto done;
+        }
+
+        OSSL_PARAM *params = OSSL_PARAM_BLD_to_param(bld);
+        OSSL_PARAM_BLD_free(bld);
+        BN_free(d_bn);
+
+        if (!params) {
+            EVP_PKEY_CTX_free(ctx);
+            goto done;
+        }
+
+        if (EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEYPAIR, params) != 1) {
+            OSSL_PARAM_free(params);
+            EVP_PKEY_CTX_free(ctx);
+            goto done;
+        }
+
+        OSSL_PARAM_free(params);
+    } else {
+        OSSL_PARAM params[3];
+        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, (char *)"prime256v1", 0);
+        params[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY, pub, sizeof(pub));
+        params[2] = OSSL_PARAM_construct_end();
+
+        if (EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_PUBLIC_KEY, params) != 1) {
+            EVP_PKEY_CTX_free(ctx);
+            goto done;
+        }
     }
 
     EVP_PKEY_CTX_free(ctx);
-    return pkey; /* caller frees with EVP_PKEY_free() */
+
+done:
+    FREE(kty);
+    FREE(crv);
+    FREE(x64);
+    FREE(y64);
+    if (expect_private)
+        FREE(d64_local);
+
+    return pkey;
 }
 
 /**
@@ -317,7 +475,7 @@ EVP_PKEY *crypto_from_string(const char *key_json) {
  *
  * @return
  */
-EVP_PKEY *crypto_generate_key(void) {
+EVP_PKEY *crypto_generate_keys(void) {
     EVP_PKEY     *pkey = NULL;
     EVP_PKEY_CTX *ctx  = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
 
@@ -338,8 +496,6 @@ EVP_PKEY *crypto_generate_key(void) {
         goto fail;
 
     EVP_PKEY_CTX_free(ctx);
-
-    crypto_print_key(pkey);
 
     return pkey;
 
@@ -406,7 +562,7 @@ static bool parse_url_path_and_query(const char *url, const char **out_begin, si
     return true;
 }
 
-static bool ecdsa_sign_p1363_sha256(EVP_PKEY *pkey, const uint8_t *data, size_t data_len, uint8_t out_sig64[64]) {
+static bool ecdsa_sign_p1363_sha256(const EVP_PKEY *pkey, const uint8_t *data, size_t data_len, uint8_t out_sig64[64]) {
 
     bool           ok       = false;
     EVP_MD_CTX    *mdctx    = NULL;
@@ -424,7 +580,7 @@ static bool ecdsa_sign_p1363_sha256(EVP_PKEY *pkey, const uint8_t *data, size_t 
     if (!mdctx)
         goto done;
 
-    if (EVP_DigestSignInit(mdctx, &pkey_ctx, EVP_sha256(), NULL, pkey) != 1)
+    if (EVP_DigestSignInit(mdctx, &pkey_ctx, EVP_sha256(), NULL, (EVP_PKEY *)pkey) != 1)
         goto done;
 
     if (EVP_DigestSignUpdate(mdctx, data, data_len) != 1)
@@ -486,14 +642,16 @@ done:
  * @param out_len
  * @return
  */
-uint8_t *crypto_sign(EVP_PKEY *private_key, const char *url, const char *authorization_token, const char *payload,
+uint8_t *crypto_sign(const EVP_PKEY *private_key, const char *url, const char *authorization_token, const char *payload,
                      size_t *out_len) {
 
     if (out_len)
         *out_len = 0;
 
-    if (!private_key || !url || !authorization_token || !payload || !out_len)
+    if (!private_key || !url || !authorization_token || !payload || !out_len) {
+        obs_log(LOG_ERROR, "Unable to create signature: invalid parameters");
         return NULL;
+    }
 
     const uint32_t policy_version   = 1;
     const uint64_t unix_seconds     = (uint64_t)time(NULL);
@@ -502,8 +660,10 @@ uint8_t *crypto_sign(EVP_PKEY *private_key, const char *url, const char *authori
     const char *path_begin = NULL;
     size_t      path_len   = 0;
 
-    if (!parse_url_path_and_query(url, &path_begin, &path_len))
+    if (!parse_url_path_and_query(url, &path_begin, &path_len)) {
+        obs_log(LOG_ERROR, "Unable to create signature: unable to retrieve the URL's path");
         return NULL;
+    }
 
     const char   method[]    = "POST";
     const size_t method_len  = 4;
@@ -514,8 +674,10 @@ uint8_t *crypto_sign(EVP_PKEY *private_key, const char *url, const char *authori
     const size_t buf_len = 4 + 1 + 8 + 1 + (method_len + 1) + (path_len + 1) + (auth_len + 1) + (payload_len + 1);
     uint8_t     *buf     = (uint8_t *)bzalloc(buf_len);
 
-    if (!buf)
+    if (!buf) {
+        obs_log(LOG_ERROR, "Unable to create signature: unable to allocate memory for the buffer");
         return NULL;
+    }
 
     size_t off = 0;
     write_u32_be(buf + off, policy_version);
@@ -542,6 +704,7 @@ uint8_t *crypto_sign(EVP_PKEY *private_key, const char *url, const char *authori
     buf[off++] = 0;
 
     if (off != buf_len) {
+        obs_log(LOG_ERROR, "Unable to create signature: the size of the buffer does not match the expectation");
         bfree(buf);
         return NULL;
     }
@@ -559,6 +722,7 @@ uint8_t *crypto_sign(EVP_PKEY *private_key, const char *url, const char *authori
 
     uint8_t sig64[64];
     if (!ecdsa_sign_p1363_sha256(private_key, buf, buf_len, sig64)) {
+        obs_log(LOG_ERROR, "Unable to create signature: the signing of the buffer failed");
         bfree(buf);
         return NULL;
     }
@@ -568,8 +732,10 @@ uint8_t *crypto_sign(EVP_PKEY *private_key, const char *url, const char *authori
     /* Header: u32 + u64 + sig */
     const size_t header_len = 4 + 8 + sizeof(sig64);
     uint8_t     *header     = (uint8_t *)bzalloc(header_len);
-    if (!header)
+    if (!header) {
+        obs_log(LOG_ERROR, "Unable to create signature: unable to allocate memory for the header");
         return NULL;
+    }
 
     write_u32_be(header, policy_version);
     write_u64_be(header + 4, windows_ts_100ns);

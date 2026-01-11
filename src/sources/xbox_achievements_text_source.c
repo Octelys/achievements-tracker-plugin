@@ -150,13 +150,13 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
     UNUSED_PARAMETER(property);
     UNUSED_PARAMETER(data);
 
-    const char *device_uuid = state_get_device_uuid();
+    device_t *device = state_get_device();
 
     char *xid        = NULL;
     char *uhs        = NULL;
     char *xsts_token = NULL;
 
-    if (!xbox_live_get_authenticate(device_uuid, &uhs, &xid, &xsts_token)) {
+    if (!xbox_live_get_authenticate(device, &uhs, &xid, &xsts_token)) {
         obs_log(LOG_WARNING, "Xbox sign-in failed");
         return false;
     }

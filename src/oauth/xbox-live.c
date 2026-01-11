@@ -2,14 +2,12 @@
 
 #include <obs-module.h>
 #include <diagnostics/log.h>
-#include <openssl/evp.h>
 
 #include "net/browser/browser.h"
 #include "net/http/http.h"
 #include "net/json/json.h"
 #include "crypto/crypto.h"
 #include "encoding/base64.h"
-#include "util/uuid.h"
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -56,22 +54,23 @@ static void sleep_ms(unsigned int ms) {
 /* */
 struct device_flow_ctx {
     /* Input parameters */
-    const char *device_uuid;
+    const device_t *device;
 
-    EVP_PKEY *device_key;
-    char     *device_code;
-    long      interval_in_seconds;
-    long      sleep_time;
-    long      expires_in_seconds;
+    char *device_code;
+    long  interval_in_seconds;
+    long  sleep_time;
+    long  expires_in_seconds;
 
     pthread_t thread;
+
+    xbox_live_authenticate_result_t result;
 
     /* Returned values */
     char user_token[4096];
     bool got_user_token;
 
-    char device_token[4096];
-    char title_token[4096];
+    device_token_t *device_token;
+    char            title_token[4096];
 
     char xbox_live_token[4096];
     char sisu_token[4096];
@@ -151,12 +150,12 @@ static void retrieve_title_token(struct device_flow_ctx *ctx) {
     snprintf(json_body,
              sizeof(json_body),
              "{\"Properties\":{\"AuthMethod\":\"RPS\",\"DeviceToken\":\"%s\",\"RpsTicket\":\"t=%s\",\"SiteName\":\"user.auth.xboxlive.com\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
-             ctx->device_token,
+             ctx->device_token->token,
              ctx->user_token,
-             crypto_to_string(ctx->device_key));
+             crypto_to_string(ctx->device->keys, false));
 
     size_t   signature_len = 0;
-    uint8_t *signature     = crypto_sign(ctx->device_key, TITLE_AUTHENTICATE, "", json_body, &signature_len);
+    uint8_t *signature     = crypto_sign(ctx->device->keys, TITLE_AUTHENTICATE, "", json_body, &signature_len);
 
     if (!signature) {
         obs_log(LOG_ERROR, "Unable to sign the request for a title token");
@@ -205,7 +204,7 @@ static void retrieve_title_token(struct device_flow_ctx *ctx) {
         return;
     }
 
-    char *title_token = json_get_string_value(title_token_json, "Token");
+    char *title_token = json_read_string(title_token_json, "Token");
 
     if (!title_token_json) {
         obs_log(4, "Could not parse Title token");
@@ -227,44 +226,45 @@ static void retrieve_title_token(struct device_flow_ctx *ctx) {
     bfree(title_token);
 }
 
-static const char *kDeviceType = "iOS";
-
 /**
  * Retrieves the device token
  *
  * @param ctx
  */
 static bool retrieve_device_token(struct device_flow_ctx *ctx) {
-    char serial_number[37];
-    uuid_get_random(serial_number);
+
+    /* TODO Get the device token from the cache if it has not expired yet */
+
+    crypto_print_keys(ctx->device->keys);
 
     char json_body[8192];
     snprintf(json_body,
              sizeof(json_body),
-             "{\"Properties\":{\"AuthMethod\":\"ProofOfPossession\",\"Id\":\"{%s}\",\"DeviceType\":\"%s\",\"SerialNumber\":\"{%s}\",\"Version\":\"0.0.0\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
-             ctx->device_uuid,
-             kDeviceType,
-             serial_number,
-             crypto_to_string(ctx->device_key));
+             "{\"Properties\":{\"AuthMethod\":\"ProofOfPossession\",\"Id\":\"{%s}\",\"DeviceType\":\"iOS\",\"SerialNumber\":\"{%s}\",\"Version\":\"1.0.0\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
+             ctx->device->uuid,
+             ctx->device->serial_number,
+             crypto_to_string(ctx->device->keys, false));
+
+    obs_log(LOG_INFO, "Requesting device token: %s", json_body);
 
     size_t   signature_len = 0;
-    uint8_t *signature     = crypto_sign(ctx->device_key, DEVICE_AUTHENTICATE, "", json_body, &signature_len);
+    uint8_t *signature     = crypto_sign(ctx->device->keys, DEVICE_AUTHENTICATE, "", json_body, &signature_len);
 
     if (!signature) {
+        ctx->result.error_message = "Unable retrieve a device token: signing failed";
         obs_log(LOG_ERROR, "Unable to sign the request for a device token");
-        bfree(json_body);
         return false;
     }
 
-    char *signature_b64 = base64_encode(signature, signature_len);
+    char *encoded_signature = base64_encode(signature, signature_len);
 
-    if (!signature_b64) {
+    if (!encoded_signature) {
+        ctx->result.error_message = "Unable retrieve a device token: signature encoding failed";
         obs_log(LOG_ERROR, "Unable to base64-encode the request signature");
-        bfree(json_body);
         return false;
     }
 
-    obs_log(LOG_DEBUG, "Signature (base64): %s", signature_b64);
+    obs_log(LOG_INFO, "Encoded signature: %s", encoded_signature);
 
     char extra_headers[4096];
     snprintf(extra_headers,
@@ -273,16 +273,15 @@ static bool retrieve_device_token(struct device_flow_ctx *ctx) {
              "Cache-Control: no-store, must-revalidate, no-cache\r\n"
              "Content-Type: text/plain;charset=UTF-8\r\n"
              "x-xbl-contract-version: 1\r\n",
-             signature_b64);
-
-    obs_log(LOG_DEBUG, "Sending request for device token: %s", json_body);
+             encoded_signature);
 
     long  http_code         = 0;
     char *device_token_json = http_post(DEVICE_AUTHENTICATE, json_body, extra_headers, &http_code);
 
-    bfree(signature_b64);
+    bfree(encoded_signature);
 
     if (http_code < 200 || http_code >= 300) {
+        ctx->result.error_message = "Unable retrieve a device token: server returned an error";
         obs_log(LOG_ERROR, "Device authentication failed. Received status code: %d", http_code);
         // bfree(json_body);
         // if (device_token_json) {
@@ -292,18 +291,19 @@ static bool retrieve_device_token(struct device_flow_ctx *ctx) {
     }
 
     if (!device_token_json) {
+        ctx->result.error_message = "Unable retrieve a device token: server returned no response";
         obs_log(LOG_ERROR, "Device authentication failed (no response)");
-        bfree(json_body);
+        bfree(device_token_json);
         return false;
     }
 
-    char *device_token = json_get_string_value(device_token_json, "Token");
+    char *token = json_read_string(device_token_json, "Token");
 
-    if (!device_token) {
-        obs_log(4, "Could not parse Device token");
-        obs_log(3, "XBL response: %s", device_token_json);
+    if (!token) {
+        ctx->result.error_message = "Unable retrieve a device token: unable to read the token from the response";
+        obs_log(LOG_ERROR, "Unable parse the device token from the response: %s", device_token_json);
         bfree(device_token_json);
-        bfree(device_token);
+        bfree(token);
         return false;
     }
 
@@ -314,9 +314,12 @@ static bool retrieve_device_token(struct device_flow_ctx *ctx) {
 
     obs_log(LOG_INFO, "Device authentication succeeded!");
 
-    strncpy(ctx->device_token, device_token, sizeof(ctx->device_token) - 1);
-    ctx->device_token[sizeof(ctx->device_token) - 1] = '\0';
-    bfree(device_token);
+    device_token_t *device = (device_token_t *)bzalloc(sizeof(device_token_t));
+    device->token          = bstrdup_n(token, strlen(token));
+
+    bfree(token);
+
+    ctx->device_token = device;
 
     return true;
 }
@@ -351,7 +354,7 @@ static void retrieve_xbox_token(struct device_flow_ctx *ctx) {
 
     obs_log(2, "Xbox live authentication succeeded");
 
-    char *xbl_token = json_get_string_value(xbl_json, "Token");
+    char *xbl_token = json_read_string(xbl_json, "Token");
 
     if (!xbl_token) {
         obs_log(4, "Could not parse XBL token");
@@ -402,7 +405,7 @@ static void *check_access_token_loop(void *param) {
                     interval);
         } else {
 
-            char *user_token = json_get_string_value(json, "access_token");
+            char *user_token = json_read_string(json, "access_token");
 
             if (user_token) {
                 strncpy(ctx->user_token, user_token, sizeof(ctx->user_token) - 1);
@@ -435,10 +438,10 @@ static void *check_access_token_loop(void *param) {
 
 /**
  *
- * @param device_uuid
+ * @param device
  * @return
  */
-static bool start_device_registration_flow(const char *device_uuid) {
+static bool start_device_registration_flow(const device_t *device) {
     obs_log(2, "Starting Xbox sign-in in browser");
 
     /* ******************************* */
@@ -482,7 +485,7 @@ static bool start_device_registration_flow(const char *device_uuid) {
     /* ******************************************* */
     /* Retrieves the information from the response */
     /* ******************************************* */
-    char *user_code = json_get_string_value(token_json, "user_code");
+    char *user_code = json_read_string(token_json, "user_code");
 
     if (!user_code) {
         obs_log(4, "Could not parse user_code from token response");
@@ -490,7 +493,7 @@ static bool start_device_registration_flow(const char *device_uuid) {
         return false;
     }
 
-    char *device_code = json_get_string_value(token_json, "device_code");
+    char *device_code = json_read_string(token_json, "device_code");
 
     if (!device_code) {
         obs_log(4, "Could not parse device_code from token response");
@@ -524,23 +527,24 @@ static bool start_device_registration_flow(const char *device_uuid) {
 
     obs_log(LOG_DEBUG, "Open browser for OAuth verification at URL: %s", verification_uri);
 
+    /*
     if (!open_url(verification_uri)) {
         obs_log(4, "Failed to open browser for OAuth verification");
         return false;
     }
+    */
 
     /* ************************************* */
     /* Starts the loop waiting for the token */
     /* ************************************* */
     struct device_flow_ctx *ctx = bzalloc(sizeof(struct device_flow_ctx));
-    ctx->device_uuid            = device_uuid;
+    ctx->device                 = device;
     ctx->device_code            = device_code;
     ctx->interval_in_seconds    = *interval;
     ctx->expires_in_seconds     = *expires_in;
     ctx->got_user_token         = false;
-    ctx->device_key             = crypto_generate_key();
 
-    check_access_token_loop(ctx);
+    retrieve_device_token(ctx);
 
     //	TODO Reactivate
     // return pthread_create(&ctx->thread, NULL, check_access_token_loop, ctx)
@@ -613,7 +617,7 @@ static char *oauth_exchange_code_for_access_token(const char *client_id, const c
         return NULL;
     }
 
-    char *access_token = json_get_string_value(token_json, "access_token");
+    char *access_token = json_read_string(token_json, "access_token");
     if (!access_token) {
         obs_log(4, "Could not parse access_token from token response");
         obs_log(3, "Token response: %s", token_json);
@@ -654,7 +658,7 @@ static bool xbl_authenticate(const char *ms_access_token, char **out_xbl_token) 
 
     obs_log(4, "Received: %s", xbl_json);
 
-    char *xbl_token = json_get_string_value(xbl_json, "Token");
+    char *xbl_token = json_read_string(xbl_json, "Token");
 
     if (!xbl_token) {
         obs_log(4, "Could not parse XBL token");
@@ -707,7 +711,7 @@ static void xsts_authorize(const char *xbl_token, char **out_xsts_token, char **
          * XSTS errors are usually JSON like:
          * {"XErr":2148916233,"Message":"...","Redirect":"..."}
          */
-        char *message = json_get_string_value(xsts_json, "Message");
+        char *message = json_read_string(xsts_json, "Message");
         xbl_token     = xbl_token; /* silence unused in some builds */
         obs_log(4, "XSTS authorize HTTP %ld: %s", http_code, xsts_json[0] ? xsts_json : "<empty body>");
         if (message) {
@@ -718,7 +722,7 @@ static void xsts_authorize(const char *xbl_token, char **out_xsts_token, char **
         return;
     }
 
-    char *xsts_token = json_get_string_value(xsts_json, "Token");
+    char *xsts_token = json_read_string(xsts_json, "Token");
     if (!xsts_token) {
         obs_log(4, "Could not parse XSTS token");
         obs_log(3, "XSTS response: %s", xsts_json);
@@ -727,12 +731,12 @@ static void xsts_authorize(const char *xbl_token, char **out_xsts_token, char **
     char       *uhs     = NULL;
     const char *uhs_pos = strstr(xsts_json, "\"uhs\"");
     if (uhs_pos)
-        uhs = json_get_string_value(uhs_pos, "uhs");
+        uhs = json_read_string(uhs_pos, "uhs");
 
     char       *xid     = NULL;
     const char *xid_pos = strstr(xsts_json, "\"xid\"");
     if (xid_pos)
-        xid = json_get_string_value(xid_pos, "xid");
+        xid = json_read_string(xid_pos, "xid");
 
     obs_log(4, "XSTS token: %s", xsts_token);
 
@@ -754,12 +758,12 @@ static void xsts_authorize(const char *xbl_token, char **out_xsts_token, char **
     bfree(xsts_json);
 }
 
-bool xbox_live_get_authenticate(const char *device_uuid, char **out_uhs, char **out_xid, char **out_xsts_token) {
+bool xbox_live_get_authenticate(const device_t *device, char **out_uhs, char **out_xid, char **out_xsts_token) {
     CLEAR(out_uhs);
     CLEAR(out_xsts_token);
     CLEAR(out_xid);
 
-    if (!start_device_registration_flow(device_uuid)) {
+    if (!start_device_registration_flow(device)) {
         obs_log(LOG_ERROR, "Unable to authenticate with Xbox live");
         return false;
     }

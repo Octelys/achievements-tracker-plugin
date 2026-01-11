@@ -1,12 +1,14 @@
 #pragma once
 
+#include "common/types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void io_load(void);
 
-const char *state_get_device_uuid(void);
+device_t *state_get_device(void);
 
 const char *get_xid(void);
 const char *get_xsts_token(void);
