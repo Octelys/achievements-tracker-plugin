@@ -16,21 +16,11 @@ extern "C" {
  *  - challenge: 128 bytes is plenty for S256 base64url output
  */
 
-void oauth_random_state(
-	char *out,
-	size_t out_size
-);
+void oauth_random_state(char *out, size_t out_size);
 
-void oauth_pkce_verifier(
-	char *out,
-	size_t out_size
-);
+void oauth_pkce_verifier(char *out, size_t out_size);
 
-void oauth_pkce_challenge_s256(
-	const char *verifier,
-	char *out,
-	size_t out_size
-);
+void oauth_pkce_challenge_s256(const char *verifier, char *out, size_t out_size);
 
 #ifdef __cplusplus
 }

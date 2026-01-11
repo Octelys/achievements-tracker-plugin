@@ -6,9 +6,7 @@
 extern "C" {
 #endif
 
-void uuid_get_random(
-	char random_uuid[37]
-);
+void uuid_get_random(char random_uuid[37]);
 
 #ifdef __cplusplus
 }

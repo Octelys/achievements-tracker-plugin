@@ -6,9 +6,7 @@
 extern "C" {
 #endif
 
-bool open_url(
-	const char *url
-);
+bool open_url(const char *url);
 
 #ifdef __cplusplus
 }

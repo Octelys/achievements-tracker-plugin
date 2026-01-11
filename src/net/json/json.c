@@ -5,92 +5,86 @@
 #include <stdlib.h>
 #include <string.h>
 
-char *json_get_string_value(
-	const char *json,
-	const char *key
-) {
-	if (!json || !key)
-		return NULL;
+char *json_get_string_value(const char *json, const char *key) {
+    if (!json || !key)
+        return NULL;
 
-	char needle[256];
-	snprintf(needle, sizeof(needle), "\"%s\"", key);
+    char needle[256];
+    snprintf(needle, sizeof(needle), "\"%s\"", key);
 
-	const char *p = strstr(json, needle);
+    const char *p = strstr(json, needle);
 
-	if (!p)
-		return NULL;
+    if (!p)
+        return NULL;
 
-	p = strchr(p + strlen(needle), ':');
+    p = strchr(p + strlen(needle), ':');
 
-	if (!p)
-		return NULL;
+    if (!p)
+        return NULL;
 
-	p++;
+    p++;
 
-	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
-		p++;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+        p++;
 
-	if (*p != '"')
-		return NULL;
-	p++;
+    if (*p != '"')
+        return NULL;
+    p++;
 
-	const char *start = p;
+    const char *start = p;
 
-	while (*p && *p != '"')
-		p++;
+    while (*p && *p != '"')
+        p++;
 
-	if (*p != '"')
-		return NULL;
+    if (*p != '"')
+        return NULL;
 
-	size_t len = (size_t)(p - start);
+    size_t len = (size_t)(p - start);
 
-	char *out = bzalloc(len + 1);
+    char *out = bzalloc(len + 1);
 
-	memcpy(out, start, len);
+    memcpy(out, start, len);
 
-	out[len] = '\0';
+    out[len] = '\0';
 
-	return out;
+    return out;
 }
 
-long *json_get_long_value(
-	const char *json,
-	const char *key
-) {
-	if (!json || !key)
-		return NULL;
+long *json_get_long_value(const char *json, const char *key) {
+    if (!json || !key)
+        return NULL;
 
-	char needle[256];
-	snprintf(needle, sizeof(needle), "\"%s\"", key);
+    char needle[256];
+    snprintf(needle, sizeof(needle), "\"%s\"", key);
 
-	const char *p = strstr(json, needle);
+    const char *p = strstr(json, needle);
 
-	if (!p)
-		return NULL;
+    if (!p)
+        return NULL;
 
-	p = strchr(p + strlen(needle), ':');
+    p = strchr(p + strlen(needle), ':');
 
-	if (!p)
-		return NULL;
+    if (!p)
+        return NULL;
 
-	p++; /* after ':' */
+    p++; /* after ':' */
 
-	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
-		p++;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+        p++;
 
-	/* Reject quoted values (string) */
-	if (*p == '"')
-		return NULL;
+    /* Reject quoted values (string) */
+    if (*p == '"')
+        return NULL;
 
-	char *end = NULL;
-	long v = strtol(p, &end, 10);
+    char *end = NULL;
+    long  v   = strtol(p, &end, 10);
 
-	/* No digits parsed */
-	if (end == p)
-		return NULL;
+    /* No digits parsed */
+    if (end == p)
+        return NULL;
 
-	long *out_value = bzalloc(sizeof(long));
-	*out_value = v;
+    long *out_value = bzalloc(sizeof(long));
+    *out_value      = v;
 
-	return out_value;
+    return out_value;
 }

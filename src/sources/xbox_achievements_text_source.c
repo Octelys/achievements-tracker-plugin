@@ -13,120 +13,102 @@
 static obs_source_t *g_xbox_achievements_text_src = NULL;
 
 struct xbox_achievements_text_src {
-	obs_source_t *source;
-	char *text;
-	obs_source_t *child_text;
-	uint32_t width;
-	uint32_t height;
+    obs_source_t *source;
+    char         *text;
+    obs_source_t *child_text;
+    uint32_t      width;
+    uint32_t      height;
 };
 
-static void text_src_update_child(
-	struct xbox_achievements_text_src *s
-) {
-	if (!s || !s->child_text)
-		return;
+static void text_src_update_child(struct xbox_achievements_text_src *s) {
+    if (!s || !s->child_text)
+        return;
 
-	obs_data_t *st = obs_data_create();
-	obs_data_set_string(st, "text", s->text ? s->text : "");
-	obs_data_set_int(st, "color1", 0xFFFFFFFF); /* white */
-	obs_data_set_bool(st, "outline", false);
-	obs_data_set_int(st, "align", 0);  /* left */
-	obs_data_set_int(st, "valign", 0); /* top */
-	obs_source_update(s->child_text, st);
-	obs_data_release(st);
+    obs_data_t *st = obs_data_create();
+    obs_data_set_string(st, "text", s->text ? s->text : "");
+    obs_data_set_int(st, "color1", 0xFFFFFFFF); /* white */
+    obs_data_set_bool(st, "outline", false);
+    obs_data_set_int(st, "align", 0);  /* left */
+    obs_data_set_int(st, "valign", 0); /* top */
+    obs_source_update(s->child_text, st);
+    obs_data_release(st);
 }
 
-void *xbox_achievements_text_src_create(
-	obs_data_t *settings,
-	obs_source_t *source
-) {
-	g_xbox_achievements_text_src = source;
+void *xbox_achievements_text_src_create(obs_data_t *settings, obs_source_t *source) {
+    g_xbox_achievements_text_src = source;
 
-	struct xbox_achievements_text_src *s = bzalloc(sizeof(*s));
-	s->source = source;
+    struct xbox_achievements_text_src *s = bzalloc(sizeof(*s));
+    s->source                            = source;
 
-	const char *t = obs_data_get_string(settings, "text");
-	s->text = bstrdup(t ? t : "Hello from plugin");
+    const char *t = obs_data_get_string(settings, "text");
+    s->text       = bstrdup(t ? t : "Hello from plugin");
 
-	s->width = 800;
-	s->height = 200;
+    s->width  = 800;
+    s->height = 200;
 
-	/* Create built-in text source as a child */
-	obs_data_t *st = obs_data_create();
-	obs_data_set_string(st, "text", s->text);
-	s->child_text =
-		obs_source_create_private("text_ft2_source", "child_text", st);
-	obs_data_release(st);
+    /* Create built-in text source as a child */
+    obs_data_t *st = obs_data_create();
+    obs_data_set_string(st, "text", s->text);
+    s->child_text = obs_source_create_private("text_ft2_source", "child_text", st);
+    obs_data_release(st);
 
-	text_src_update_child(s);
-	return s;
+    text_src_update_child(s);
+    return s;
 }
 
-void xbox_achievements_text_src_destroy(
-	void *data
-) {
-	struct xbox_achievements_text_src *s = data;
+void xbox_achievements_text_src_destroy(void *data) {
+    struct xbox_achievements_text_src *s = data;
 
-	if (!s)
-		return;
+    if (!s)
+        return;
 
-	if (s->child_text)
-		obs_source_release(s->child_text);
+    if (s->child_text)
+        obs_source_release(s->child_text);
 
-	bfree(s->text);
-	bfree(s);
+    bfree(s->text);
+    bfree(s);
 }
 
-void xbox_achievements_text_src_update(
-	void *data,
-	obs_data_t *settings
-) {
-	struct xbox_achievements_text_src *s = data;
-	const char *t = obs_data_get_string(settings, "text");
+void xbox_achievements_text_src_update(void *data, obs_data_t *settings) {
+    struct xbox_achievements_text_src *s = data;
+    const char                        *t = obs_data_get_string(settings, "text");
 
-	bfree(s->text);
-	s->text = bstrdup(t ? t : "");
+    bfree(s->text);
+    s->text = bstrdup(t ? t : "");
 
-	text_src_update_child(s);
+    text_src_update_child(s);
 }
 
-uint32_t xbox_achievements_text_src_get_width(
-	void *data
-) {
-	struct xbox_achievements_text_src *s = data;
-	return s->width;
+uint32_t xbox_achievements_text_src_get_width(void *data) {
+    struct xbox_achievements_text_src *s = data;
+    return s->width;
 }
 
-uint32_t xbox_achievements_text_src_get_height(
-	void *data
-) {
-	struct xbox_achievements_text_src *s = data;
-	return s->height;
+uint32_t xbox_achievements_text_src_get_height(void *data) {
+    struct xbox_achievements_text_src *s = data;
+    return s->height;
 }
 
-void xbox_achievements_text_src_video_render(
-	void *data,
-	gs_effect_t *effect
-) {
-	UNUSED_PARAMETER(effect);
-	struct xbox_achievements_text_src *s = data;
-	if (!s || !s->child_text)
-		return;
+void xbox_achievements_text_src_video_render(void *data, gs_effect_t *effect) {
+    UNUSED_PARAMETER(effect);
+    struct xbox_achievements_text_src *s = data;
+    if (!s || !s->child_text)
+        return;
 
-	/* Let the child (Text FT2) render into our source */
-	obs_source_video_render(s->child_text);
+    /* Let the child (Text FT2) render into our source */
+    obs_source_video_render(s->child_text);
 }
 
 static void refresh_page() {
-	if (!g_xbox_achievements_text_src)
-		return;
+    if (!g_xbox_achievements_text_src)
+        return;
 
-	/*
-	 * Force OBS to refresh the properties UI by signaling that
-	 * properties need to be recreated. Returning true from the
-	 * button callback also helps trigger this.
-	 */
-	obs_source_update_properties(g_xbox_achievements_text_src);
+    /*
+     * Force OBS to refresh the properties UI by signaling that
+     * properties need to be recreated. Returning true from the
+     * button callback also helps trigger this.
+     */
+    obs_source_update_properties(g_xbox_achievements_text_src);
 }
 
 /**
@@ -139,20 +121,16 @@ static void refresh_page() {
  * @param data
  * @return
  */
-static bool on_sign_out_clicked(
-	obs_properties_t *props,
-	obs_property_t *property,
-	void *data
-) {
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(property);
-	UNUSED_PARAMETER(data);
+static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
+    UNUSED_PARAMETER(props);
+    UNUSED_PARAMETER(property);
+    UNUSED_PARAMETER(data);
 
-	state_clear();
+    state_clear();
 
-	refresh_page();
+    refresh_page();
 
-	return true;
+    return true;
 }
 
 /**
@@ -167,41 +145,37 @@ static bool on_sign_out_clicked(
  *
  * @return
  */
-static bool on_sign_in_xbox_clicked(
-	obs_properties_t *props,
-	obs_property_t *property,
-	void *data
-) {
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(property);
-	UNUSED_PARAMETER(data);
+static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
+    UNUSED_PARAMETER(props);
+    UNUSED_PARAMETER(property);
+    UNUSED_PARAMETER(data);
 
-	const char *device_uuid = state_get_device_uuid();
+    const char *device_uuid = state_get_device_uuid();
 
-	char *xid = NULL;
-	char *uhs = NULL;
-	char *xsts_token = NULL;
+    char *xid        = NULL;
+    char *uhs        = NULL;
+    char *xsts_token = NULL;
 
-	if (!xbox_live_get_authenticate(device_uuid, &uhs, &xid, &xsts_token)) {
-		obs_log(LOG_WARNING, "Xbox sign-in failed");
-		return false;
-	}
+    if (!xbox_live_get_authenticate(device_uuid, &uhs, &xid, &xsts_token)) {
+        obs_log(LOG_WARNING, "Xbox sign-in failed");
+        return false;
+    }
 
-	char *token = bzalloc(4096);
-	snprintf(token, 4096, "XBL3.0 x=%s;%s", uhs, xsts_token);
-	state_set_tokens(xid, token);
+    char *token = bzalloc(4096);
+    snprintf(token, 4096, "XBL3.0 x=%s;%s", uhs, xsts_token);
+    state_set_tokens(xid, token);
 
-	obs_log(LOG_WARNING, "XSTS: %s", token);
+    obs_log(LOG_WARNING, "XSTS: %s", token);
 
-	bfree(uhs);
-	bfree(xsts_token);
+    bfree(uhs);
+    bfree(xsts_token);
 
-	long out_http_code = 0;
-	xbox_fetch_presence_json(&out_http_code);
+    long out_http_code = 0;
+    xbox_fetch_presence_json(&out_http_code);
 
-	refresh_page();
+    refresh_page();
 
-	return true;
+    return true;
 }
 
 /**
@@ -210,34 +184,30 @@ static bool on_sign_in_xbox_clicked(
  * @param data
  * @return
  */
-obs_properties_t *xbox_achievements_get_properties(
-	void *data
-) {
-	UNUSED_PARAMETER(data);
+obs_properties_t *xbox_achievements_get_properties(void *data) {
+    UNUSED_PARAMETER(data);
 
-	/* Lists all the UI components of the properties page */
-	obs_properties_t *p = obs_properties_create();
-	obs_properties_add_text(p, "text", "Text", OBS_TEXT_DEFAULT);
-	obs_property_t *xboxSignInButton = obs_properties_add_button(
-		p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked
-	);
-	obs_property_t *xboxSignOutButton = obs_properties_add_button(
-		p, "sign-out-xbox", "Sign out from Xbox", &on_sign_out_clicked
-	);
+    /* Lists all the UI components of the properties page */
+    obs_properties_t *p = obs_properties_create();
+    obs_properties_add_text(p, "text", "Text", OBS_TEXT_DEFAULT);
+    obs_property_t *xboxSignInButton =
+        obs_properties_add_button(p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
+    obs_property_t *xboxSignOutButton =
+        obs_properties_add_button(p, "sign-out-xbox", "Sign out from Xbox", &on_sign_out_clicked);
 
-	/* Finds out if there is a token available already */
-	const char *token = get_xsts_token();
+    /* Finds out if there is a token available already */
+    const char *token = get_xsts_token();
 
-	if (token != NULL && strlen(token) > 0) {
-		obs_property_set_visible(xboxSignInButton, false);
-		obs_property_set_visible(xboxSignOutButton, true);
-		obs_log(LOG_WARNING, "Found token %s", token);
-	} else {
-		obs_property_set_visible(xboxSignInButton, true);
-		obs_property_set_visible(xboxSignOutButton, false);
-	}
+    if (token != NULL && strlen(token) > 0) {
+        obs_property_set_visible(xboxSignInButton, false);
+        obs_property_set_visible(xboxSignOutButton, true);
+        obs_log(LOG_WARNING, "Found token %s", token);
+    } else {
+        obs_property_set_visible(xboxSignInButton, true);
+        obs_property_set_visible(xboxSignOutButton, false);
+    }
 
-	return p;
+    return p;
 }
 
 /**
@@ -247,24 +217,24 @@ obs_properties_t *xbox_achievements_get_properties(
  * @return
  */
 const char *xbox_achievements_text_src_get_name(void *unused) {
-	UNUSED_PARAMETER(unused);
+    UNUSED_PARAMETER(unused);
 
-	return "Achievements Tracker";
+    return "Achievements Tracker";
 }
 
 static struct obs_source_info xbox_achievements_text_src_info = {
-	.id = "xbox_achievements_text_source",
-	.type = OBS_SOURCE_TYPE_INPUT,
-	.output_flags = OBS_SOURCE_VIDEO,
-	.get_name = xbox_achievements_text_src_get_name,
-	.create = xbox_achievements_text_src_create,
-	.destroy = xbox_achievements_text_src_destroy,
-	.update = xbox_achievements_text_src_update,
-	.get_properties = xbox_achievements_get_properties,
-	.get_width = xbox_achievements_text_src_get_width,
-	.get_height = xbox_achievements_text_src_get_height,
-	.video_tick = NULL,
-	.video_render = xbox_achievements_text_src_video_render,
+    .id             = "xbox_achievements_text_source",
+    .type           = OBS_SOURCE_TYPE_INPUT,
+    .output_flags   = OBS_SOURCE_VIDEO,
+    .get_name       = xbox_achievements_text_src_get_name,
+    .create         = xbox_achievements_text_src_create,
+    .destroy        = xbox_achievements_text_src_destroy,
+    .update         = xbox_achievements_text_src_update,
+    .get_properties = xbox_achievements_get_properties,
+    .get_width      = xbox_achievements_text_src_get_width,
+    .get_height     = xbox_achievements_text_src_get_height,
+    .video_tick     = NULL,
+    .video_render   = xbox_achievements_text_src_video_render,
 };
 
 //	Public methods
@@ -275,9 +245,9 @@ static struct obs_source_info xbox_achievements_text_src_info = {
  * @return
  */
 const struct obs_source_info *xbox_achievements_text_source_get(void) {
-	return &xbox_achievements_text_src_info;
+    return &xbox_achievements_text_src_info;
 }
 
 void xbox_achievements_text_source_register(void) {
-	obs_register_source(xbox_achievements_text_source_get());
+    obs_register_source(xbox_achievements_text_source_get());
 }

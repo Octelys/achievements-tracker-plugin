@@ -13,10 +13,7 @@ const char *get_xsts_token(void);
 
 void state_clear(void);
 
-void state_set_tokens(
-	const char *xid,
-	const char *token
-);
+void state_set_tokens(const char *xid, const char *token);
 
 #ifdef __cplusplus
 }
