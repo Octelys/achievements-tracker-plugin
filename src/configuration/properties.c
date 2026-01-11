@@ -9,12 +9,7 @@
 #include "crypto/crypto.h"
 #include "xbox/client.h"
 
-/*
- * Forward declarations for the source callbacks.
- *
- * They’re implemented in sources/achievements-tracker-source.c, but we keep the obs_source_info
- * structure itself isolated in this file.
- */
+/* Forward declarations for the source callbacks. */
 void *text_src_create(obs_data_t *settings, obs_source_t *source);
 void text_src_destroy(void *data);
 void text_src_update(void *data, obs_data_t *settings);
@@ -23,21 +18,43 @@ uint32_t text_src_get_height(void *data);
 void text_src_video_render(void *data, gs_effect_t *effect);
 
 static void refresh_page(obs_source_t *source) {
+	// TODO Does not seem to work
 	if (source)
 		obs_source_update_properties(source);
 }
 
+/**
+ * Called when the Sign out button is clicked
+ *
+ * Clears the tokens from the state.
+ *
+ * @param props
+ * @param property
+ * @param data
+ * @return
+ */
 static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(property);
 
-	clear_xid_xsts_token();
+	state_clear_tokens();
 
 	refresh_page((obs_source_t *)data);
 
 	return true;
 }
 
+/**
+ * Called when the Sign in button is called.
+ *
+ * The method triggers the device oauth flow to register the device with Xbox live.
+ *
+ * @param props
+ * @param property
+ * @param data
+ *
+ * @return
+ */
 static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(property);
@@ -55,7 +72,7 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 
 	char *token = bzalloc(4096);
 	snprintf(token, 4096, "XBL3.0 x=%s;%s", uhs, xsts_token);
-	set_xid_xsts_token(xid, token);
+	state_set_tokens(xid, token);
 
 	obs_log(LOG_WARNING, "XSTS: %s", token);
 

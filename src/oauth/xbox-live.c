@@ -24,7 +24,7 @@
 #define REGISTER_ENDPOINT "https://login.live.com/oauth20_remoteconnect.srf?otc="
 #define GRANT_TYPE "urn:ietf:params:oauth:grant-type:device_code"
 #define XBOX_LIVE_AUTHENTICATE "https://user.auth.xboxlive.com/user/authenticate"
-//#define DEVICE_AUTHENTICATE "https://localhost:7800/api/v1/accounts/test"
+// #define DEVICE_AUTHENTICATE "https://localhost:7800/api/v1/accounts/test"
 #define DEVICE_AUTHENTICATE "https://device.auth.xboxlive.com/device/authenticate"
 #define SISU_AUTHENTICATE "https://sisu.xboxlive.com/authorize"
 
@@ -150,9 +150,10 @@ static void retrieve_device_token(struct device_flow_ctx *ctx) {
 	uuid_get_random(serial_number);
 
 	char json_body[8192];
-	snprintf(json_body, sizeof(json_body),
-			 "{\"Properties\":{\"AuthMethod\":\"ProofOfPossession\",\"Id\":\"{%s}\",\"DeviceType\":\"%s\",\"SerialNumber\":\"{%s}\",\"Version\":\"0.0.0\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
-			 ctx->device_uuid, kDeviceType, serial_number, crypto_key_to_string(ctx->device_key));
+	snprintf(
+		json_body, sizeof(json_body),
+		"{\"Properties\":{\"AuthMethod\":\"ProofOfPossession\",\"Id\":\"{%s}\",\"DeviceType\":\"%s\",\"SerialNumber\":\"{%s}\",\"Version\":\"0.0.0\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
+		ctx->device_uuid, kDeviceType, serial_number, crypto_key_to_string(ctx->device_key));
 
 	size_t signature_len = 0;
 	uint8_t *signature = crypto_sign_policy_header(ctx->device_key, DEVICE_AUTHENTICATE, "", json_body, &signature_len);
@@ -294,8 +295,8 @@ static void *check_access_token_loop(void *param) {
 		char *json = http_get(TOKEN_ENDPOINT, NULL, get_token_form_url_encoded, &code);
 
 		if (code != 200) {
-			obs_log(2, "Device not validated yet. Received code %d, Waiting %d second before retrying...", code,
-					interval);
+			obs_log(
+				2, "Device not validated yet. Received code %d, Waiting %d second before retrying...", code, interval);
 		} else {
 
 			char *access_token = json_get_string_value(json, "access_token");
@@ -433,7 +434,7 @@ static bool start_device_registration(const char *device_uuid) {
 	retrieve_device_token(ctx);
 
 	//	TODO Reactivate
-	//return pthread_create(&ctx->thread, NULL, check_access_token_loop, ctx) == 0;
+	// return pthread_create(&ctx->thread, NULL, check_access_token_loop, ctx) == 0;
 	return true;
 }
 

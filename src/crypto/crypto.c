@@ -406,5 +406,3 @@ uint8_t *crypto_sign_policy_header(
 
 	return header;
 }
-
-

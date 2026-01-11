@@ -81,7 +81,7 @@ const char *get_xid(void) {
 	return obs_data_get_string(g_state, XID_KEY);
 }
 
-void clear_xid_xsts_token(void) {
+void state_clear_tokens(void) {
 	obs_data_set_string(g_state, XID_KEY, "");
 	obs_data_set_string(g_state, XSTS_TOKEN_KEY, "");
 
@@ -94,9 +94,9 @@ void clear_xid_xsts_token(void) {
  *
  * @return Device UUID
  */
-const char* state_get_device_uuid(void) {
+const char *state_get_device_uuid(void) {
 
-	const char* device_uuid = obs_data_get_string(g_state, DEVICE_UUID);
+	const char *device_uuid = obs_data_get_string(g_state, DEVICE_UUID);
 
 	if (!device_uuid) {
 
@@ -121,7 +121,7 @@ const char* state_get_device_uuid(void) {
 	return device_uuid;
 }
 
-void set_xid_xsts_token(const char *xid, const char *token) {
+void state_set_tokens(const char *xid, const char *token) {
 	obs_data_set_string(g_state, XID_KEY, xid);
 	obs_data_set_string(g_state, XSTS_TOKEN_KEY, token);
 

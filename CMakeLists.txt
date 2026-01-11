@@ -27,9 +27,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 if(APPLE)
   execute_process(
-          COMMAND xcrun --sdk macosx --show-sdk-path
-          OUTPUT_VARIABLE MACOS_SDK_PATH
-          OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND xcrun --sdk macosx --show-sdk-path
+    OUTPUT_VARIABLE MACOS_SDK_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
   )
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -isysroot ${MACOS_SDK_PATH}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isysroot ${MACOS_SDK_PATH}")
