@@ -59,10 +59,3 @@ cmake --preset macos-ci -DBUILD_TESTING=ON
 cmake --build build_macos --target test_encoder --config RelWithDebInfo
 ctest --test-dir build_macos -C RelWithDebInfo --output-on-failure
 ```
-
-
-{"Properties":{"AuthMethod":"ProofOfPossession","Id":"{90eaeebb-5212-30fb-baae-9e74a36012aa}","DeviceType":"iOS","SerialNumber":"{90eaeebb-5212-30fb-baae-9e74a36012aa}","Version":"0.0.0","ProofKey":{"kty":"EC","crv":"P-256","x":"9I_BhcP50opRVRBHYRvozXes554VVrKB7RlTgtlm9hU","y":"9LRgfqXSFQsZZ05qDopk5pf-d9TXF8bexNv6HNzPJmE","alg":"ES256","use":"sig"}},"RelyingParty":"http://auth.xboxlive.com","TokenType":"JWT"}
-{"Properties":{"AuthMethod":"ProofOfPossession","Id":"{90eaeebb-5212-30fb-baae-9e74a36012aa}","DeviceType":"iOS","SerialNumber":"{90eaeebb-5212-30fb-baae-9e74a36012aa}","Version":"0.0.0","ProofKey":{"kty":"EC","crv":"P-256","x":"KmCnOlAo5S9Hpd5Jw96ajFHzK2WfXY0P3qIYbbf8oio","y":"SjjdWhgrSDp7--p7d-Q_qt4Ae3ZLLidXKhqyheOZhyI","alg":"ES256","use":"sig"}},"RelyingParty":"http://auth.xboxlive.com","TokenType":"JWT"}
-
-AAAAAQHcgkRLetOAOBgHIoN0hmw9QdzJXO4RWPiJ1u4x7T2ypliU9cFFr4xG0EVpfYAEeJzE0l1Mwr3iULywaheCtukjIdsGd8z/xw==
-AAAAAQHcgRN+cXoAwH+14u6l/pu/7UlmRJtHUZ/xPZ4+yH972ipcgFVpSzZ9zb1htOnZM1nOw9Vn3qc1ZPXGqwYBufbpCw3emMfNUg==

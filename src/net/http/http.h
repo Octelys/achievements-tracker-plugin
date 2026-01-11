@@ -1,9 +1,5 @@
 #pragma once
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,6 +11,9 @@ extern "C" {
  */
 
 char *http_post_form(const char *url, const char *postfields, long *out_http_code);
+
+/* Perform an HTTP POST with optional extra headers (CRLF-separated). No Content-Type is set. */
+char *http_post(const char *url, const char *body, const char *extra_headers, long *out_http_code);
 
 /* Perform an HTTP POST (JSON) with optional extra headers (CRLF-separated). */
 char *http_post_json(const char *url, const char *json_body, const char *extra_headers, long *out_http_code);

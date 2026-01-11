@@ -25,6 +25,16 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
 find_package(CURL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
+if(APPLE)
+  execute_process(
+          COMMAND xcrun --sdk macosx --show-sdk-path
+          OUTPUT_VARIABLE MACOS_SDK_PATH
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -isysroot ${MACOS_SDK_PATH}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isysroot ${MACOS_SDK_PATH}")
+endif()
+
 # OpenSSL
 #
 # IMPORTANT (macOS universal): do NOT link against Homebrew's OpenSSL.
@@ -139,6 +149,7 @@ target_sources(
     src/xbox/client.c
     src/io/state.c
     src/encoding/encoder.c
+    src/util/uuid.c
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
@@ -160,6 +171,7 @@ if(BUILD_TESTING)
     test/test_encoder.c
     ${unity_SOURCE_DIR}/src/unity.c
     src/encoding/encoder.c
+    src/util/uuid.c
     test/stubs/bmem_stub.c
   )
 
@@ -204,6 +216,7 @@ if(BUILD_TESTING)
     ${unity_SOURCE_DIR}/src/unity.c
     src/crypto/crypto.c
     src/encoding/encoder.c
+    src/util/uuid.c
     test/stubs/bmem_stub.c
   )
 
@@ -239,6 +252,53 @@ if(BUILD_TESTING)
   # Note: We use bmem_stub.c instead of linking OBS::libobs to avoid
   # heavy runtime dependencies (FFmpeg, etc.) for simple unit tests.
 
+  # ------------------------------
+  # test_xbox_live
+  # ------------------------------
+  add_executable(
+    test_xbox_live
+    test/test_xbox_live.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/oauth/xbox-live.c
+    src/crypto/crypto.c
+    src/encoding/encoder.c
+    src/net/http/http.c
+    src/net/json/json.c
+    src/util/uuid.c
+    test/stubs/bmem_stub.c
+  )
+
+  target_include_directories(
+    test_xbox_live
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_xbox_live PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  if(TARGET OpenSSL::Crypto)
+    target_link_libraries(test_xbox_live PRIVATE OpenSSL::Crypto)
+    if(TARGET OpenSSL::SSL)
+      target_link_libraries(test_xbox_live PRIVATE OpenSSL::SSL)
+    endif()
+    if(OPENSSL_INCLUDE_DIR)
+      target_include_directories(test_xbox_live PRIVATE ${OPENSSL_INCLUDE_DIR})
+    endif()
+  else()
+    target_include_directories(test_xbox_live PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(test_xbox_live PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+    if(OPENSSL_SSL_LIBRARY)
+      target_link_libraries(test_xbox_live PRIVATE ${OPENSSL_SSL_LIBRARY})
+    endif()
+  endif()
+
+  # Link libcurl for HTTP functionality
+  find_package(CURL REQUIRED)
+  target_link_libraries(test_xbox_live PRIVATE CURL::libcurl)
+
   # On macOS with dev builds (single-arch using Homebrew OpenSSL), we need to
   # disable library validation. CI builds use universal OpenSSL which doesn't
   # have this issue.
@@ -248,13 +308,16 @@ if(BUILD_TESTING)
       # Single-arch dev build - use wrapper script that re-signs with entitlements
       add_test(NAME test_encoder COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run-tests.sh" test_encoder)
       add_test(NAME test_crypto COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run-tests.sh" test_crypto)
+      add_test(NAME test_xbox_live COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run-tests.sh" test_xbox_live)
     else()
       # Universal build (CI) - direct execution works fine
       add_test(NAME test_encoder COMMAND test_encoder)
       add_test(NAME test_crypto COMMAND test_crypto)
+      add_test(NAME test_xbox_live COMMAND test_xbox_live)
     endif()
   else()
     add_test(NAME test_encoder COMMAND test_encoder)
     add_test(NAME test_crypto COMMAND test_crypto)
+    add_test(NAME test_xbox_live COMMAND test_xbox_live)
   endif()
 endif()

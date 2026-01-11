@@ -1,6 +1,5 @@
 #include <obs-module.h>
 #include <graphics/graphics.h>
-#include <diagnostics/log.h>
 
 #include "sources/achievements-tracker-source.h"
 #include "configuration/properties.h"
@@ -94,5 +93,5 @@ void text_src_video_render(void *data, gs_effect_t *effect) {
 }
 
 void register_achievements_tracker_source(void) {
-	obs_register_source(get_plugin_properties());
+	obs_register_source(configuration_get_plugin_properties());
 }

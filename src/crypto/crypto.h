@@ -7,12 +7,13 @@ extern "C" {
 /* OpenSSL key generation helpers. */
 #include <openssl/evp.h>
 
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 
 /* Generate an EC P-256 keypair. Caller must EVP_PKEY_free(). */
 EVP_PKEY *crypto_generate_p256_keypair(void);
+
+/* Debug: print public and private key in PEM format. */
+void crypto_debug_print_keypair(EVP_PKEY *pkey);
 
 char *crypto_key_to_string(EVP_PKEY *pkey);
 

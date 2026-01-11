@@ -5,7 +5,6 @@
 
 #include <openssl/evp.h>
 #include <openssl/ec.h>
-#include <openssl/ecdsa.h>
 #include <openssl/bn.h>
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
@@ -13,7 +12,6 @@
 #include <openssl/bio.h>
 
 #include "crypto/crypto.h"
-#include "encoding/encoder.h"
 
 #include "unity.h"
 

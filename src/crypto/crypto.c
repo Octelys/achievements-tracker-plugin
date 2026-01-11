@@ -2,7 +2,6 @@
 #include <openssl/ec.h>
 #include <openssl/pem.h>
 #include <openssl/core_names.h>
-#include <openssl/params.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -11,6 +10,56 @@
 
 #include <obs-module.h>
 #include <diagnostics/log.h>
+
+void crypto_debug_print_keypair(EVP_PKEY *pkey) {
+	if (!pkey) {
+		obs_log(4, "[xbl] failed to export EC key pair for debug: pkey is NULL");
+		return;
+	}
+
+	BIO *bio = BIO_new(BIO_s_mem());
+	if (!bio) {
+		obs_log(4, "[xbl] failed to export EC key pair for debug: BIO_new failed");
+		return;
+	}
+
+	/* Export public key (SPKI format) */
+	obs_log(4, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
+	if (PEM_write_bio_PUBKEY(bio, pkey)) {
+		char *pem_data = NULL;
+		long pem_len = BIO_get_mem_data(bio, &pem_data);
+		if (pem_len > 0 && pem_data) {
+			char *pub_pem = bzalloc(pem_len + 1);
+			memcpy(pub_pem, pem_data, pem_len);
+			pub_pem[pem_len] = '\0';
+			printf("%s", pub_pem);
+			bfree(pub_pem);
+		}
+	} else {
+		obs_log(4, "[xbl] failed to export public key");
+	}
+
+	/* Reset BIO for reuse */
+	BIO_reset(bio);
+
+	/* Export private key (PKCS8 format) */
+	obs_log(4, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
+	if (PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, NULL, NULL)) {
+		char *pem_data = NULL;
+		long pem_len = BIO_get_mem_data(bio, &pem_data);
+		if (pem_len > 0 && pem_data) {
+			char *priv_pem = bzalloc(pem_len + 1);
+			memcpy(priv_pem, pem_data, pem_len);
+			priv_pem[pem_len] = '\0';
+			printf("%s", priv_pem);
+			bfree(priv_pem);
+		}
+	} else {
+		obs_log(4, "[xbl] failed to export private key");
+	}
+
+	BIO_free(bio);
+}
 
 static char *b64url_encode(const unsigned char *in, size_t inlen) {
 	static const char tbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -48,24 +97,6 @@ static char *b64url_encode(const unsigned char *in, size_t inlen) {
 
 	out[o] = '\0';
 	return out;
-}
-
-static int bn_to_fixed_32(const BIGNUM *bn, unsigned char out[32]) {
-	if (!bn)
-		return 0;
-
-	memset(out, 0, 32);
-
-	int n = BN_num_bytes(bn);
-
-	if (n < 0 || n > 32)
-		return 0;
-
-	/* right-align (big-endian) */
-	if (BN_bn2bin(bn, out + (32 - n)) != n)
-		return 0;
-
-	return 1;
 }
 
 /* Extract uncompressed EC public point (04 || X || Y) from an EVP_PKEY using OpenSSL 3 params API. */
@@ -112,7 +143,7 @@ char *crypto_key_to_string(EVP_PKEY *pkey) {
 
 	char key_json[4096];
 	snprintf(key_json, sizeof(key_json),
-			 "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"%s\",\"y\":\"%s\",\"alg\":\"ES256\",\"use\":\"sig\"}", x64,
+			 "{\"kty\":\"EC\",\"x\":\"%s\",\"y\":\"%s\",\"crv\":\"P-256\",\"alg\":\"ES256\",\"use\":\"sig\"}", x64,
 			 y64);
 
 	returned_key_json = bstrdup(key_json);
@@ -145,6 +176,8 @@ EVP_PKEY *crypto_generate_p256_keypair(void) {
 		goto fail;
 
 	EVP_PKEY_CTX_free(ctx);
+
+	crypto_debug_print_keypair(pkey);
 
 	return pkey;
 
@@ -206,6 +239,7 @@ static bool parse_url_path_and_query(const char *url, const char **out_begin, si
 
 	*out_begin = slash;
 	*out_len = strlen(slash);
+
 	return true;
 }
 
@@ -339,6 +373,17 @@ uint8_t *crypto_sign_policy_header(
 		return NULL;
 	}
 
+	/* Debug: print the buffer right before signing */
+	char *hex = bzalloc(buf_len * 2 + 1);
+	if (hex) {
+		for (size_t i = 0; i < buf_len; i++) {
+			sprintf(hex + i * 2, "%02x", buf[i]);
+		}
+		printf("[sign] Buffer to sign (hex): %s\n", hex);
+		printf("[sign] Buffer to sign (length): %zu\n\n", buf_len);
+		bfree(hex);
+	}
+
 	uint8_t sig64[64];
 	if (!ecdsa_sign_p1363_sha256(private_key, buf, buf_len, sig64)) {
 		bfree(buf);
@@ -362,51 +407,4 @@ uint8_t *crypto_sign_policy_header(
 	return header;
 }
 
-/* Example: write private/public PEM (similar to exporting in Node). */
-static int write_pem_files(EVP_PKEY *pkey) {
-	FILE *fp = fopen("ec_p256_private.pem", "wb");
 
-	if (!fp)
-		return 0;
-
-	if (!PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL)) {
-		fclose(fp);
-		return 0;
-	}
-
-	fclose(fp);
-
-	fp = fopen("ec_p256_public.pem", "wb");
-
-	if (!fp)
-		return 0;
-
-	if (!PEM_write_PUBKEY(fp, pkey)) {
-		fclose(fp);
-		return 0;
-	}
-
-	fclose(fp);
-
-	return 1;
-}
-
-/*
-int main(void)
-{
-	EVP_PKEY *pkey = crypto_generate_p256_keypair();
-	if (!pkey) {
-		fprintf(stderr, "Failed to generate P-256 keypair\n");
-		return 1;
-	}
-
-	if (!write_pem_files(pkey)) {
-		fprintf(stderr, "Failed to write PEM files\n");
-		EVP_PKEY_free(pkey);
-		return 1;
-	}
-
-	EVP_PKEY_free(pkey);
-	return 0;
-}
-*/

@@ -4,7 +4,6 @@
 #include <diagnostics/log.h>
 
 #include <stdlib.h>
-#include <stdio.h>
 
 bool open_url(const char *url) {
 	if (!url || !*url)

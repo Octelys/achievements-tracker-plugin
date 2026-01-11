@@ -5,7 +5,10 @@
 #include <util/config-file.h>
 #include <util/platform.h>
 
+#include "util/uuid.h"
+
 #define PERSIST_FILE "state.json"
+#define DEVICE_UUID "device_uuid"
 #define XSTS_TOKEN_KEY "xsts_token"
 #define XID_KEY "xid"
 
@@ -84,6 +87,38 @@ void clear_xid_xsts_token(void) {
 
 	/* Immediately save the state to disk */
 	save_state(g_state);
+}
+
+/**
+ * Gets an existing device UUID or creates a new one if none exists
+ *
+ * @return Device UUID
+ */
+const char* state_get_device_uuid(void) {
+
+	const char* device_uuid = obs_data_get_string(g_state, DEVICE_UUID);
+
+	if (!device_uuid) {
+
+		obs_log(LOG_INFO, "No device UUID found. Creating new one");
+
+		/* Generate a random device UUID */
+		char new_device_uuid[37];
+		uuid_get_random(new_device_uuid);
+
+		/* Immediately save the state to disk */
+		obs_data_set_string(g_state, DEVICE_UUID, new_device_uuid);
+		save_state(g_state);
+
+		obs_log(LOG_INFO, "New device UUID saved %s", new_device_uuid);
+
+		/* Retrieves it from the state */
+		device_uuid = obs_data_get_string(g_state, DEVICE_UUID);
+	}
+
+	obs_log(LOG_INFO, "Device UUID: %s", device_uuid);
+
+	return device_uuid;
 }
 
 void set_xid_xsts_token(const char *xid, const char *token) {

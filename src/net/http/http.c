@@ -96,6 +96,84 @@ char *http_post_form(const char *url, const char *postfields, long *out_http_cod
 	return chunk.ptr;
 }
 
+char *http_post(const char *url, const char *body, const char *extra_headers, long *out_http_code) {
+	if (out_http_code)
+		*out_http_code = 0;
+
+	CURL *curl = curl_easy_init();
+
+	if (!curl)
+		return NULL;
+
+	struct http_buf chunk = {0};
+	chunk.ptr = bzalloc(1);
+	chunk.len = 0;
+
+	struct curl_slist *headers = NULL;
+
+	/* Avoid 100-continue edge cases that can hide error bodies on some proxies */
+	headers = curl_slist_append(headers, "Expect:");
+
+	if (extra_headers && *extra_headers) {
+		/* extra_headers contains one header per line (CRLF or LF). */
+		char *dup = bstrdup(extra_headers);
+
+		for (char *line = dup; line && *line;) {
+			char *next = strpbrk(line, "\r\n");
+
+			if (next) {
+				*next = '\0';
+				/* Skip consecutive line breaks */
+				char *p = next + 1;
+				while (*p == '\r' || *p == '\n')
+					p++;
+				next = p;
+			} else {
+				next = NULL;
+			}
+
+			if (*line)
+				headers = curl_slist_append(headers, line);
+			line = next;
+		}
+		bfree(dup);
+	}
+
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
+	curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
+
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_POST, 1L);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+	curl_easy_setopt(curl, CURLOPT_USERAGENT, "achievements-tracker-obs-plugin/1.0");
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 0L);
+
+	CURLcode res = curl_easy_perform(curl);
+	if (res != CURLE_OK) {
+		obs_log(LOG_WARNING, "curl POST failed: %s", curl_easy_strerror(res));
+		curl_slist_free_all(headers);
+		curl_easy_cleanup(curl);
+		bfree(chunk.ptr);
+		return NULL;
+	}
+
+	long http_code = 0;
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+	if (out_http_code)
+		*out_http_code = http_code;
+
+	curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
+
+	return chunk.ptr;
+}
+
 char *http_post_json(const char *url, const char *json_body, const char *extra_headers, long *out_http_code) {
 	if (out_http_code)
 		*out_http_code = 0;
@@ -110,7 +188,6 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
 	chunk.len = 0;
 
 	struct curl_slist *headers = NULL;
-	headers = curl_slist_append(headers, "Content-Type: application/json");
 	headers = curl_slist_append(headers, "Content-Type: application/json");
 
 	/* Avoid 100-continue edge cases that can hide error bodies on some proxies */

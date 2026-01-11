@@ -4,7 +4,6 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
-#include "sources/achievements-tracker-source.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
 #include "crypto/crypto.h"
@@ -43,12 +42,15 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 	UNUSED_PARAMETER(props);
 	UNUSED_PARAMETER(property);
 
+	const char *device_uuid = state_get_device_uuid();
+
 	char *xid = NULL;
 	char *uhs = NULL;
 	char *xsts_token = NULL;
-	if (!xbox_auth_interactive_get_xsts(&uhs, &xid, &xsts_token)) {
+
+	if (!xbox_auth_interactive_get_xsts(device_uuid, &uhs, &xid, &xsts_token)) {
 		obs_log(LOG_WARNING, "Xbox sign-in failed");
-		return true;
+		return false;
 	}
 
 	char *token = bzalloc(4096);
@@ -94,9 +96,9 @@ obs_properties_t *get_properties(void *data) {
 	return p;
 }
 
-/* Gets the name of the source */
 const char *text_src_get_name(void *unused) {
 	UNUSED_PARAMETER(unused);
+
 	return "Achievements Tracker";
 }
 
@@ -115,6 +117,11 @@ static struct obs_source_info text_src_info = {
 	.video_render = text_src_video_render,
 };
 
-const struct obs_source_info *get_plugin_properties(void) {
+/**
+ * Returns the configuration of the plugin
+ *
+ * @return
+ */
+const struct obs_source_info *configuration_get_plugin_properties(void) {
 	return &text_src_info;
 }

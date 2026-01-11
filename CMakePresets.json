@@ -64,6 +64,25 @@
       }
     },
     {
+      "name": "macos-clion",
+      "displayName": "macOS CLion (Ninja)",
+      "description": "Build for macOS using Ninja generator for CLion IDE",
+      "inherits": ["template"],
+      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "generator": "Ninja",
+      "warnings": {"dev": true, "deprecated": true},
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "12.0",
+        "BUILD_TESTING": true
+      }
+    },
+    {
       "name": "windows-x64",
       "displayName": "Windows x64",
       "description": "Build for Windows x64",

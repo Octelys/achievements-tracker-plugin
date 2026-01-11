@@ -3,7 +3,6 @@
 
 #include "sources/achievements-tracker-source.h"
 #include "io/state.h"
-#include "configuration/properties.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
