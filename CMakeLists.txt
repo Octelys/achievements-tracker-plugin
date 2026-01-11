@@ -26,6 +26,22 @@ if(WIN32)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Rpcrt4)
 endif()
 
+# UUID (Linux/BSD): uuid_generate_random/uuid_unparse_lower live in libuuid
+if(NOT WIN32)
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(LIBUUID QUIET uuid)
+  endif()
+
+  if(LIBUUID_FOUND)
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBUUID_INCLUDE_DIRS})
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBUUID_LIBRARIES})
+  else()
+    # Fallback: most Linux distros provide libuuid as -luuid
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE uuid)
+  endif()
+endif()
+
 # HTTP client for OAuth + XBL/XSTS flows
 find_package(CURL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
@@ -193,6 +209,14 @@ if(BUILD_TESTING)
 
   if(WIN32)
     target_link_libraries(test_encoder PRIVATE Rpcrt4)
+  else()
+    # libuuid for uuid_generate_random/uuid_unparse_lower
+    if(LIBUUID_FOUND)
+      target_include_directories(test_encoder PRIVATE ${LIBUUID_INCLUDE_DIRS})
+      target_link_libraries(test_encoder PRIVATE ${LIBUUID_LIBRARIES})
+    else()
+      target_link_libraries(test_encoder PRIVATE uuid)
+    endif()
   endif()
 
   # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
@@ -241,22 +265,12 @@ if(BUILD_TESTING)
 
   if(WIN32)
     target_link_libraries(test_crypto PRIVATE Rpcrt4)
-  endif()
-
-  if(TARGET OpenSSL::Crypto)
-    target_link_libraries(test_crypto PRIVATE OpenSSL::Crypto)
-    if(TARGET OpenSSL::SSL)
-      target_link_libraries(test_crypto PRIVATE OpenSSL::SSL)
-    endif()
-
-    if(OPENSSL_INCLUDE_DIR)
-      target_include_directories(test_crypto PRIVATE ${OPENSSL_INCLUDE_DIR})
-    endif()
   else()
-    target_include_directories(test_crypto PRIVATE ${OPENSSL_INCLUDE_DIR})
-    target_link_libraries(test_crypto PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
-    if(OPENSSL_SSL_LIBRARY)
-      target_link_libraries(test_crypto PRIVATE ${OPENSSL_SSL_LIBRARY})
+    if(LIBUUID_FOUND)
+      target_include_directories(test_crypto PRIVATE ${LIBUUID_INCLUDE_DIRS})
+      target_link_libraries(test_crypto PRIVATE ${LIBUUID_LIBRARIES})
+    else()
+      target_link_libraries(test_crypto PRIVATE uuid)
     endif()
   endif()
 
