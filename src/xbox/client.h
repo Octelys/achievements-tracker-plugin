@@ -12,7 +12,8 @@ void get_presence(void);
  */
 char *xbox_fetch_achievements_json(long *out_http_code);
 
-/* Fetch user presence for the stored XUID. Returns JSON string (bfree) or NULL. */
+/* Fetch user presence for the stored XUID. Returns JSON string (bfree) or NULL.
+ */
 char *xbox_fetch_presence_json(long *out_http_code);
 
 #ifdef __cplusplus

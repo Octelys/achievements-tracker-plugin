@@ -44,13 +44,13 @@ invoke_formatter() {
 
       local -a formatter_version=($(${formatter} --version))
 
-      if ! is-at-least 21.1.8 ${formatter_version[-1]}; then
-        log_error "clang-format is not version 21.1.8 or above (found ${formatter_version[-1]}."
+      if ! is-at-least 19.1.1 ${formatter_version[-1]}; then
+        log_error "clang-format is not version 19.1.1 or above (found ${formatter_version[-1]}."
         exit 2
       fi
 
-      if ! is-at-least ${formatter_version[-1]} 21.1.8; then
-        log_error "clang-format is more recent than version 21.1.8 (found ${formatter_version[-1]})."
+      if ! is-at-least ${formatter_version[-1]} 19.1.1; then
+        log_error "clang-format is more recent than version 19.1.1 (found ${formatter_version[-1]})."
         exit 2
       fi
 
