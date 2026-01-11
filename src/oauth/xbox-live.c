@@ -146,7 +146,8 @@ http_code); bfree(xbl_json); return;
  * @param ctx
  */
 static void retrieve_title_token(struct device_flow_ctx *ctx) {
-    char json_body[8192];
+
+    char json_body[16384];
     snprintf(json_body,
              sizeof(json_body),
              "{\"Properties\":{\"AuthMethod\":\"RPS\",\"DeviceToken\":\"%s\",\"RpsTicket\":\"t=%s\",\"SiteName\":\"user.auth.xboxlive.com\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
