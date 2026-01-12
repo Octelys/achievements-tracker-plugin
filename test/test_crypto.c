@@ -622,9 +622,9 @@ void test_crypto_to_from_roundtrip(void) {
     EVP_PKEY *original_keys = crypto_generate_keys();
 
     //  Act.
-    char *serialized_keys = crypto_to_string(original_keys, true);
+    char     *serialized_keys   = crypto_to_string(original_keys, true);
     EVP_PKEY *deserialized_keys = crypto_from_string(serialized_keys, true);
-    char *reserialized_keys = crypto_to_string(deserialized_keys, true);
+    char     *reserialized_keys = crypto_to_string(deserialized_keys, true);
 
     //  Assert.
     TEST_ASSERT_EQUAL_STRING(serialized_keys, reserialized_keys);
