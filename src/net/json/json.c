@@ -89,8 +89,7 @@ long *json_get_long_value(const char *json, const char *key) {
     return out_value;
 }
 
-static char *dup_range(const char *start, const char *end)
-{
+static char *dup_range(const char *start, const char *end) {
     if (!start || !end || end < start)
         return NULL;
 
@@ -101,8 +100,7 @@ static char *dup_range(const char *start, const char *end)
     return out;
 }
 
-static char *json_read_object_subjson(const char *json, const char *key)
-{
+static char *json_read_object_subjson(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
 
@@ -161,8 +159,7 @@ static char *json_read_object_subjson(const char *json, const char *key)
     return NULL;
 }
 
-char *json_read_string_from_path(const char *json, const char *path)
-{
+char *json_read_string_from_path(const char *json, const char *path) {
     if (!json || !path || !*path)
         return NULL;
 
@@ -179,7 +176,7 @@ char *json_read_string_from_path(const char *json, const char *path)
         if (seg_end == seg_start)
             goto cleanup;
 
-        char key[256];
+        char   key[256];
         size_t klen = (size_t)(seg_end - seg_start);
         if (klen >= sizeof(key))
             goto cleanup;

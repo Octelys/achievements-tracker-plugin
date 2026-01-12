@@ -183,7 +183,7 @@ static void retrieve_sisu_token(struct authentication_ctx *ctx) {
 
     obs_log(LOG_INFO, "Sending request for sisu token: %s", json_body);
 
-    long  http_code        = 0;
+    long  http_code       = 0;
     char *sisu_token_json = http_post(SISU_AUTHENTICATE, json_body, extra_headers, &http_code);
 
     bfree(signature_b64);
@@ -588,7 +588,7 @@ static void *start_authentication_flow(void *param) {
         obs_log(LOG_INFO, "Using cached user token");
         ctx->user_token = user_token;
         retrieve_device_token(ctx);
-        return (void*)false;
+        return (void *)false;
     }
 
     obs_log(LOG_INFO, "Starting Xbox sign-in in browser");
@@ -600,7 +600,7 @@ static void *start_authentication_flow(void *param) {
 
     if (!scope_enc) {
         obs_log(LOG_WARNING, ctx->result.error_message);
-        return (void*)false;
+        return (void *)false;
     }
 
     char form_url_encoded[8192];
@@ -622,14 +622,14 @@ static void *start_authentication_flow(void *param) {
     if (!token_json) {
         ctx->result.error_message = "Unable to retrieve a user token: received no response from the server";
         obs_log(LOG_ERROR, ctx->result.error_message);
-        return (void*)false;
+        return (void *)false;
     }
 
     if (http_code < 200 || http_code >= 300) {
         ctx->result.error_message = "Unable to retrieve a user token: received an error from the server";
         obs_log(LOG_ERROR, "Unable to retrieve a user token:  %ld", http_code);
         bfree(token_json);
-        return (void*)false;
+        return (void *)false;
     }
 
     /* ******************************************* */
@@ -642,7 +642,7 @@ static void *start_authentication_flow(void *param) {
             "Unable to received a user token: could not parse the user_code from token response";
         obs_log(LOG_ERROR, ctx->result.error_message);
         bfree(token_json);
-        return (void*)false;
+        return (void *)false;
     }
 
     char *device_code = json_read_string(token_json, "device_code");
@@ -653,7 +653,7 @@ static void *start_authentication_flow(void *param) {
         obs_log(LOG_ERROR, ctx->result.error_message);
         bfree(token_json);
         bfree(user_code);
-        return (void*)false;
+        return (void *)false;
     }
 
     long *interval = json_get_long_value(token_json, "interval");
@@ -664,7 +664,7 @@ static void *start_authentication_flow(void *param) {
         bfree(interval);
         bfree(token_json);
         bfree(user_code);
-        return (void*)false;
+        return (void *)false;
     }
 
     long *expires_in = json_get_long_value(token_json, "expires_in");
@@ -677,7 +677,7 @@ static void *start_authentication_flow(void *param) {
         bfree(interval);
         bfree(token_json);
         bfree(user_code);
-        return (void*)false;
+        return (void *)false;
     }
 
     ctx->device_code         = device_code;
@@ -699,7 +699,7 @@ static void *start_authentication_flow(void *param) {
         bfree(interval);
         bfree(token_json);
         bfree(user_code);
-        return (void*)false;
+        return (void *)false;
     }
 
     /* ************************************* */
@@ -712,7 +712,7 @@ static void *start_authentication_flow(void *param) {
     bfree(token_json);
     bfree(user_code);
 
-    return (void*)true;
+    return (void *)true;
 }
 
 //	--
