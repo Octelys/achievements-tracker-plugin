@@ -104,7 +104,7 @@ static char *json_read_object_subjson(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
 
-    char needle[256];
+    char *needle = bzalloc(strlen(key) + 32);
     snprintf(needle, sizeof(needle), "\"%s\"", key);
 
     const char *p = strstr(json, needle);
