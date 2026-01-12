@@ -20,17 +20,19 @@ typedef struct device {
 
 typedef struct token {
     const char *value;
+    /* unix timestamp */
+    long        expires;
 } token_t;
 
 typedef struct xbox_live_authenticate_result {
     const char *error_message;
 } xbox_live_authenticate_result_t;
 
-typedef struct xbox_identity_result {
+typedef struct xbox_identity {
     const char    *gamertag;
     const char    *xid;
     const token_t *token;
-} xbox_identity_result_t;
+} xbox_identity_t;
 
 #ifdef __cplusplus
 }

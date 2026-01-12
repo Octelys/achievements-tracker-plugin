@@ -19,8 +19,10 @@
 
 #define SISU_TOKEN "sisu_token"
 
-#define XSTS_TOKEN_KEY "xsts_token"
-#define XID_KEY "xid"
+#define XBOX_IDENTITY_GTG "xbox_gamertag"
+#define XBOX_IDENTITY_ID "xbox_id"
+#define XBOX_TOKEN "xbox_token"
+#define XBOX_TOKEN_EXPIRY "xbox_token_expiry"
 
 static obs_data_t *g_state = NULL;
 
@@ -93,22 +95,13 @@ void io_load(void) {
     (void)last_sync;
 }
 
-const char *get_xsts_token(void) {
-    return obs_data_get_string(g_state, XSTS_TOKEN_KEY);
-}
-
-const char *get_xid(void) {
-    return obs_data_get_string(g_state, XID_KEY);
-}
-
 void state_clear(void) {
-    obs_data_set_string(g_state, DEVICE_UUID, "");
-    obs_data_set_string(g_state, DEVICE_SERIAL_NUMBER, "");
-    obs_data_set_string(g_state, DEVICE_TOKEN, "");
-    obs_data_set_string(g_state, DEVICE_KEYS, "");
+    /* Considering how sensitive the Xbox live API appears, let's always keep the UUID / Serial / Keys constant */
+    /*obs_data_set_string(g_state, DEVICE_UUID, "");*/
+    /*obs_data_set_string(g_state, DEVICE_SERIAL_NUMBER, "");*/
+    /*obs_data_set_string(g_state, DEVICE_KEYS, "");*/
 
-    obs_data_set_string(g_state, XID_KEY, "");
-    obs_data_set_string(g_state, XSTS_TOKEN_KEY, "");
+    obs_data_set_string(g_state, DEVICE_TOKEN, "");
 
     /* Immediately save the state to disk */
     save_state(g_state);
@@ -212,12 +205,6 @@ device_t *state_get_device(void) {
     return device;
 }
 
-void state_set_tokens(const char *xid, const char *token) {
-    obs_data_set_string(g_state, XID_KEY, xid);
-    obs_data_set_string(g_state, XSTS_TOKEN_KEY, token);
-    save_state(g_state);
-}
-
 void state_set_device_token(const token_t *device_token) {
     obs_data_set_string(g_state, DEVICE_TOKEN, device_token->value);
     obs_log(LOG_INFO, "Device token saved %s", device_token->value);
@@ -285,4 +272,56 @@ token_t *state_get_user_token(void) {
     token->value   = user_token;
 
     return token;
+}
+
+void state_set_xbox_identity(const xbox_identity_t *xbox_identity) {
+    obs_data_set_string(g_state, XBOX_IDENTITY_GTG, xbox_identity->gamertag);
+    obs_data_set_string(g_state, XBOX_IDENTITY_ID, xbox_identity->xid);
+    obs_data_set_string(g_state, XBOX_TOKEN, xbox_identity->token->value);
+    obs_data_set_int(g_state, XBOX_TOKEN_EXPIRY, xbox_identity->token->expires);
+    save_state(g_state);
+}
+
+xbox_identity_t *state_get_xbox_identity(void) {
+
+    const char *gtg = obs_data_get_string(g_state, XBOX_IDENTITY_GTG);
+
+    if (!gtg || strlen(gtg) == 0) {
+        obs_log(LOG_INFO, "No gamertag found in the cache");
+        return NULL;
+    }
+
+    const char *xid = obs_data_get_string(g_state, XBOX_IDENTITY_ID);
+
+    if (!xid || strlen(xid) == 0) {
+        obs_log(LOG_INFO, "No user ID found in the cache");
+        return NULL;
+    }
+
+    const char *xbox_token = obs_data_get_string(g_state, XBOX_TOKEN);
+
+    if (!xbox_token || strlen(xbox_token) == 0) {
+        obs_log(LOG_INFO, "No xbox token found in the cache");
+        return NULL;
+    }
+
+    long xbox_token_expiry = obs_data_get_int(g_state, XBOX_TOKEN_EXPIRY);
+
+    if (xbox_token_expiry == 0) {
+        obs_log(LOG_INFO, "No xbox token expiry found in the cache");
+        return NULL;
+    }
+
+    obs_log(LOG_INFO, "Xbox identity found in the cache: %s (%s)", gtg, xid);
+
+    token_t *token = bzalloc(sizeof(token_t));
+    token->value   = xbox_token;
+    token->expires = xbox_token_expiry;
+
+    xbox_identity_t *identity = bzalloc(sizeof(xbox_identity_t));
+    identity->gamertag        = gtg;
+    identity->xid             = xid;
+    identity->token           = token;
+
+    return identity;
 }

@@ -10,9 +10,6 @@ void io_load(void);
 
 device_t *state_get_device(void);
 
-const char *get_xid(void);
-const char *get_xsts_token(void);
-
 void     state_set_user_token(const token_t *user_token);
 token_t *state_get_user_token(void);
 
@@ -22,9 +19,10 @@ token_t *state_get_device_token(void);
 void     state_set_sisu_token(const token_t *sisu_token);
 token_t *state_get_sisu_token(void);
 
-void state_clear(void);
+void             state_set_xbox_identity(const xbox_identity_t *xbox_identity);
+xbox_identity_t *state_get_xbox_identity(void);
 
-void state_set_tokens(const char *xid, const char *token);
+void state_clear(void);
 
 #ifdef __cplusplus
 }

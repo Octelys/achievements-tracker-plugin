@@ -157,22 +157,6 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
         return false;
     }
 
-    /*
-    char *token = bzalloc(4096);
-    snprintf(token, 4096, "XBL3.0 x=%s;%s", uhs, xsts_token);
-    state_set_tokens(xid, token);
-
-    obs_log(LOG_WARNING, "XSTS: %s", token);
-
-    bfree(uhs);
-    bfree(xsts_token);
-
-    long out_http_code = 0;
-    xbox_fetch_presence_json(&out_http_code);
-
-    refresh_page();
-    */
-
     return true;
 }
 
@@ -185,24 +169,20 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 obs_properties_t *xbox_achievements_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
+    /* Finds out if there is a token available already */
+    const xbox_identity_t *xbox_identity = state_get_xbox_identity();
+
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
-    obs_properties_add_text(p, "text", "Text", OBS_TEXT_DEFAULT);
-    obs_property_t *xboxSignInButton =
-        obs_properties_add_button(p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
-    obs_property_t *xboxSignOutButton =
+
+    if (xbox_identity != NULL) {
+        char status[4096];
+        snprintf(status, 4096, "Signed in as %s", xbox_identity->gamertag);
+        obs_properties_add_text(p, "status_info", status, OBS_TEXT_INFO);
         obs_properties_add_button(p, "sign-out-xbox", "Sign out from Xbox", &on_sign_out_clicked);
-
-    /* Finds out if there is a token available already */
-    const char *token = get_xsts_token();
-
-    if (token != NULL && strlen(token) > 0) {
-        obs_property_set_visible(xboxSignInButton, false);
-        obs_property_set_visible(xboxSignOutButton, true);
-        obs_log(LOG_WARNING, "Found token %s", token);
     } else {
-        obs_property_set_visible(xboxSignInButton, true);
-        obs_property_set_visible(xboxSignOutButton, false);
+        obs_properties_add_text(p, "status_info", "You are not connected.", OBS_TEXT_INFO);
+        obs_properties_add_button(p, "sign-in-xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
     }
 
     return p;
