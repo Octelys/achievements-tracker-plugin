@@ -11,6 +11,12 @@ extern "C" {
 if (p)			\
     bfree(p);
 
+#define COPY_OR_FREE(src, dst)	\
+if (dst)					    \
+    *dst = src;				    \
+else						    \
+    FREE(src);
+
 typedef struct device {
     /* unique identifier for the device */
     const char     *uuid;
