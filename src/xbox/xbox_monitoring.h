@@ -14,6 +14,11 @@ extern "C" {
 typedef void (*on_xbox_rta_message_received_t)(const char *message);
 
 /**
+ * Callback function type for when a game is being played
+ */
+typedef void (*on_xbox_game_played_t)(const game_t *game);
+
+/**
  * Callback function type for when the connection status changes
  * @param connected true if connected, false if disconnected
  * @param error_message Error message if disconnected due to error, NULL otherwise

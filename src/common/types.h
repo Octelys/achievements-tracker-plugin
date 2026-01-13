@@ -42,6 +42,11 @@ typedef struct xbox_identity {
     const token_t *token;
 } xbox_identity_t;
 
+typedef struct game {
+    const char     *title_id;
+    const char     *title;
+} game_t;
+
 #ifdef __cplusplus
 }
 #endif
