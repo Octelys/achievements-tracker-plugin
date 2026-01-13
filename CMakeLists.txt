@@ -46,6 +46,20 @@ endif()
 find_package(CURL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
+# WebSocket client for Xbox Live RTA monitoring
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
+endif()
+
+if(LIBWEBSOCKETS_FOUND)
+  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+  target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
+else()
+  message(WARNING "libwebsockets not found. Xbox Live RTA monitoring will be disabled.")
+endif()
+
 if(APPLE)
   execute_process(
     COMMAND xcrun --sdk macosx --show-sdk-path
@@ -166,6 +180,7 @@ target_sources(
     src/oauth/util.c
     src/oauth/xbox-live.c
     src/xbox/xbox_client.c
+    src/xbox/xbox_monitoring.c
     src/io/state.c
     src/encoding/base64.c
     src/util/uuid.c
