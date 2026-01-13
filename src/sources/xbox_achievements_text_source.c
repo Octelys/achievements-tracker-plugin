@@ -166,7 +166,9 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 }
 
 static void on_xbox_monitoring_message_received(const char *message) {
-    obs_log(LOG_WARNING, message);
+    char text[4096];
+    snprintf(text, 4096, "Received message from Real-Time Activity endpoint: %s", message);
+    obs_log(LOG_WARNING, text);
 }
 
 static void on_xbox_monitoring_connection_status_changed(bool connected, const char *error_message) {
@@ -176,7 +178,6 @@ static void on_xbox_monitoring_connection_status_changed(bool connected, const c
         obs_log(LOG_WARNING, error_message);
     }
 }
-
 
 static bool on_monitoring_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
     UNUSED_PARAMETER(props);

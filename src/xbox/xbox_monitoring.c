@@ -17,6 +17,8 @@
 #define RTA_PATH "/connect"
 #define RTA_PORT 443
 
+#define PROTOCOL "rta.xboxlive.com.V2"
+
 typedef struct xbox_monitoring_ctx {
     struct lws_context *context;
     struct lws         *wsi;
@@ -41,6 +43,8 @@ static xbox_monitoring_ctx_t *g_ctx = NULL;
 
 static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) {
 
+    UNUSED_PARAMETER(user);
+
     xbox_monitoring_ctx_t *ctx = (xbox_monitoring_ctx_t *)lws_context_user(lws_get_context(wsi));
 
     if (!ctx) {
@@ -64,7 +68,8 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
                 obs_log(LOG_ERROR, "Xbox RTA: Failed to add Authorization header");
                 return -1;
             }
-            obs_log(LOG_DEBUG, "Xbox RTA: Added Authorization header to handshake");
+
+            obs_log(LOG_INFO, "Xbox RTA: Added Authorization header to handshake");
         }
         break;
 
@@ -150,7 +155,6 @@ static void *monitoring_thread(void *arg) {
 
     info.port      = CONTEXT_PORT_NO_LISTEN;
     info.protocols = protocols;
-    info.gidx      = 0;
     info.user      = ctx;
     info.options   = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 
@@ -230,7 +234,7 @@ bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message, on_xbox_rt
     g_ctx->on_status  = on_status;
     g_ctx->running    = true;
     g_ctx->connected  = false;
-    g_ctx->auth_token = auth_header;
+    g_ctx->auth_token = bstrdup(auth_header);
 
     /* Allocate initial receive buffer */
     g_ctx->rx_buffer_size = 4096;
@@ -295,8 +299,7 @@ bool xbox_monitoring_is_active(void) {
 
 /* Stub implementations when libwebsockets is not available */
 
-bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message,
-                           on_xbox_rta_connection_status_t on_status) {
+bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message, on_xbox_rta_connection_status_t on_status) {
     (void)on_message;
     (void)on_status;
 

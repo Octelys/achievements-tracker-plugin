@@ -43,7 +43,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
              identity->xid,
              GAMERSCORE_SETTING);
 
-    obs_log(LOG_INFO, "Body: %s", json_body);
+    obs_log(LOG_DEBUG, "Body: %s", json_body);
 
     char headers[4096];
     snprintf(headers,
@@ -54,7 +54,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
 
-    obs_log(LOG_INFO, "Headers: %s", headers);
+    obs_log(LOG_DEBUG, "Headers: %s", headers);
 
     /*
      * Sends the request
