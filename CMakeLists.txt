@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.28...3.30)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/common/bootstrap.cmake" NO_POLICY_SCOPE)
 
+# Prefer universal OpenSSL when present (macOS)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalOpenSSL.cmake")
+
 project(${_name} VERSION ${_version})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
@@ -18,9 +21,40 @@ add_library(${CMAKE_PROJECT_NAME} MODULE)
 find_package(libobs REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
 
+# Windows UUID (Rpc.h/UUuid*) lives in Rpcrt4
+if(WIN32)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Rpcrt4)
+endif()
+
+# UUID (Linux/BSD): uuid_generate_random/uuid_unparse_lower live in libuuid
+if(NOT WIN32)
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(LIBUUID QUIET uuid)
+  endif()
+
+  if(LIBUUID_FOUND)
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBUUID_INCLUDE_DIRS})
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBUUID_LIBRARIES})
+  else()
+    # Fallback: most Linux distros provide libuuid as -luuid
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE uuid)
+  endif()
+endif()
+
 # HTTP client for OAuth + XBL/XSTS flows
 find_package(CURL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
+
+if(APPLE)
+  execute_process(
+    COMMAND xcrun --sdk macosx --show-sdk-path
+    OUTPUT_VARIABLE MACOS_SDK_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -isysroot ${MACOS_SDK_PATH}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isysroot ${MACOS_SDK_PATH}")
+endif()
 
 # OpenSSL
 #
@@ -29,81 +63,43 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 # universal (arm64+x86_64) linking.
 #
 # obs-deps 2024+ no longer includes OpenSSL. We build a universal OpenSSL
-# in .deps/openssl-universal during the CI build. We prevent CMake from
-# searching in Homebrew paths to avoid arm64-only libraries.
+# in .deps/openssl-universal during the CI build.
 if(APPLE)
   # Ignore typical Homebrew prefixes to prevent finding arm64-only OpenSSL
   list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local")
-
-  # For debugging: show CMAKE_PREFIX_PATH
-  message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
-
-  set(_found_openssl_root "")
-
-  # First, check for our custom-built universal OpenSSL in .deps/openssl-universal
-  set(_openssl_universal_dir "${CMAKE_CURRENT_SOURCE_DIR}/.deps/openssl-universal")
-  if(EXISTS "${_openssl_universal_dir}/include/openssl/ssl.h")
-    message(STATUS "Found universal OpenSSL at: ${_openssl_universal_dir}")
-    set(OPENSSL_ROOT_DIR "${_openssl_universal_dir}")
-    set(_found_openssl_root "${_openssl_universal_dir}")
-  else()
-    # Try to find openssl/ssl.h in various locations within CMAKE_PREFIX_PATH
-    find_path(
-      _openssl_include_dir
-      openssl/ssl.h
-      PATHS ${CMAKE_PREFIX_PATH}
-      PATH_SUFFIXES include ssl/include openssl/include
-      NO_DEFAULT_PATH
-    )
-
-    if(_openssl_include_dir)
-      get_filename_component(_root "${_openssl_include_dir}" DIRECTORY)
-      set(_found_openssl_root "${_root}")
-      message(STATUS "Found OpenSSL root via find_path: ${_found_openssl_root}")
-      set(OPENSSL_ROOT_DIR "${_found_openssl_root}")
-    else()
-      message(STATUS "OpenSSL headers not found in obs-deps or .deps/openssl-universal.")
-
-      # Debug: list contents of obs-deps directories to help diagnose
-      foreach(_prefix ${CMAKE_PREFIX_PATH})
-        if(_prefix MATCHES "obs-deps" AND NOT _prefix MATCHES "qt")
-          message(STATUS "Checking obs-deps directory: ${_prefix}")
-          if(EXISTS "${_prefix}/include")
-            message(STATUS "  include/ exists")
-          endif()
-          if(EXISTS "${_prefix}/lib")
-            message(STATUS "  lib/ exists")
-          endif()
-          if(EXISTS "${_prefix}/include/openssl")
-            message(STATUS "  include/openssl/ exists - OpenSSL headers found!")
-            set(OPENSSL_ROOT_DIR "${_prefix}")
-            set(_found_openssl_root "${_prefix}")
-          endif()
-        endif()
-      endforeach()
-
-      if(NOT _found_openssl_root)
-        message(STATUS "OpenSSL not found. Will search system paths (excluding Homebrew).")
-      endif()
-    endif()
-  endif()
 endif()
 
-# On macOS, obs-deps doesn't provide OpenSSLConfig.cmake, so skip CONFIG mode
-# On other platforms, try CONFIG mode first
+# Prefer CONFIG mode on non-macOS.
 if(NOT APPLE)
   find_package(OpenSSL CONFIG QUIET)
 endif()
 
 if(NOT TARGET OpenSSL::Crypto)
-  # Use module mode (FindOpenSSL.cmake)
-  if(APPLE)
-    # On macOS, only search in CMAKE_PREFIX_PATH (not system paths or Homebrew)
-    # We rely on CMAKE_IGNORE_PREFIX_PATH to skip Homebrew.
-    # obs-deps provides OpenSSL libraries.
-    find_package(OpenSSL REQUIRED)
+  find_package(OpenSSL REQUIRED)
+endif()
+
+# If OpenSSL resolves to Homebrew on macOS, fail early ONLY for universal builds.
+# Homebrew bottles are often single-arch (arm64 on Apple Silicon Macs), which
+# breaks universal (arm64+x86_64) builds. For single-arch dev builds, allow it.
+if(APPLE)
+  list(LENGTH CMAKE_OSX_ARCHITECTURES _arch_count)
+  if(_arch_count GREATER 1)
+    # Universal build - require non-Homebrew OpenSSL
+    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+      message(
+        FATAL_ERROR
+        "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is often single-arch.\n"
+        "This breaks universal (arm64+x86_64) builds.\n"
+        "Install/use a universal OpenSSL (CI builds one at .deps/openssl-universal).\n"
+        "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
+        "For local testing, use the 'macos-dev' preset which builds for native arch only."
+      )
+    endif()
   else()
-    find_package(OpenSSL REQUIRED)
+    # Single-arch build - Homebrew OpenSSL is fine
+    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+      message(STATUS "Using Homebrew OpenSSL for single-arch dev build: ${OPENSSL_CRYPTO_LIBRARY}")
+    endif()
   endif()
 endif()
 
@@ -113,18 +109,20 @@ if(TARGET OpenSSL::Crypto)
     message(STATUS "Successfully linked OpenSSL::Crypto target")
   endif()
 else()
-  # Module mode found it but didn't create imported target - verify and link manually
+  # Module mode found it but didn't create imported target - link manually
   if(APPLE)
     message(STATUS "Found OpenSSL at: ${OPENSSL_CRYPTO_LIBRARY}")
 
-    if(OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
+    # Only fail on Homebrew for universal builds
+    list(LENGTH CMAKE_OSX_ARCHITECTURES _arch_count2)
+    if(_arch_count2 GREATER 1 AND OPENSSL_CRYPTO_LIBRARY MATCHES "(/opt/homebrew|/usr/local)")
       message(
         FATAL_ERROR
         "Found Homebrew's OpenSSL at ${OPENSSL_CRYPTO_LIBRARY} which is arm64-only.\n"
         "This breaks universal (arm64+x86_64) builds.\n"
         "The buildspec system should have downloaded universal OpenSSL from obs-deps.\n"
         "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
-        "If you see this error, Homebrew's OpenSSL may need to be uninstalled."
+        "For local testing, use the 'macos-dev' preset which builds for native arch only."
       )
     endif()
   endif()
@@ -160,18 +158,176 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
-    src/sources/achievements-tracker-source.c
-    src/configuration/properties.c
+    src/sources/xbox_achievements_text_source.c
     src/crypto/crypto.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
-    src/oauth/callback-server.c
     src/oauth/util.c
     src/oauth/xbox-live.c
-    src/xbox/client.c
+    src/xbox/xbox_client.c
     src/io/state.c
-    src/encoding/encoder.c
+    src/encoding/base64.c
+    src/util/uuid.c
+    src/time/time.c
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
+
+# ------------------------------
+# Unit tests (Unity)
+# ------------------------------
+include(CTest)
+
+if(BUILD_TESTING)
+  # Unity test framework (vendored via FetchContent)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FetchUnity.cmake)
+
+  # ------------------------------
+  # test_encoder
+  # ------------------------------
+  add_executable(
+    test_encoder
+    test/test_encoder.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/encoding/base64.c
+    src/util/uuid.c
+    src/time/time.c
+    test/stubs/bmem_stub.c
+  )
+
+  target_include_directories(
+    test_encoder
+    PRIVATE
+      # Use stub headers instead of real OBS headers for unit tests
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  # Unity uses UNITY_INCLUDE_CONFIG_H to include a project-specific config header.
+  target_compile_definitions(test_encoder PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  if(WIN32)
+    target_link_libraries(test_encoder PRIVATE Rpcrt4)
+  else()
+    # libuuid for uuid_generate_random/uuid_unparse_lower
+    if(LIBUUID_FOUND)
+      target_include_directories(test_encoder PRIVATE ${LIBUUID_INCLUDE_DIRS})
+      target_link_libraries(test_encoder PRIVATE ${LIBUUID_LIBRARIES})
+    else()
+      target_link_libraries(test_encoder PRIVATE uuid)
+    endif()
+  endif()
+
+  # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
+  if(TARGET OpenSSL::Crypto)
+    target_link_libraries(test_encoder PRIVATE OpenSSL::Crypto)
+    if(TARGET OpenSSL::SSL)
+      target_link_libraries(test_encoder PRIVATE OpenSSL::SSL)
+    endif()
+
+    # Ensure headers are available even if the imported targets don't propagate include dirs.
+    if(OPENSSL_INCLUDE_DIR)
+      target_include_directories(test_encoder PRIVATE ${OPENSSL_INCLUDE_DIR})
+    endif()
+  else()
+    target_include_directories(test_encoder PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(test_encoder PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+    if(OPENSSL_SSL_LIBRARY)
+      target_link_libraries(test_encoder PRIVATE ${OPENSSL_SSL_LIBRARY})
+    endif()
+  endif()
+
+  # ------------------------------
+  # test_crypto
+  # ------------------------------
+  add_executable(
+    test_crypto
+    test/test_crypto.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/crypto/crypto.c
+    src/encoding/base64.c
+    src/net/json/json.c
+    src/util/uuid.c
+    src/time/time.c
+    test/stubs/bmem_stub.c
+  )
+
+  target_include_directories(
+    test_crypto
+    PRIVATE
+      # Use stub headers instead of real OBS headers for unit tests
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_crypto PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  if(WIN32)
+    target_link_libraries(test_crypto PRIVATE Rpcrt4)
+  else()
+    if(LIBUUID_FOUND)
+      target_include_directories(test_crypto PRIVATE ${LIBUUID_INCLUDE_DIRS})
+      target_link_libraries(test_crypto PRIVATE ${LIBUUID_LIBRARIES})
+    else()
+      target_link_libraries(test_crypto PRIVATE uuid)
+    endif()
+  endif()
+
+  # OpenSSL is required by test_crypto (EVP/BIO/BN/ECDSA helpers).
+  if(TARGET OpenSSL::Crypto)
+    target_link_libraries(test_crypto PRIVATE OpenSSL::Crypto)
+    if(TARGET OpenSSL::SSL)
+      target_link_libraries(test_crypto PRIVATE OpenSSL::SSL)
+    endif()
+
+    if(OPENSSL_INCLUDE_DIR)
+      target_include_directories(test_crypto PRIVATE ${OPENSSL_INCLUDE_DIR})
+    endif()
+  else()
+    target_include_directories(test_crypto PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(test_crypto PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+    if(OPENSSL_SSL_LIBRARY)
+      target_link_libraries(test_crypto PRIVATE ${OPENSSL_SSL_LIBRARY})
+    endif()
+  endif()
+
+  # ------------------------------
+  # test_time
+  # ------------------------------
+  add_executable(test_time test/test_time.c ${unity_SOURCE_DIR}/src/unity.c src/time/time.c test/stubs/bmem_stub.c)
+
+  target_include_directories(
+    test_time
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_time PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
+  if(TARGET OpenSSL::Crypto)
+    target_link_libraries(test_time PRIVATE OpenSSL::Crypto)
+    if(TARGET OpenSSL::SSL)
+      target_link_libraries(test_time PRIVATE OpenSSL::SSL)
+    endif()
+
+    # Ensure headers are available even if the imported targets don't propagate include dirs.
+    if(OPENSSL_INCLUDE_DIR)
+      target_include_directories(test_time PRIVATE ${OPENSSL_INCLUDE_DIR})
+    endif()
+  else()
+    target_include_directories(test_time PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(test_time PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+    if(OPENSSL_SSL_LIBRARY)
+      target_link_libraries(test_time PRIVATE ${OPENSSL_SSL_LIBRARY})
+    endif()
+  endif()
+endif()

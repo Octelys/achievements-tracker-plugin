@@ -17,7 +17,9 @@ extern "C" {
  */
 
 void oauth_random_state(char *out, size_t out_size);
+
 void oauth_pkce_verifier(char *out, size_t out_size);
+
 void oauth_pkce_challenge_s256(const char *verifier, char *out, size_t out_size);
 
 #ifdef __cplusplus

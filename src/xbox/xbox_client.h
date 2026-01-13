@@ -1,8 +1,13 @@
 #pragma once
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+bool xbox_fetch_gamerscore(int64_t *out_gamerscore);
 
 void get_presence(void);
 
@@ -12,7 +17,8 @@ void get_presence(void);
  */
 char *xbox_fetch_achievements_json(long *out_http_code);
 
-/* Fetch user presence for the stored XUID. Returns JSON string (bfree) or NULL. */
+/* Fetch user presence for the stored XUID. Returns JSON string (bfree) or NULL.
+ */
 char *xbox_fetch_presence_json(long *out_http_code);
 
 #ifdef __cplusplus

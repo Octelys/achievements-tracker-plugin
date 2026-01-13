@@ -2,14 +2,20 @@
 
 Standard: c++17
 AccessModifierOffset: -8
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
-AlignEscapedNewlines: Left
+AlignAfterOpenBracket: true
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: true
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: true
+AlignEscapedNewlines: LeftWithLastLine
 AlignOperands: true
-AlignTrailingComments: true
+AlignTrailingComments: Always
 AllowAllArgumentsOnNextLine: true
-AllowAllConstructorInitializersOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false
@@ -20,8 +26,8 @@ AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 # Note: keep to portable, supported options across clang-format versions.
-BinPackArguments: true
-BinPackParameters: false
+BinPackArguments: false
+BinPackParameters: true
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Custom
 BreakBeforeTernaryOperators: true
@@ -55,7 +61,8 @@ ObjCSpaceAfterProperty: true
 ObjCSpaceBeforeProtocolList: true
 
 PenaltyBreakAssignment: 10
-PenaltyBreakBeforeFirstCallParameter: 0
+# Force breaking before call parameters so multi-arg calls like snprintf format one-arg-per-line.
+PenaltyBreakBeforeFirstCallParameter: 1000
 PenaltyBreakComment: 10
 PenaltyBreakFirstLessLess: 0
 PenaltyBreakString: 10
@@ -63,7 +70,6 @@ PenaltyExcessCharacter: 100
 PenaltyReturnTypeOnItsOwnLine: 60
 
 PointerAlignment: Right
-ReflowComments: Never
 SkipMacroDefinitionBody: true
 SortIncludes: false
 SortUsingDeclarations: false
@@ -87,7 +93,8 @@ StatementMacros:
 TabWidth: 4
 TypenameMacros:
   - 'DARRAY'
-UseTab: ForContinuationAndIndentation
+# Use spaces so the "BlockIndent" alignment looks consistent.
+UseTab: Never
 ---
 Language: ObjC
 AccessModifierOffset: 2
@@ -113,7 +120,7 @@ BraceWrapping:
   AfterClass: true
   AfterControlStatement: Never
   AfterEnum: false
-  AfterFunction: true
+  AfterFunction: false
   AfterNamespace: false
   AfterObjCDeclaration: false
   AfterStruct: false
@@ -138,7 +145,7 @@ ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: LogicalBlock
-ExperimentalAutoDetectBinPacking: false
+ExperimentalAutoDetectBinPacking: true
 FixNamespaceComments: true
 IndentAccessModifiers: false
 IndentCaseBlocks: false

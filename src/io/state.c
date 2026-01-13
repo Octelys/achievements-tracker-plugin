@@ -5,91 +5,313 @@
 #include <util/config-file.h>
 #include <util/platform.h>
 
-#define PERSIST_FILE "state.json"
-#define XSTS_TOKEN_KEY "xsts_token"
-#define XID_KEY "xid"
+#include "crypto/crypto.h"
+#include "util/uuid.h"
+
+#define PERSIST_FILE "achievements-tracker-state.json"
+
+#define USER_TOKEN "user_token"
+
+#define DEVICE_UUID "device_uuid"
+#define DEVICE_SERIAL_NUMBER "device_serial_number"
+#define DEVICE_KEYS "device_keys"
+#define DEVICE_TOKEN "device_token"
+
+#define SISU_TOKEN "sisu_token"
+
+#define XBOX_IDENTITY_GTG "xbox_gamertag"
+#define XBOX_IDENTITY_ID "xbox_id"
+#define XBOX_IDENTITY_UHS "xbox_uhs"
+#define XBOX_TOKEN "xbox_token"
+#define XBOX_TOKEN_EXPIRY "xbox_token_expiry"
 
 static obs_data_t *g_state = NULL;
 
 static char *get_state_path(void) {
-	/* Put state under: <OBS config dir>/plugins/<plugin_name>/ */
-	char *dir = obs_module_config_path("");
+    /* Put state under: <OBS config dir>/plugins/<plugin_name>/ */
+    char *dir = obs_module_config_path("");
 
-	if (!dir)
-		return NULL;
+    if (!dir)
+        return NULL;
 
-	/* Ensure directory exists */
-	os_mkdirs(dir);
+    /* Ensure directory exists */
+    os_mkdirs(dir);
 
-	char *path = (char *)bzalloc(1024);
-	snprintf(path, 1024, "%s/%s", dir, PERSIST_FILE);
-	bfree(dir);
+    char *path = (char *)bzalloc(1024);
+    snprintf(path, 1024, "%s/%s", dir, PERSIST_FILE);
+    bfree(dir);
 
-	return path;
+    return path;
 }
 
+/**
+ * Reads the state from the disk.
+ *
+ * @return
+ */
 static obs_data_t *load_state(void) {
-	char *path = get_state_path();
+    char *path = get_state_path();
 
-	if (!path)
-		return NULL;
+    if (!path)
+        return NULL;
 
-	obs_data_t *data = obs_data_create_from_json_file(path);
-	bfree(path);
+    obs_log(LOG_INFO, "loading state from %s", path);
 
-	/* If file doesn’t exist yet, return an empty object */
-	if (!data) {
-		obs_log(LOG_INFO, "no state found: creating a new one");
-		data = obs_data_create();
-	}
+    obs_data_t *data = obs_data_create_from_json_file(path);
+    bfree(path);
 
-	return data;
+    /* If file doesn’t exist yet, return an empty object */
+    if (!data) {
+        obs_log(LOG_INFO, "no state found: creating a new one");
+        data = obs_data_create();
+    }
+
+    return data;
 }
 
+/**
+ * Persists the state to disk
+ *
+ * @param data
+ */
 static void save_state(obs_data_t *data) {
-	if (!data)
-		return;
+    if (!data)
+        return;
 
-	char *path = get_state_path();
+    char *path = get_state_path();
 
-	if (!path)
-		return;
+    if (!path)
+        return;
 
-	obs_data_save_json_safe(data, path, ".tmp", ".bak");
-	bfree(path);
+    obs_data_save_json_safe(data, path, ".tmp", ".bak");
+    bfree(path);
 }
 
 void io_load(void) {
-	g_state = load_state();
+    g_state = load_state();
 
-	/* Read values */
-	const char *token = obs_data_get_string(g_state, "oauth_token");
-	int64_t last_sync = obs_data_get_int(g_state, "last_sync_unix");
+    /* Read values */
+    const char *token     = obs_data_get_string(g_state, "oauth_token");
+    int64_t     last_sync = obs_data_get_int(g_state, "last_sync_unix");
 
-	(void)token;
-	(void)last_sync;
+    (void)token;
+    (void)last_sync;
 }
 
-const char *get_xsts_token(void) {
-	return obs_data_get_string(g_state, XSTS_TOKEN_KEY);
+void state_clear(void) {
+    /* Considering how sensitive the Xbox live API appears, let's always keep the UUID / Serial / Keys constant */
+    /*obs_data_set_string(g_state, DEVICE_UUID, "");*/
+    /*obs_data_set_string(g_state, DEVICE_SERIAL_NUMBER, "");*/
+    /*obs_data_set_string(g_state, DEVICE_KEYS, "");*/
+
+    obs_data_set_string(g_state, DEVICE_TOKEN, "");
+    obs_data_set_string(g_state, XBOX_IDENTITY_GTG, "");
+    obs_data_set_string(g_state, XBOX_IDENTITY_ID, "");
+    obs_data_set_string(g_state, XBOX_TOKEN, "");
+    obs_data_set_string(g_state, XBOX_TOKEN_EXPIRY, "");
+    save_state(g_state);
 }
 
-const char *get_xid(void) {
-	return obs_data_get_string(g_state, XID_KEY);
+static const char *create_device_uuid() {
+    /* Generate a random device UUID */
+    char new_device_uuid[37];
+    uuid_get_random(new_device_uuid);
+
+    obs_data_set_string(g_state, DEVICE_UUID, new_device_uuid);
+    save_state(g_state);
+
+    /* Retrieves it from the state */
+    return obs_data_get_string(g_state, DEVICE_UUID);
 }
 
-void clear_xid_xsts_token(void) {
-	obs_data_set_string(g_state, XID_KEY, "");
-	obs_data_set_string(g_state, XSTS_TOKEN_KEY, "");
+static const char *create_device_serial_number() {
+    /* Generate a random device UUID */
+    char new_device_serial_number[37];
+    uuid_get_random(new_device_serial_number);
 
-	/* Immediately save the state to disk */
-	save_state(g_state);
+    obs_data_set_string(g_state, DEVICE_SERIAL_NUMBER, new_device_serial_number);
+    save_state(g_state);
+
+    /* Retrieves it from the state */
+    return obs_data_get_string(g_state, DEVICE_SERIAL_NUMBER);
 }
 
-void set_xid_xsts_token(const char *xid, const char *token) {
-	obs_data_set_string(g_state, XID_KEY, xid);
-	obs_data_set_string(g_state, XSTS_TOKEN_KEY, token);
+static const char *create_device_keys() {
+    /* Generate a random key pair */
+    EVP_PKEY *device_key = crypto_generate_keys();
 
-	/* Immediately save the state to disk */
-	save_state(g_state);
+    char *serialized_keys = crypto_to_string(device_key, true);
+
+    obs_data_set_string(g_state, DEVICE_KEYS, serialized_keys);
+    save_state(g_state);
+
+    bfree(serialized_keys);
+    EVP_PKEY_free(device_key);
+
+    /* Retrieves it from the state */
+    return obs_data_get_string(g_state, DEVICE_KEYS);
+}
+
+/**
+ * Gets an existing device or create one if needed.
+ *
+ * @return Device UUID
+ */
+device_t *state_get_device(void) {
+
+    /* Retrieves the device UUID & serial number */
+    const char *device_uuid          = obs_data_get_string(g_state, DEVICE_UUID);
+    const char *device_serial_number = obs_data_get_string(g_state, DEVICE_SERIAL_NUMBER);
+
+    /* Retrieves the device's public & private keys */
+    const char *device_keys = obs_data_get_string(g_state, DEVICE_KEYS);
+
+    if (!device_uuid || strlen(device_uuid) == 0) {
+        obs_log(LOG_INFO, "No device UUID found. Creating new one");
+        device_uuid          = create_device_uuid();
+        device_serial_number = create_device_serial_number();
+
+        /* Forces the keys to be recreated if the device UUID is new */
+        device_keys = NULL;
+    }
+
+    if (!device_keys || strlen(device_keys) == 0) {
+        obs_log(LOG_INFO, "No device keys found. Creating new one pair");
+        device_keys = create_device_keys();
+    }
+
+    /* Retrieves the keys from the serialized string */
+    EVP_PKEY *device_evp_pkeys = crypto_from_string(device_keys, true);
+
+    if (!device_evp_pkeys) {
+        obs_log(LOG_ERROR, "Could not load device keys from state");
+        return NULL;
+    }
+    device_t *device      = (device_t *)bzalloc(sizeof(device_t));
+    device->uuid          = device_uuid;
+    device->serial_number = device_serial_number;
+    device->keys          = device_evp_pkeys;
+
+    return device;
+}
+
+void state_set_device_token(const token_t *device_token) {
+    obs_data_set_string(g_state, DEVICE_TOKEN, device_token->value);
+    save_state(g_state);
+}
+
+token_t *state_get_device_token(void) {
+
+    const char *device_token = obs_data_get_string(g_state, DEVICE_TOKEN);
+
+    if (!device_token || strlen(device_token) == 0) {
+        obs_log(LOG_INFO, "No device token found in the cache");
+        return NULL;
+    }
+
+    token_t *token = bzalloc(sizeof(token_t));
+    token->value   = device_token;
+
+    return token;
+}
+
+void state_set_sisu_token(const token_t *sisu_token) {
+    obs_data_set_string(g_state, SISU_TOKEN, sisu_token->value);
+    save_state(g_state);
+}
+
+token_t *state_get_sisu_token(void) {
+
+    const char *sisu_token = obs_data_get_string(g_state, SISU_TOKEN);
+
+    if (!sisu_token || strlen(sisu_token) == 0) {
+        obs_log(LOG_INFO, "No sisu token found in the cache");
+        return NULL;
+    }
+
+    token_t *token = bzalloc(sizeof(token_t));
+    token->value   = sisu_token;
+
+    return token;
+}
+
+void state_set_user_token(const token_t *user_token) {
+    obs_data_set_string(g_state, USER_TOKEN, user_token->value);
+    save_state(g_state);
+}
+
+token_t *state_get_user_token(void) {
+
+    const char *user_token = obs_data_get_string(g_state, USER_TOKEN);
+
+    if (!user_token || strlen(user_token) == 0) {
+        obs_log(LOG_INFO, "No user token found in the cache");
+        return NULL;
+    }
+
+    token_t *token = bzalloc(sizeof(token_t));
+    token->value   = user_token;
+
+    return token;
+}
+
+void state_set_xbox_identity(const xbox_identity_t *xbox_identity) {
+    obs_data_set_string(g_state, XBOX_IDENTITY_GTG, xbox_identity->gamertag);
+    obs_data_set_string(g_state, XBOX_IDENTITY_ID, xbox_identity->xid);
+    obs_data_set_string(g_state, XBOX_IDENTITY_UHS, xbox_identity->uhs);
+    obs_data_set_string(g_state, XBOX_TOKEN, xbox_identity->token->value);
+    obs_data_set_int(g_state, XBOX_TOKEN_EXPIRY, xbox_identity->token->expires);
+    save_state(g_state);
+}
+
+xbox_identity_t *state_get_xbox_identity(void) {
+
+    const char *gtg = obs_data_get_string(g_state, XBOX_IDENTITY_GTG);
+
+    if (!gtg || strlen(gtg) == 0) {
+        obs_log(LOG_INFO, "No gamertag found in the cache");
+        return NULL;
+    }
+
+    const char *xid = obs_data_get_string(g_state, XBOX_IDENTITY_ID);
+
+    if (!xid || strlen(xid) == 0) {
+        obs_log(LOG_INFO, "No user ID found in the cache");
+        return NULL;
+    }
+
+    const char *uhs = obs_data_get_string(g_state, XBOX_IDENTITY_UHS);
+
+    if (!uhs || strlen(uhs) == 0) {
+        obs_log(LOG_INFO, "No user hash found in the cache");
+        return NULL;
+    }
+
+    const char *xbox_token = obs_data_get_string(g_state, XBOX_TOKEN);
+
+    if (!xbox_token || strlen(xbox_token) == 0) {
+        obs_log(LOG_INFO, "No xbox token found in the cache");
+        return NULL;
+    }
+
+    int64_t xbox_token_expiry = (int64_t)obs_data_get_int(g_state, XBOX_TOKEN_EXPIRY);
+
+    if (xbox_token_expiry == 0) {
+        obs_log(LOG_INFO, "No xbox token expiry found in the cache");
+        return NULL;
+    }
+
+    obs_log(LOG_INFO, "Xbox identity found in the cache: %s (%s)", gtg, xid);
+
+    token_t *token = bzalloc(sizeof(token_t));
+    token->value   = xbox_token;
+    token->expires = xbox_token_expiry;
+
+    xbox_identity_t *identity = bzalloc(sizeof(xbox_identity_t));
+    identity->gamertag        = gtg;
+    identity->xid             = xid;
+    identity->uhs             = uhs;
+    identity->token           = token;
+
+    return identity;
 }
