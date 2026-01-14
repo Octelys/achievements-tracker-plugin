@@ -1,4 +1,4 @@
-#include "sources/xbox_achievements_text_source.h"
+#include "sources/xbox/achievements_text_source.h"
 
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
@@ -13,9 +13,9 @@
 #include "xbox/xbox_monitoring.h"
 
 // Store the source reference somewhere accessible
-static obs_source_t *g_xbox_achievements_text_src = NULL;
+static obs_source_t *g_xbox_game_cover_src = NULL;
 
-struct xbox_achievements_text_src {
+struct xbox_game_cover_source {
     obs_source_t *source;
     char         *text;
     obs_source_t *child_text;
@@ -34,15 +34,15 @@ struct xbox_achievements_text_src {
  * Image download helpers
  * ------------------------------------------------------------------------- */
 
-struct image_download_buffer {
+struct image_buffer {
     uint8_t *data;
     size_t   size;
     size_t   capacity;
 };
 
 static size_t image_download_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
-    struct image_download_buffer *buf = (struct image_download_buffer *)userdata;
-    size_t total = size * nmemb;
+    struct image_buffer *buf   = (struct image_buffer *)userdata;
+    size_t               total = size * nmemb;
 
     if (buf->size + total > buf->capacity) {
         size_t new_cap = (buf->capacity == 0) ? 65536 : buf->capacity * 2;
@@ -51,7 +51,7 @@ static size_t image_download_write_cb(void *ptr, size_t size, size_t nmemb, void
         uint8_t *new_data = brealloc(buf->data, new_cap);
         if (!new_data)
             return 0;
-        buf->data = new_data;
+        buf->data     = new_data;
         buf->capacity = new_cap;
     }
 
@@ -78,7 +78,7 @@ static bool download_image_to_memory(const char *url, uint8_t **out_data, size_t
         return false;
     }
 
-    struct image_download_buffer buf = {0};
+    struct image_buffer buf = {0};
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, image_download_write_cb);
@@ -105,7 +105,7 @@ static bool download_image_to_memory(const char *url, uint8_t **out_data, size_t
  * Loads an image from a URL and creates a texture.
  * Must be called from the graphics thread (e.g., in video_render or via obs_enter_graphics).
  */
-static void load_image_from_url(struct xbox_achievements_text_src *s) {
+static void load_image_from_url(struct xbox_game_cover_source *s) {
     if (!s || !s->image_url || s->image_url[0] == '\0')
         return;
 
@@ -114,11 +114,11 @@ static void load_image_from_url(struct xbox_achievements_text_src *s) {
         gs_texture_destroy(s->image_texture);
         s->image_texture = NULL;
     }
-    s->image_width = 0;
+    s->image_width  = 0;
     s->image_height = 0;
 
     uint8_t *data = NULL;
-    size_t size = 0;
+    size_t   size = 0;
 
     if (!download_image_to_memory(s->image_url, &data, &size)) {
         obs_log(LOG_WARNING, "Failed to download image from: %s", s->image_url);
@@ -148,7 +148,7 @@ static void load_image_from_url(struct xbox_achievements_text_src *s) {
     obs_enter_graphics();
     s->image_texture = gs_texture_create_from_file(temp_path);
     if (s->image_texture) {
-        s->image_width = gs_texture_get_width(s->image_texture);
+        s->image_width  = gs_texture_get_width(s->image_texture);
         s->image_height = gs_texture_get_height(s->image_texture);
         obs_log(LOG_INFO, "Loaded image %ux%u from %s", s->image_width, s->image_height, s->image_url);
     } else {
@@ -165,16 +165,16 @@ static void load_image_from_url(struct xbox_achievements_text_src *s) {
 /**
  * Sets a new image URL for the source. The image will be loaded on next render.
  */
-static void set_image_url(struct xbox_achievements_text_src *s, const char *url) {
+static void set_image_url(struct xbox_game_cover_source *s, const char *url) {
     if (!s)
         return;
 
     bfree(s->image_url);
-    s->image_url = url ? bstrdup(url) : NULL;
+    s->image_url        = url ? bstrdup(url) : NULL;
     s->image_needs_load = (url && url[0] != '\0');
 }
 
-static void text_src_update_child(struct xbox_achievements_text_src *s) {
+static void text_src_update_child(struct xbox_game_cover_source *s) {
     if (!s || !s->child_text)
         return;
 
@@ -188,11 +188,11 @@ static void text_src_update_child(struct xbox_achievements_text_src *s) {
     obs_data_release(st);
 }
 
-void *xbox_achievements_text_src_create(obs_data_t *settings, obs_source_t *source) {
-    g_xbox_achievements_text_src = source;
+void *xbox_game_cover_src_create(obs_data_t *settings, obs_source_t *source) {
+    g_xbox_game_cover_src = source;
 
-    struct xbox_achievements_text_src *s = bzalloc(sizeof(*s));
-    s->source                            = source;
+    struct xbox_game_cover_source *s = bzalloc(sizeof(*s));
+    s->source                        = source;
 
     const char *t = obs_data_get_string(settings, "text");
     s->text       = bstrdup(t ? t : "Hello from plugin");
@@ -210,8 +210,8 @@ void *xbox_achievements_text_src_create(obs_data_t *settings, obs_source_t *sour
     return s;
 }
 
-void xbox_achievements_text_src_destroy(void *data) {
-    struct xbox_achievements_text_src *s = data;
+void xbox_game_cover_src_destroy(void *data) {
+    struct xbox_game_cover_source *s = data;
 
     if (!s)
         return;
@@ -231,9 +231,9 @@ void xbox_achievements_text_src_destroy(void *data) {
     bfree(s);
 }
 
-void xbox_achievements_text_src_update(void *data, obs_data_t *settings) {
-    struct xbox_achievements_text_src *s = data;
-    const char                        *t = obs_data_get_string(settings, "text");
+void xbox_game_cover_src_update(void *data, obs_data_t *settings) {
+    struct xbox_game_cover_source *s = data;
+    const char                    *t = obs_data_get_string(settings, "text");
 
     bfree(s->text);
     s->text = bstrdup(t ? t : "");
@@ -242,23 +242,23 @@ void xbox_achievements_text_src_update(void *data, obs_data_t *settings) {
 }
 
 uint32_t xbox_achievements_text_src_get_width(void *data) {
-    struct xbox_achievements_text_src *s = data;
+    struct xbox_game_cover_source *s = data;
     /* Use image width if available, otherwise default */
     if (s->image_texture && s->image_width > 0)
         return s->image_width;
     return s->width;
 }
 
-uint32_t xbox_achievements_text_src_get_height(void *data) {
-    struct xbox_achievements_text_src *s = data;
+uint32_t xbox_game_cover_src_get_height(void *data) {
+    struct xbox_game_cover_source *s = data;
     /* Use image height if available, otherwise default */
     if (s->image_texture && s->image_height > 0)
         return s->image_height;
     return s->height;
 }
 
-void xbox_achievements_text_src_video_render(void *data, gs_effect_t *effect) {
-    struct xbox_achievements_text_src *s = data;
+void xbox_game_cover_src_video_render(void *data, gs_effect_t *effect) {
+    struct xbox_game_cover_source *s = data;
     if (!s)
         return;
 
@@ -297,7 +297,7 @@ void xbox_achievements_text_src_video_render(void *data, gs_effect_t *effect) {
 }
 
 static void refresh_page() {
-    if (!g_xbox_achievements_text_src)
+    if (!g_xbox_game_cover_src)
         return;
 
     /*
@@ -305,7 +305,7 @@ static void refresh_page() {
      * properties need to be recreated. Returning true from the
      * button callback also helps trigger this.
      */
-    obs_source_update_properties(g_xbox_achievements_text_src);
+    obs_source_update_properties(g_xbox_game_cover_src);
 }
 
 /**
@@ -458,14 +458,14 @@ static struct obs_source_info xbox_achievements_text_src_info = {
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = xbox_achievements_text_src_get_name,
-    .create         = xbox_achievements_text_src_create,
-    .destroy        = xbox_achievements_text_src_destroy,
-    .update         = xbox_achievements_text_src_update,
+    .create         = xbox_game_cover_src_create,
+    .destroy        = xbox_game_cover_src_destroy,
+    .update         = xbox_game_cover_src_update,
     .get_properties = xbox_achievements_get_properties,
     .get_width      = xbox_achievements_text_src_get_width,
-    .get_height     = xbox_achievements_text_src_get_height,
+    .get_height     = xbox_game_cover_src_get_height,
     .video_tick     = NULL,
-    .video_render   = xbox_achievements_text_src_video_render,
+    .video_render   = xbox_game_cover_src_video_render,
 };
 
 //	Public methods
@@ -484,15 +484,14 @@ void xbox_achievements_text_source_register(void) {
 }
 
 void xbox_achievements_text_source_set_image_url(const char *url) {
-    if (!g_xbox_achievements_text_src)
+    if (!g_xbox_game_cover_src)
         return;
 
     /* Get the private data from the source */
-    void *data = obs_obj_get_data(g_xbox_achievements_text_src);
+    void *data = obs_obj_get_data(g_xbox_game_cover_src);
     if (!data)
         return;
 
-    struct xbox_achievements_text_src *s = data;
+    struct xbox_game_cover_source *s = data;
     set_image_url(s, url);
 }
-

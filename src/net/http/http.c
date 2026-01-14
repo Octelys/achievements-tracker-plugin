@@ -8,18 +8,26 @@
 
 #define DEFAULT_USER_AGENT "achievements-tracker-obs-plugin/1.0"
 
-struct http_buf {
+struct http_buffer {
     char  *ptr;
     size_t len;
 };
 
+struct image_buffer {
+    uint8_t *data;
+    size_t   size;
+    size_t   capacity;
+};
+
 static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t           realsize = size * nmemb;
-    struct http_buf *mem      = (struct http_buf *)userp;
+    size_t              realsize = size * nmemb;
+    struct http_buffer *mem      = (struct http_buffer *)userp;
 
     char *p = brealloc(mem->ptr, mem->len + realsize + 1);
+
     if (!p)
         return 0;
+
     mem->ptr = p;
     memcpy(&(mem->ptr[mem->len]), contents, realsize);
     mem->len += realsize;
@@ -54,9 +62,9 @@ char *http_post_form(const char *url, const char *post_fields, long *out_http_co
     if (!curl)
         return NULL;
 
-    struct http_buf chunk = {0};
-    chunk.ptr             = bzalloc(1);
-    chunk.len             = 0;
+    struct http_buffer chunk = {0};
+    chunk.ptr                = bzalloc(1);
+    chunk.len                = 0;
 
     struct curl_slist *headers = NULL;
     headers                    = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
@@ -107,9 +115,9 @@ char *http_post(const char *url, const char *body, const char *extra_headers, lo
     if (!curl)
         return NULL;
 
-    struct http_buf chunk = {0};
-    chunk.ptr             = bzalloc(1);
-    chunk.len             = 0;
+    struct http_buffer chunk = {0};
+    chunk.ptr                = bzalloc(1);
+    chunk.len                = 0;
 
     struct curl_slist *headers = NULL;
 
@@ -186,9 +194,9 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
     if (!curl)
         return NULL;
 
-    struct http_buf chunk = {0};
-    chunk.ptr             = bzalloc(1);
-    chunk.len             = 0;
+    struct http_buffer chunk = {0};
+    chunk.ptr                = bzalloc(1);
+    chunk.len                = 0;
 
     struct curl_slist *headers = NULL;
     headers                    = curl_slist_append(headers, "Content-Type: application/json");
@@ -267,9 +275,9 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
     if (!curl)
         return NULL;
 
-    struct http_buf chunk = {0};
-    chunk.ptr             = bzalloc(1);
-    chunk.len             = 0;
+    struct http_buffer chunk = {0};
+    chunk.ptr                = bzalloc(1);
+    chunk.len                = 0;
 
     struct curl_slist *headers = NULL;
 
@@ -359,4 +367,42 @@ char *http_urlencode(const char *in) {
     curl_easy_cleanup(curl);
 
     return out;
+}
+
+bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
+
+    if (!url || !out_data || !out_size)
+        return false;
+
+    *out_data = NULL;
+    *out_size = 0;
+
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+        obs_log(LOG_ERROR, "Failed to init curl for download");
+        return false;
+    }
+
+    struct image_buffer buf = {0};
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, DEFAULT_USER_AGENT);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        obs_log(LOG_ERROR, "Download failed: %s", curl_easy_strerror(res));
+        bfree(buf.data);
+        return false;
+    }
+
+    *out_data = buf.data;
+    *out_size = buf.size;
+
+    return true;
 }

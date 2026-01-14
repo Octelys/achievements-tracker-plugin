@@ -15,7 +15,7 @@
 #define GAMERSCORE_SETTING                 "Gamerscore"
 #define XBOX_TITLE_HUB                     "https://titlehub.xboxlive.com/users/xuid(%s)/titles/titleId(%s)/decoration/image"
 
-char* xbox_get_game_cover(const game_t *game) {
+char *xbox_get_game_cover(const game_t *game) {
 
     char *display_image_url = NULL;
 
@@ -42,7 +42,7 @@ char* xbox_get_game_cover(const game_t *game) {
              sizeof(headers),
              "Authorization: XBL3.0 x=%s;%s\r\n"
              "x-xbl-contract-version: %s\r\n"
-             "Accept-Language: en-CA\r\n",          //  Must be present!
+             "Accept-Language: en-CA\r\n", //  Must be present!
              identity->uhs,
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);

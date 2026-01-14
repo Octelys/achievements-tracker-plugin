@@ -22,7 +22,7 @@ char *xbox_fetch_achievements_json(long *out_http_code);
  */
 char *xbox_fetch_presence_json(long *out_http_code);
 
-char* xbox_get_game_cover(const game_t *game);
+char *xbox_get_game_cover(const game_t *game);
 
 #ifdef __cplusplus
 }
