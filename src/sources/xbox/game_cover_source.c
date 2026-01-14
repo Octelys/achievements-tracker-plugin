@@ -143,7 +143,6 @@ static void *xbox_game_cover_src_create(obs_data_t *settings, obs_source_t *sour
 
     const char *t = obs_data_get_string(settings, "text");
     s->text       = bstrdup(t ? t : "Hello from plugin");
-
     s->width  = 800;
     s->height = 200;
 
@@ -154,6 +153,7 @@ static void *xbox_game_cover_src_create(obs_data_t *settings, obs_source_t *sour
     obs_data_release(st);
 
     text_src_update_child(s);
+
     return s;
 }
 
@@ -378,7 +378,6 @@ static void on_xbox_game_played(const game_t *game) {
     obs_log(LOG_WARNING, text);
 
     const char *game_cover_url = xbox_get_game_cover(game);
-
     source_set_image_url(game_cover_url);
 
     refresh_page();
@@ -483,6 +482,14 @@ const char *xbox_game_cover_src_get_name(void *unused) {
  */
 void xbox_game_cover_source_register(void) {
     obs_register_source(xbox_game_cover_source_get());
+
+    /* Starts the monitoring if the user is already logged in */
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (identity) {
+        xbox_monitoring_start(&on_xbox_game_played, &on_xbox_monitoring_connection_status_changed);
+        obs_log(LOG_INFO, "Monitoring started");
+    }
 }
 
 /**

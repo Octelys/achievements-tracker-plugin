@@ -15,6 +15,12 @@
 #define GAMERSCORE_SETTING                 "Gamerscore"
 #define XBOX_TITLE_HUB                     "https://titlehub.xboxlive.com/users/xuid(%s)/titles/titleId(%s)/decoration/image"
 
+#define XBOX_GAME_COVER_DISPLAY_IMAGE      "/titles/0/displayImage"
+#define XBOX_GAME_COVER_TYPE               "/titles/0/images/%d/type"
+#define XBOX_GAME_COVER_URL                "/titles/0/images/%d/url"
+#define XBOX_GAME_COVER_POSTER_TYPE        "poster"
+#define XBOX_GAME_COVER_BOXART_TYPE        "boxart"
+
 char *xbox_get_game_cover(const game_t *game) {
 
     char *display_image_url = NULL;
@@ -65,18 +71,59 @@ char *xbox_get_game_cover(const game_t *game) {
         goto cleanup;
     }
 
-    obs_log(LOG_WARNING, "Response: %s", response);
+    obs_log(LOG_DEBUG, "Response: %s", response);
 
+    /*
+     *  Process the response by trying to get the poster image URL.
+     *  Otherwise falls back on the display name.
+     */
     cJSON *presence_json = cJSON_Parse(response);
 
-    cJSON *display_image = cJSONUtils_GetPointer(presence_json, "/titles/0/displayImage");
+    for (int image_index = 0;; image_index++) {
 
-    if (!display_image) {
-        obs_log(LOG_ERROR, "Failed to fetch title image: displayName property not found");
-        goto cleanup;
+        char image_type_key[128];
+        snprintf(image_type_key, sizeof(image_type_key), XBOX_GAME_COVER_TYPE, image_index);
+
+        cJSON *image_type_value = cJSONUtils_GetPointer(presence_json, image_type_key);
+
+        if (!image_type_value) {
+            break;
+        }
+
+        if (strcmp(image_type_value->valuestring, XBOX_GAME_COVER_POSTER_TYPE) != 0 &&
+            strcmp(image_type_value->valuestring, XBOX_GAME_COVER_BOXART_TYPE) != 0) {
+            continue;
+        }
+
+        char image_url_key[128];
+        snprintf(image_url_key, sizeof(image_url_key), XBOX_GAME_COVER_URL, image_index);
+
+        cJSON *image_url_value = cJSONUtils_GetPointer(presence_json, image_url_key);
+
+        if (!image_url_value || strlen(image_url_value->valuestring) == 0) {
+            continue;
+        }
+
+        display_image_url = bstrdup_n(image_url_value->valuestring, strlen(image_url_value->valuestring));
+        obs_log(LOG_INFO, "Xbox poster image found");
+        break;
     }
 
-    display_image_url = bstrdup_n(display_image->valuestring, strlen(display_image->valuestring));
+    if (!display_image_url) {
+
+        obs_log(LOG_INFO, "No Xbox game poster image found: falling back on the display image");
+
+        /* No poster image found. Let's see if we can get the display image at least */
+        cJSON *display_image = cJSONUtils_GetPointer(presence_json, XBOX_GAME_COVER_DISPLAY_IMAGE);
+
+        if (!display_image) {
+            obs_log(LOG_ERROR, "Failed to fetch title image: displayName property not found");
+            goto cleanup;
+        }
+
+        display_image_url = bstrdup_n(display_image->valuestring, strlen(display_image->valuestring));
+        obs_log(LOG_INFO, "Xbox game display image found");
+    }
 
 cleanup:
     FREE(response);

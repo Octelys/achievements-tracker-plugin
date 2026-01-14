@@ -55,7 +55,7 @@ static void progress_buffer(const char *buffer, on_xbox_game_played_t on_xbox_ga
         return;
     }
 
-    obs_log(LOG_WARNING, "New buffer received %s", buffer);
+    obs_log(LOG_DEBUG, "New buffer received %s", buffer);
 
     /* Parse the buffer [X,X,X] */
     cJSON *root = cJSON_Parse(buffer);
