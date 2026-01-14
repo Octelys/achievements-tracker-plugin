@@ -490,8 +490,8 @@ bool xbox_unsubscribe(const char *subscription_id) {
 
 /* Stub implementations when libwebsockets is not available */
 
-bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message, on_xbox_rta_connection_status_t on_status) {
-    (void)on_message;
+bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_connection_status_t on_status) {
+    (void)on_game_played;
     (void)on_status;
 
     obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, monitoring not started");
