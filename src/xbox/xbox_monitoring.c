@@ -10,6 +10,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include "external/cjson/cJSON.h"
+#include "external/cjson/cJSON_Utils.h"
 
 #include "io/state.h"
 
@@ -27,7 +29,7 @@ typedef struct xbox_monitoring_ctx {
     bool                connected;
 
     /* Callbacks */
-    on_xbox_rta_message_received_t  on_message;
+    on_xbox_game_played_t           on_game_played;
     on_xbox_rta_connection_status_t on_status;
 
     /* Authentication */
@@ -40,6 +42,111 @@ typedef struct xbox_monitoring_ctx {
 } xbox_monitoring_ctx_t;
 
 static xbox_monitoring_ctx_t *g_ctx = NULL;
+
+static game_t *g_current_game = NULL;
+
+const game_t *get_current_game() {
+    return g_current_game;
+}
+
+static void progress_buffer(const char *buffer, on_xbox_game_played_t on_xbox_game_played) {
+
+    if (!buffer) {
+        return;
+    }
+
+    obs_log(LOG_WARNING, "New buffer received %s", buffer);
+
+    /* Parse the JSON */
+    cJSON *root = cJSON_Parse(buffer);
+
+    if (!root) {
+        return;
+    }
+
+    cJSON *inner = cJSON_GetArrayItem(root, 2);
+
+    if (!inner) {
+        obs_log(LOG_WARNING, "No inner array found");
+        cJSON_Delete(root);
+        return;
+    }
+
+    char *presence_message = cJSON_PrintUnformatted(inner);
+
+    if (strlen(presence_message) < 5) {
+        FREE(g_current_game);
+        obs_log(LOG_WARNING, "No game is played");
+        return;
+    }
+
+    obs_log(LOG_WARNING, "Presence message is %s", presence_message);
+
+    cJSON *presence_json = cJSON_Parse(presence_message);
+
+    char current_game_title[512];
+    char current_game_id[512];
+
+    for (int detail_index = 0; detail_index < 3; detail_index++) {
+
+        /* Finds out if there is anything at this index */
+        char is_game_key[512];
+        snprintf(is_game_key, sizeof(is_game_key), "/presenceDetails/%d/isGame", detail_index);
+
+        cJSON *is_game_value = cJSONUtils_GetPointer(presence_json, is_game_key);
+
+        if (!is_game_value) {
+            /* There is nothing more */
+            obs_log(LOG_WARNING, "No more game at %d", detail_index);
+            break;
+        }
+
+        if (is_game_value->type == cJSON_False) {
+            /* This is not a game: most likely the xbox home */
+            obs_log(LOG_WARNING, "No game at %d. Is game = %s", detail_index, is_game_value->valuestring);
+            continue;
+        }
+
+        obs_log(LOG_WARNING, "Game at %d. Is game = %s", detail_index, is_game_value->valuestring);
+
+        /* Retrieve the game title and its ID */
+        char game_title_key[512];
+        snprintf(game_title_key, sizeof(game_title_key), "/presenceDetails/%d/presenceText", detail_index);
+
+        cJSON *game_title_value = cJSONUtils_GetPointer(presence_json, game_title_key);
+
+        obs_log(LOG_WARNING, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
+
+        char game_id_key[512];
+        snprintf(game_id_key, sizeof(game_id_key), "/presenceDetails/%d/titleId", detail_index);
+
+        cJSON *game_id_value = cJSONUtils_GetPointer(presence_json, game_id_key);
+
+        obs_log(LOG_WARNING, "Game ID: %s %s", game_id_value->string, game_id_value->valuestring);
+
+        snprintf(current_game_title, sizeof(current_game_title), "%s", game_title_value->valuestring);
+        snprintf(current_game_id, sizeof(current_game_id), "%s", game_id_value->valuestring);
+    }
+
+    if (strlen(current_game_id) == 0) {
+        FREE(g_current_game);
+        obs_log(LOG_WARNING, "No game found");
+        return;
+    }
+
+    obs_log(LOG_WARNING, "Game is %s %s", current_game_title, current_game_id);
+
+    game_t *game = bzalloc(sizeof(game_t));
+    game->id     = strdup(current_game_id);
+    game->title  = strdup(current_game_title);
+
+    FREE(g_current_game);
+    g_current_game = game;
+
+    on_xbox_game_played(game);
+
+    FREE(presence_message);
+}
 
 static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) {
 
@@ -107,9 +214,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
 
             obs_log(LOG_DEBUG, "Xbox RTA: Complete message received: %s", ctx->rx_buffer);
 
-            if (ctx->on_message) {
-                ctx->on_message(ctx->rx_buffer);
-            }
+            progress_buffer(ctx->rx_buffer, ctx->on_game_played);
 
             /* Reset buffer for next message */
             ctx->rx_buffer_used = 0;
@@ -207,7 +312,7 @@ static void *monitoring_thread(void *arg) {
     return NULL;
 }
 
-bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message, on_xbox_rta_connection_status_t on_status) {
+bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_connection_status_t on_status) {
 
     if (g_ctx) {
         obs_log(LOG_WARNING, "Xbox RTA: Monitoring already active");
@@ -230,11 +335,11 @@ bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message, on_xbox_rt
     char auth_header[4096];
     snprintf(auth_header, sizeof(auth_header), "XBL3.0 x=%s;%s", identity->uhs, identity->token->value);
 
-    g_ctx->on_message = on_message;
-    g_ctx->on_status  = on_status;
-    g_ctx->running    = true;
-    g_ctx->connected  = false;
-    g_ctx->auth_token = bstrdup(auth_header);
+    g_ctx->on_game_played = on_game_played;
+    g_ctx->on_status      = on_status;
+    g_ctx->running        = true;
+    g_ctx->connected      = false;
+    g_ctx->auth_token     = bstrdup(auth_header);
 
     /* Allocate initial receive buffer */
     g_ctx->rx_buffer_size = 4096;

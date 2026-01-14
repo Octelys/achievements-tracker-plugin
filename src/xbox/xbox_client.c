@@ -12,7 +12,7 @@
 #define GAMERSCORE_SETTING                 "Gamerscore"
 
 /*
- *
+ *  https://learn.microsoft.com/en-us/gaming/gdk/docs/reference/live/rest/uri/profilev2/uri-usersbatchprofilesettingspost
  */
 bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     if (!out_gamerscore) {

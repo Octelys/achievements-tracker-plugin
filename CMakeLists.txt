@@ -228,6 +228,7 @@ target_sources(
     src/main.c
     src/sources/xbox_achievements_text_source.c
     src/crypto/crypto.c
+    src/common/types.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c

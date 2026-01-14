@@ -165,10 +165,12 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
     return true;
 }
 
-static void on_xbox_monitoring_message_received(const char *message) {
+static void on_xbox_game_played(const game_t *game) {
     char text[4096];
-    snprintf(text, 4096, "Received message from Real-Time Activity endpoint: %s", message);
+    snprintf(text, 4096, "Playing game %s (%s)", game->title, game->id);
     obs_log(LOG_WARNING, text);
+
+    refresh_page();
 }
 
 static void on_xbox_monitoring_connection_status_changed(bool connected, const char *error_message) {
@@ -185,7 +187,7 @@ static bool on_monitoring_clicked(obs_properties_t *props, obs_property_t *prope
     UNUSED_PARAMETER(property);
     UNUSED_PARAMETER(data);
 
-    xbox_monitoring_start(&on_xbox_monitoring_message_received, &on_xbox_monitoring_connection_status_changed);
+    xbox_monitoring_start(&on_xbox_game_played, &on_xbox_monitoring_connection_status_changed);
     obs_log(LOG_WARNING, "Monitoring started!");
 
     return true;
@@ -218,6 +220,15 @@ obs_properties_t *xbox_achievements_get_properties(void *data) {
 
         obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
         obs_properties_add_text(p, "gamerscore_info", gamerscore_text, OBS_TEXT_INFO);
+
+        const game_t *game = get_current_game();
+
+        if (game) {
+            char game_played[4096];
+            snprintf(game_played, sizeof(game_played), "Playing %s (%s)", game->title, game->id);
+            obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
+        }
+
         obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
 
         /* Temporary */

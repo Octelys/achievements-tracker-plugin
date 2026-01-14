@@ -25,14 +25,16 @@ typedef void (*on_xbox_game_played_t)(const game_t *game);
  */
 typedef void (*on_xbox_rta_connection_status_t)(bool connected, const char *error_message);
 
+const game_t *get_current_game();
+
 /**
  * Start monitoring Xbox Live RTA (Real-Time Activity) endpoint
  * Uses the authorization token from the current state
- * @param on_message Callback for received messages
+ * @param on_game_played Callback for received messages
  * @param on_status Callback for connection status changes
  * @return true if monitoring started successfully, false otherwise
  */
-bool xbox_monitoring_start(on_xbox_rta_message_received_t on_message, on_xbox_rta_connection_status_t on_status);
+bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_connection_status_t on_status);
 
 /**
  * Stop monitoring Xbox Live RTA endpoint
