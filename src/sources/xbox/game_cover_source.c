@@ -143,8 +143,8 @@ static void *xbox_game_cover_src_create(obs_data_t *settings, obs_source_t *sour
 
     const char *t = obs_data_get_string(settings, "text");
     s->text       = bstrdup(t ? t : "Hello from plugin");
-    s->width  = 800;
-    s->height = 200;
+    s->width      = 800;
+    s->height     = 200;
 
     /* Create built-in text source as a child */
     obs_data_t *st = obs_data_create();
