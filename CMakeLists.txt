@@ -21,6 +21,14 @@ add_library(${CMAKE_PROJECT_NAME} MODULE)
 find_package(libobs REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
 
+# ------------------------------
+# Vendored deps
+# ------------------------------
+# cJSON (and optional cJSON_Utils)
+add_library(cjson STATIC external/cjson/cJSON.c external/cjson/cJSON_Utils.c)
+
+target_include_directories(cjson PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/cjson)
+
 # Windows UUID (Rpc.h/UUuid*) lives in Rpcrt4
 if(WIN32)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Rpcrt4)
@@ -233,6 +241,9 @@ target_sources(
     src/time/time.c
 )
 
+# Link vendored deps
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE cjson)
+
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
 # ------------------------------
@@ -269,6 +280,9 @@ if(BUILD_TESTING)
 
   # Unity uses UNITY_INCLUDE_CONFIG_H to include a project-specific config header.
   target_compile_definitions(test_encoder PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  # Link vendored deps
+  target_link_libraries(test_encoder PRIVATE cjson)
 
   if(WIN32)
     target_link_libraries(test_encoder PRIVATE Rpcrt4)
@@ -328,6 +342,9 @@ if(BUILD_TESTING)
 
   target_compile_definitions(test_crypto PRIVATE UNITY_INCLUDE_CONFIG_H)
 
+  # Link vendored deps
+  target_link_libraries(test_crypto PRIVATE cjson)
+
   if(WIN32)
     target_link_libraries(test_crypto PRIVATE Rpcrt4)
   else()
@@ -372,6 +389,9 @@ if(BUILD_TESTING)
   )
 
   target_compile_definitions(test_time PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  # Link vendored deps
+  target_link_libraries(test_time PRIVATE cjson)
 
   # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
   if(TARGET OpenSSL::Crypto)

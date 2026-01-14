@@ -349,7 +349,8 @@ bool xbox_subscribe() {
      * Resource URI format: https://notify.xboxlive.com/users/xuid(<xuid>)/deviceId/current/titleId/current
      */
     char message[512];
-    snprintf(message, sizeof(message),
+    snprintf(message,
+             sizeof(message),
              "[1,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]",
              identity->xid);
 
