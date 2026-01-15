@@ -338,7 +338,7 @@ xbox_identity_t *state_get_xbox_identity(void) {
         return NULL;
     }
 
-    obs_log(LOG_INFO, "Xbox identity found in the cache: %s (%s)", gtg, xid);
+    obs_log(LOG_DEBUG, "Xbox identity found in the cache: %s (%s)", gtg, xid);
 
     token_t *token = bzalloc(sizeof(token_t));
     token->value   = xbox_token;

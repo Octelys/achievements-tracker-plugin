@@ -22,114 +22,99 @@ typedef struct xbox_game_cover_source {
     obs_source_t *child_text;
     uint32_t      width;
     uint32_t      height;
-
-    /* Image support */
-    gs_texture_t *image_texture;
-    uint32_t      image_width;
-    uint32_t      image_height;
-    char         *image_url;
-    bool          image_needs_load;
 } xbox_game_cover_source_t;
+
+/* Keeps track of the game cover image data */
+typedef struct game_cover {
+    char          image_path[512];
+    gs_texture_t *image_texture;
+    bool          must_reload;
+} game_cover_t;
+
+static game_cover_t g_game_cover;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * Loads an image from a URL and creates a texture.
- * Must be called from the graphics thread (e.g., in video_render or via obs_enter_graphics).
+ * Downloads the game box art from the specified URL and saves it in a temporary file.
+ *
+ * @param image_url
  */
-static void load_image_from_url(xbox_game_cover_source_t *s) {
+static void download_box_art_from_url(const char *image_url) {
 
-    if (!s || !s->image_url || s->image_url[0] == '\0') {
+    if (!image_url || image_url[0] == '\0') {
         return;
     }
 
-    /* Free existing texture */
-    if (s->image_texture) {
-        gs_texture_destroy(s->image_texture);
-        s->image_texture = NULL;
-    }
+    obs_log(LOG_INFO, "Loading Xbox game box art from URL: %s", image_url);
 
-    s->image_width  = 0;
-    s->image_height = 0;
-
+    /* Downloads the image in memory */
     uint8_t *data = NULL;
     size_t   size = 0;
 
-    if (!http_download(s->image_url, &data, &size)) {
-        obs_log(LOG_WARNING, "Failed to download image from: %s", s->image_url);
+    if (!http_download(image_url, &data, &size)) {
+        obs_log(LOG_WARNING, "Unable to download box art from URL: %s", image_url);
         return;
     }
 
-    /* Use OBS's gs_texture_create_from_file with a temp file, or decode manually.
-     * OBS doesn't have a direct "from memory" for arbitrary formats, so we use
-     * `gs_create_texture_file_data` which can decode PNG/JPEG from memory. */
+    /* Write the bytes to a temp file and use gs_texture_create_from_file of the render thread */
+    snprintf(g_game_cover.image_path,
+             sizeof(g_game_cover.image_path),
+             "%s/obs_plugin_temp_image.png",
+             getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
 
-    /* Decode the image using stb_image (OBS uses it internally).
-     * We'll write to a temp file and use gs_texture_create_from_file. */
-    char temp_path[512];
-    snprintf(temp_path, sizeof(temp_path), "%s/obs_plugin_temp_image.png", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+    FILE *temp_file = fopen(g_game_cover.image_path, "wb");
 
-    FILE *f = fopen(temp_path, "wb");
-    if (!f) {
+    if (!temp_file) {
         obs_log(LOG_ERROR, "Failed to create temp file for image");
         bfree(data);
         return;
     }
-    fwrite(data, 1, size, f);
-    fclose(f);
+    fwrite(data, 1, size, temp_file);
+    fclose(temp_file);
     bfree(data);
 
-    /* Now load from file using OBS graphics */
+    /* Force its reload into a texture on the next render */
+    g_game_cover.must_reload = true;
+}
+
+/**
+ *  Loads the game box art into the texture, if needed.
+ *
+ *  Use OBS's gs_texture_create_from_file with a temp file, or decode manually.
+ *  OBS doesn't have a direct "from memory" for arbitrary formats, so we use
+ *  `gs_create_texture_file_data` which can decode PNG/JPEG from memory.
+ */
+static void load_texture_from_file() {
+
+    if (!g_game_cover.must_reload) {
+        return;
+    }
+
+    /* Now load the image from the temporary file using OBS graphics */
     obs_enter_graphics();
 
-    s->image_texture = gs_texture_create_from_file(temp_path);
-
-    if (s->image_texture) {
-        s->image_width  = gs_texture_get_width(s->image_texture);
-        s->image_height = gs_texture_get_height(s->image_texture);
-        obs_log(LOG_INFO, "Loaded image %ux%u from %s", s->image_width, s->image_height, s->image_url);
-    } else {
-        obs_log(LOG_WARNING, "Failed to create texture from downloaded image");
+    /* Free existing texture */
+    if (g_game_cover.image_texture) {
+        gs_texture_destroy(g_game_cover.image_texture);
     }
+
+    g_game_cover.image_texture = gs_texture_create_from_file(g_game_cover.image_path);
 
     obs_leave_graphics();
 
+    g_game_cover.must_reload = false;
+
     /* Clean up temp file */
-    remove(temp_path);
+    remove(g_game_cover.image_path);
 
-    s->image_needs_load = false;
-}
-
-/**
- * Sets a new image URL for the source. The image will be loaded on next render.
- */
-static void set_image_url(xbox_game_cover_source_t *s, const char *url) {
-    if (!s)
-        return;
-
-    bfree(s->image_url);
-    s->image_url        = url ? bstrdup(url) : NULL;
-    s->image_needs_load = url && url[0] != '\0';
-}
-
-/**
- * Sets the image URL for the Xbox game cover source.
- *
- * @param url
- */
-static void source_set_image_url(const char *url) {
-    if (!g_xbox_game_cover_src)
-        return;
-
-    /* Get the private data from the source */
-    void *data = obs_obj_get_data(g_xbox_game_cover_src);
-    if (!data)
-        return;
-
-    xbox_game_cover_source_t *s = data;
-    set_image_url(s, url);
+    if (g_game_cover.image_texture) {
+        obs_log(LOG_INFO, "New image has been successfully loaded from the file");
+    } else {
+        obs_log(LOG_WARNING, "Failed to create texture from the file");
+    }
 }
 
 /**
@@ -246,12 +231,10 @@ static void on_xbox_game_played(const game_t *game) {
 
     char text[4096];
     snprintf(text, 4096, "Playing game %s (%s)", game->title, game->id);
-    obs_log(LOG_WARNING, text);
+    obs_log(LOG_INFO, text);
 
     const char *game_cover_url = xbox_get_game_cover(game);
-    source_set_image_url(game_cover_url);
-
-    refresh_page();
+    download_box_art_from_url(game_cover_url);
 }
 
 /**
@@ -293,12 +276,45 @@ static bool on_monitoring_clicked(obs_properties_t *props, obs_property_t *prope
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
+ * Returns the configured width of the source.
+ *
+ * @param data
+ * @return
+ */
+static uint32_t source_get_width(void *data) {
+    const xbox_game_cover_source_t *s = data;
+    return s->width;
+}
+
+/**
+ * Returns the configured height of the source.
+ *
+ * @param data
+ * @return
+ */
+static uint32_t source_get_height(void *data) {
+    const xbox_game_cover_source_t *s = data;
+    return s->height;
+}
+
+/**
+ *  Gets the name of the source.
+ */
+static const char *source_get_name(void *unused) {
+
+    UNUSED_PARAMETER(unused);
+
+    return "Game Cover";
+}
+
+/**
  *
  * @param settings
  * @param source
  * @return
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
+
     g_xbox_game_cover_src = source;
 
     xbox_game_cover_source_t *s = bzalloc(sizeof(*s));
@@ -325,26 +341,25 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  * @param data
  */
 static void on_source_destroy(void *data) {
-    xbox_game_cover_source_t *s = data;
+    xbox_game_cover_source_t *source = data;
 
-    if (!s) {
+    if (!source) {
         return;
     }
 
-    if (s->child_text) {
-        obs_source_release(s->child_text);
+    if (source->child_text) {
+        obs_source_release(source->child_text);
     }
 
     /* Free image resources */
-    if (s->image_texture) {
+    if (g_game_cover.image_texture) {
         obs_enter_graphics();
-        gs_texture_destroy(s->image_texture);
+        gs_texture_destroy(g_game_cover.image_texture);
         obs_leave_graphics();
     }
 
-    bfree(s->image_url);
-    bfree(s->text);
-    bfree(s);
+    bfree(source->text);
+    bfree(source);
 }
 
 /**
@@ -363,28 +378,6 @@ static void on_source_update(void *data, obs_data_t *settings) {
 }
 
 /**
- * Returns the configured width of the source.
- *
- * @param data
- * @return
- */
-static uint32_t source_get_width(void *data) {
-    const xbox_game_cover_source_t *s = data;
-    return s->width;
-}
-
-/**
- * Returns the configured height of the source.
- *
- * @param data
- * @return
- */
-static uint32_t source_get_height(void *data) {
-    const xbox_game_cover_source_t *s = data;
-    return s->height;
-}
-
-/**
  * Draws the image.
  *
  * @param data
@@ -399,12 +392,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     /* Load image if needed (deferred load in graphics context) */
-    if (source->image_needs_load) {
-        load_image_from_url(source);
-    }
+    load_texture_from_file();
 
     /* Render the image if we have a texture */
-    if (source->image_texture) {
+    if (g_game_cover.image_texture) {
 
         /* Use the passed effect or get the default if NULL */
         gs_effect_t *used_effect = effect ? effect : obs_get_base_effect(OBS_EFFECT_DEFAULT);
@@ -415,14 +406,14 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
             /* Effect already active from caller - just set texture and draw */
             gs_eparam_t *image_param = gs_effect_get_param_by_name(effect, "image");
             if (image_param)
-                gs_effect_set_texture(image_param, source->image_texture);
-            gs_draw_sprite(source->image_texture, 0, source->width, source->height);
+                gs_effect_set_texture(image_param, g_game_cover.image_texture);
+            gs_draw_sprite(g_game_cover.image_texture, 0, source->width, source->height);
         } else {
             /* No effect passed - start our own loop */
             gs_eparam_t *image_param = gs_effect_get_param_by_name(used_effect, "image");
-            gs_effect_set_texture(image_param, source->image_texture);
+            gs_effect_set_texture(image_param, g_game_cover.image_texture);
             while (gs_effect_loop(used_effect, "Draw")) {
-                gs_draw_sprite(source->image_texture, 0, source->width, source->height);
+                gs_draw_sprite(g_game_cover.image_texture, 0, source->width, source->height);
             }
         }
     }
@@ -480,16 +471,6 @@ static obs_properties_t *source_get_properties(void *data) {
 }
 
 /**
- *  Gets the name of the source.
- */
-static const char *source_get_name(void *unused) {
-
-    UNUSED_PARAMETER(unused);
-
-    return "Game Cover";
-}
-
-/**
  * Configuration of the Xbox game cover source.
  */
 static struct obs_source_info xbox_game_cover_source_info = {
@@ -525,6 +506,7 @@ static const struct obs_source_info *xbox_game_cover_source_get(void) {
  * This allows the Xbox game cover source to be available for use within OBS.
  */
 void xbox_game_cover_source_register(void) {
+
     obs_register_source(xbox_game_cover_source_get());
 
     /* Starts the monitoring if the user is already logged in */

@@ -10,7 +10,8 @@
 #include <cJSON.h>
 #include <cJSON_Utils.h>
 
-#define XBOX_PROFILE_SETTINGS_ENDPOINT_FMT "https://profile.xboxlive.com/users/batch/profile/settings"
+#define XBOX_PRESENCE_ENDPOINT             "https://userpresence.xboxlive.com/users/xuid(%s)"
+#define XBOX_PROFILE_SETTINGS_ENDPOINT     "https://profile.xboxlive.com/users/batch/profile/settings"
 #define XBOX_PROFILE_CONTRACT_VERSION      "2"
 #define GAMERSCORE_SETTING                 "Gamerscore"
 #define XBOX_TITLE_HUB                     "https://titlehub.xboxlive.com/users/xuid(%s)/titles/titleId(%s)/decoration/image"
@@ -181,7 +182,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
      * Sends the request
      */
     long http_code = 0;
-    json           = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT_FMT, json_body, headers, &http_code);
+    json           = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
         obs_log(LOG_ERROR, "Failed to fetch gamerscore: received status code %d", http_code);
@@ -219,10 +220,124 @@ cleanup:
     return result;
 }
 
-void get_presence(void) {
-    /* TODO: implement presence retrieval. */
-    // const char *xid = get_xid();
-    // obs_log(LOG_DEBUG, "xid=%s", xid ? xid : "(null)");
+game_t *xbox_get_current_game(void) {
+
+    obs_log(LOG_INFO, "Retrieving current game");
+
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (!identity) {
+        obs_log(LOG_ERROR, "Failed to fetch the current game: no identity found");
+        return NULL;
+    }
+
+    char   *response_json = NULL;
+    game_t *game          = NULL;
+
+    char headers[4096];
+    snprintf(headers,
+             sizeof(headers),
+             "Authorization: XBL3.0 x=%s;%s\r\n"
+             "x-xbl-contract-version: %s\r\n",
+             identity->uhs,
+             identity->token->value,
+             XBOX_PROFILE_CONTRACT_VERSION);
+
+    obs_log(LOG_DEBUG, "Headers: %s", headers);
+
+    /*
+     * Sends the request
+     */
+    char presence_url[512];
+    snprintf(presence_url, sizeof(presence_url), XBOX_PRESENCE_ENDPOINT, identity->xid);
+
+    long http_code = 0;
+    response_json  = http_get(presence_url, headers, NULL, &http_code);
+
+    if (http_code < 200 || http_code >= 300) {
+        obs_log(LOG_ERROR, "Failed to fetch the current game: received status code %d", http_code);
+        goto cleanup;
+    }
+
+    if (!response_json) {
+        obs_log(LOG_ERROR, "Failed to fetch the current game: received no response");
+        goto cleanup;
+    }
+
+    obs_log(LOG_DEBUG, "Response: %s", response_json);
+
+    cJSON *root = cJSON_Parse(response_json);
+
+    if (!root) {
+        obs_log(LOG_ERROR, "Failed to fetch the current game: unable to parse the JSON response");
+        goto cleanup;
+    }
+
+    /* Retrieves the current state */
+
+    char   user_state_key[512] = "/state";
+    cJSON *user_state_value    = cJSONUtils_GetPointer(root, user_state_key);
+
+    if (!user_state_value || strcmp(user_state_value->valuestring, "Offline") == 0) {
+        obs_log(LOG_INFO, "User is offline at the moment.");
+        goto cleanup;
+    }
+
+    char current_game_title[128];
+    char current_game_id[128];
+
+    for (int title_game_index = 0; title_game_index < 10; title_game_index++) {
+
+        /* Finds out if there is anything at this index */
+        char title_name_key[512];
+        snprintf(title_name_key, sizeof(title_name_key), "/devices/0/titles/%d/name", title_game_index);
+        char title_id_key[512];
+        snprintf(title_id_key, sizeof(title_id_key), "/devices/0/titles/%d/id", title_game_index);
+        char state_key[512];
+        snprintf(state_key, sizeof(state_key), "/devices/0/titles/%d/state", title_game_index);
+
+        cJSON *title_game_value = cJSONUtils_GetPointer(root, title_name_key);
+        cJSON *title_id_value   = cJSONUtils_GetPointer(root, title_id_key);
+        cJSON *state_value      = cJSONUtils_GetPointer(root, state_key);
+
+        if (!title_game_value || !title_id_value || !state_value) {
+            /* There is nothing more */
+            obs_log(LOG_DEBUG, "No more game at %d", title_game_index);
+            break;
+        }
+
+        if (strcmp(title_game_value->valuestring, "Home") == 0) {
+            obs_log(LOG_DEBUG, "Skipping home at %d", title_game_index);
+            continue;
+        }
+
+        if (strcmp(state_value->valuestring, "Active") != 0) {
+            obs_log(LOG_DEBUG, "Skipping inactivated game at %d", title_game_index);
+            continue;
+        }
+
+        /* Retrieve the game title and its ID */
+        obs_log(LOG_DEBUG, "Game title: %s %s", title_game_value->valuestring, title_id_value->valuestring);
+
+        snprintf(current_game_title, sizeof(current_game_title), "%s", title_game_value->valuestring);
+        snprintf(current_game_id, sizeof(current_game_id), "%s", title_id_value->valuestring);
+    }
+
+    if (strlen(current_game_id) == 0) {
+        obs_log(LOG_INFO, "No game found");
+        goto cleanup;
+    }
+
+    obs_log(LOG_INFO, "Game is %s (%s)", current_game_title, current_game_id);
+
+    game        = bzalloc(sizeof(game_t));
+    game->id    = strdup(current_game_id);
+    game->title = strdup(current_game_title);
+
+cleanup:
+    FREE(response_json);
+
+    return game;
 }
 
 char *xbox_fetch_achievements_json(long *out_http_code) {

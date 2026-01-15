@@ -5,6 +5,8 @@
 
 #ifdef HAVE_LIBWEBSOCKETS
 
+#include "xbox_client.h"
+
 #include <libwebsockets.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -77,7 +79,7 @@ static void progress_buffer(const char *buffer, on_xbox_game_played_t on_xbox_ga
 
     if (strlen(presence_message) < 5) {
         FREE(g_current_game);
-        obs_log(LOG_INFO, "No game is played");
+        obs_log(LOG_DEBUG, "No game is played");
         return;
     }
 
@@ -135,7 +137,7 @@ static void progress_buffer(const char *buffer, on_xbox_game_played_t on_xbox_ga
         return;
     }
 
-    obs_log(LOG_INFO, "Game is %s (%s)", current_game_title, current_game_id);
+    obs_log(LOG_DEBUG, "Game is %s (%s)", current_game_title, current_game_id);
 
     game_t *game = bzalloc(sizeof(game_t));
     game->id     = strdup(current_game_id);
@@ -296,6 +298,13 @@ static void *monitoring_thread(void *arg) {
         lws_context_destroy(ctx->context);
         ctx->context = NULL;
         return NULL;
+    }
+
+    /* Immediately retrieves the game */
+    game_t *current_game = xbox_get_current_game();
+
+    if (current_game) {
+        ctx->on_game_played(current_game);
     }
 
     /* Service the WebSocket connection */

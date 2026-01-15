@@ -10,7 +10,7 @@ extern "C" {
 
 bool xbox_fetch_gamerscore(int64_t *out_gamerscore);
 
-void get_presence(void);
+game_t *xbox_get_current_game(void);
 
 /*
  * Fetch achievements for a given titleId using the persisted XSTS token + XUID.

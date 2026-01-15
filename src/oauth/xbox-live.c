@@ -559,7 +559,7 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
                  */
                 token_t *user_token = (token_t *)bzalloc(sizeof(token_t));
                 user_token->value   = bstrdup_n(access_token_value, strlen(access_token_value));
-                //user_token->expires = time(NULL) + *token_expires_in;
+                // user_token->expires = time(NULL) + *token_expires_in;
                 user_token->expires = time(NULL) + 30;
 
                 token_t *refresh_token = (token_t *)bzalloc(sizeof(token_t));
