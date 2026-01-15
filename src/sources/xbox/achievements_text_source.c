@@ -5,6 +5,7 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 #include <curl/curl.h>
+#include <inttypes.h>
 
 #include "io/state.h"
 #include "oauth/xbox-live.h"
@@ -416,7 +417,7 @@ obs_properties_t *xbox_achievements_get_properties(void *data) {
         xbox_fetch_gamerscore(&gamerscore);
 
         char gamerscore_text[4096];
-        snprintf(gamerscore_text, 4096, "Gamerscore %lld", gamerscore);
+        snprintf(gamerscore_text, 4096, "Gamerscore %" PRId64, gamerscore);
 
         obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
         obs_properties_add_text(p, "gamerscore_info", gamerscore_text, OBS_TEXT_INFO);
