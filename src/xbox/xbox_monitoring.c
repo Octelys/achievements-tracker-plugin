@@ -47,10 +47,6 @@ static xbox_monitoring_ctx_t *g_ctx = NULL;
 
 static game_t *g_current_game = NULL;
 
-const game_t *get_current_game() {
-    return g_current_game;
-}
-
 static void progress_buffer(const char *buffer, on_xbox_game_played_t on_xbox_game_played) {
 
     if (!buffer) {
@@ -495,6 +491,10 @@ bool xbox_unsubscribe(const char *subscription_id) {
     return send_websocket_message(message);
 }
 
+const game_t *get_current_game() {
+    return g_current_game;
+}
+
 #else /* !HAVE_LIBWEBSOCKETS */
 
 /* Stub implementations when libwebsockets is not available */
@@ -514,16 +514,20 @@ bool xbox_monitoring_is_active(void) {
     return false;
 }
 
-bool xbox_start_subscribing(const char *xuid) {
+bool xbox_start_subscribe() {
     (void)xuid;
     obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, cannot subscribe");
     return false;
 }
 
-bool xbox_stop_subscribing(const char *subscription_id) {
+bool xbox_stop_subscribe(const char *subscription_id) {
     (void)subscription_id;
     obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, cannot unsubscribe");
     return false;
+}
+
+const game_t *get_current_game() {
+    return g_current_game;
 }
 
 #endif /* HAVE_LIBWEBSOCKETS */

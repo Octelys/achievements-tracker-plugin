@@ -20,7 +20,7 @@
 #define XBOX_GAME_COVER_TYPE               "/titles/0/images/%d/type"
 #define XBOX_GAME_COVER_URL                "/titles/0/images/%d/url"
 #define XBOX_GAME_COVER_POSTER_TYPE        "poster"
-#define XBOX_GAME_COVER_BOXART_TYPE        "boxart"
+#define XBOX_GAME_COVER_BOX_ART_TYPE        "boxart"
 
 char *xbox_get_game_cover(const game_t *game) {
 
@@ -92,7 +92,7 @@ char *xbox_get_game_cover(const game_t *game) {
         }
 
         if (strcmp(image_type_value->valuestring, XBOX_GAME_COVER_POSTER_TYPE) != 0 &&
-            strcmp(image_type_value->valuestring, XBOX_GAME_COVER_BOXART_TYPE) != 0) {
+            strcmp(image_type_value->valuestring, XBOX_GAME_COVER_BOX_ART_TYPE) != 0) {
             continue;
         }
 
