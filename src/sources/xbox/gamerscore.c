@@ -12,15 +12,45 @@
 #include "xbox/xbox_client.h"
 #include "xbox/xbox_monitoring.h"
 
+#define NO_FLIP 0
+
 typedef struct xbox_account_source {
     obs_source_t *source;
     uint32_t      width;
     uint32_t      height;
 } xbox_account_source_t;
 
+static int64_t                     g_gamerscore = 34698;
+static gamerscore_configuration_t *g_default_configuration;
+
+gs_image_file_t g_font_sheet_image;
+
 //  --------------------------------------------------------------------------------------------------------------------
 //	Private functions
 //  --------------------------------------------------------------------------------------------------------------------
+
+static void load_font_sheet() {
+
+    if (!g_default_configuration) {
+        obs_log(LOG_ERROR, "No default configuration available for the font sheet");
+        return;
+    }
+
+    obs_log(LOG_INFO, "Loading the font sheet from the configured path: %s", g_default_configuration->font_sheet_path);
+
+    // Load an RGBA atlas image shipped with the plugin (prebaked glyphs).
+    // OBS provides helpers for module files; loading the image into a texture
+    // is usually done via gs_image_file_t.
+    gs_image_file_init(&g_font_sheet_image, g_default_configuration->font_sheet_path);
+
+
+    if (g_font_sheet_image.loaded) {
+        obs_log(LOG_INFO, "The font sheet image has successfully been loaded");
+    } else {
+        obs_log(LOG_ERROR, "Unable to load the font sheet image");
+        gs_image_file_free(&g_font_sheet_image);
+    }
+}
 
 static void on_xbox_game_played(const game_t *game) {
 
@@ -74,57 +104,92 @@ static void on_source_update(void *data, obs_data_t *settings) {
 static void on_source_video_render(void *data, gs_effect_t *effect) {
     UNUSED_PARAMETER(data);
     UNUSED_PARAMETER(effect);
+
+    //  Number 0 is at (x,y) (offset_x,offset_y)
+    //  Number 1 is at (x,y) (offset_x + font_width,offset_y)
+    //  Number 2 is at (x,y) (offset_x + 2 * font_width,offset_y)
+
+    if (!g_default_configuration) {
+        return;
+    }
+
+    if (!g_font_sheet_image.loaded) {
+        return;
+    }
+
+    /* Ensures texture is loaded */
+    if (!g_font_sheet_image.texture) {
+        gs_image_file_init_texture(&g_font_sheet_image);
+    }
+
+    /* Prints the gamerscore in a string */
+    char gamerscore_text[128];
+    snprintf(gamerscore_text, sizeof(gamerscore_text), "%" PRId64, g_gamerscore);
+
+    /* Retrieves the configured parameters of the font sheet */
+    const uint32_t font_width = g_default_configuration->font_width;
+    const uint32_t font_height = g_default_configuration->font_height;
+    const uint32_t offset_x = g_default_configuration->offset_x;
+    const uint32_t offset_y = g_default_configuration->offset_y;
+
+    /* Retrieves the texture of the font sheet */
+    gs_texture_t *tex = g_font_sheet_image.texture;
+
+    /* Draw using the stock "Draw" technique. */
+    gs_effect_t *used_effect = effect ? effect : obs_get_base_effect(OBS_EFFECT_DEFAULT);
+    gs_eparam_t *image = gs_effect_get_param_by_name(used_effect, "image");
+
+    gs_effect_set_texture(image, tex);
+
+    float x = (float)offset_x;
+    float y = (float)offset_y;
+
+    for (const char *p = gamerscore_text; *p; ++p) {
+
+        if (*p < '0' || *p > '9') {
+            continue;
+        }
+
+        const uint32_t digit = (uint32_t)(*p - '0');
+
+        const uint32_t src_x = offset_x + digit * font_width;
+        const uint32_t src_y = offset_y;
+
+        obs_log(LOG_INFO, "Drawing digit %d at (%f,%f) found at (%f,%f)", digit, x, y, src_x, src_y);
+
+        // Draw subregion at current position.
+        gs_matrix_push();
+        gs_matrix_translate3f(x, y, 0.0f);
+        gs_draw_sprite_subregion(tex, NO_FLIP, src_x, src_y, font_width, font_height);
+        gs_matrix_pop();
+
+        x += (float)font_width;
+    }
 }
 
 static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
 
-    /* TODO Share the logic */
-
-    /* Finds out if there is a token available already */
-    const xbox_identity_t *xbox_identity = state_get_xbox_identity();
-
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
 
-    if (xbox_identity != NULL) {
-        char status[4096];
-        snprintf(status, 4096, "Signed in to your xbox account as %s", xbox_identity->gamertag);
+    obs_properties_add_path(p,
+                            "font_sheet_path",  // setting key
+                            "Font sheet image", // display name
+                            OBS_PATH_FILE,      // file chooser
+                            "Image Files (*.png *.jpg *.jpeg);;All Files (*.*)",
+                            NULL // default path (optional)
+    );
 
-        int64_t gamerscore = 0;
-        xbox_fetch_gamerscore(&gamerscore);
-
-        char gamerscore_text[4096];
-        snprintf(gamerscore_text, 4096, "Gamerscore %" PRId64, gamerscore);
-
-        obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
-        obs_properties_add_text(p, "gamerscore_info", gamerscore_text, OBS_TEXT_INFO);
-
-        const game_t *game = get_current_game();
-
-        if (game) {
-            char game_played[4096];
-            snprintf(game_played, sizeof(game_played), "Playing %s (%s)", game->title, game->id);
-            obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
-        }
-
-    } else {
-        obs_properties_add_text(p,
-                                "disconnected_status_info",
-                                "You are not connected to your xbox account.",
-                                OBS_TEXT_INFO);
-    }
+    obs_properties_add_text(p, "offset_x", "Initial X", OBS_TEXT_DEFAULT);
+    obs_properties_add_text(p, "offset_y", "Initial Y", OBS_TEXT_DEFAULT);
+    obs_properties_add_text(p, "font_width", "Font Width", OBS_TEXT_DEFAULT);
+    obs_properties_add_text(p, "font_height", "Font Height", OBS_TEXT_DEFAULT);
 
     return p;
 }
 
-/**
- * Gets the name of the source
- *
- * @param unused
- * @return
- */
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
@@ -146,10 +211,6 @@ static struct obs_source_info xbox_gamerscore_source = {
     .video_render   = on_source_video_render,
 };
 
-/**
- *
- * @return
- */
 static const struct obs_source_info *xbox_source_get(void) {
     return &xbox_gamerscore_source;
 }
@@ -163,7 +224,14 @@ static const struct obs_source_info *xbox_source_get(void) {
  */
 void xbox_gamerscore_source_register(void) {
 
+    g_default_configuration                  = bzalloc(sizeof(gamerscore_configuration_t));
+    g_default_configuration->font_sheet_path = "/Users/christophe/Downloads/font_sheet.png";
+    g_default_configuration->offset_x        = 0;
+    g_default_configuration->offset_y        = 0;
+    g_default_configuration->font_width      = 148;
+    g_default_configuration->font_height     = 226;
+
     obs_register_source(xbox_source_get());
 
-    /* TODO Register for game played notifications */
+    load_font_sheet();
 }

@@ -48,6 +48,14 @@ typedef struct game {
     const char *title;
 } game_t;
 
+typedef struct gamerscore_configuration {
+    const char *font_sheet_path;
+    uint32_t    offset_x;
+    uint32_t    offset_y;
+    uint32_t    font_width;
+    uint32_t    font_height;
+} gamerscore_configuration_t;
+
 bool is_token_expired(const token_t *token);
 
 #ifdef __cplusplus
