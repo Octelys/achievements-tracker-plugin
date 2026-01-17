@@ -1,8 +1,9 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
-#include "sources/xbox/game_cover_source.h"
-#include "sources/xbox/achievements_text_source.h"
+#include "sources/xbox/game_cover.h"
+#include "sources/xbox/gamerscore.h"
+
 #include "io/state.h"
 
 OBS_DECLARE_MODULE()
@@ -13,7 +14,7 @@ bool obs_module_load(void) {
     io_load();
 
     xbox_game_cover_source_register();
-    xbox_achievements_text_source_register();
+    xbox_gamerscore_source_register();
 
     obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
 

@@ -1,4 +1,4 @@
-#include "sources/xbox/game_cover_source.h"
+#include "sources/xbox/game_cover.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -16,7 +16,7 @@
 #include <net/http/http.h>
 
 // Store the source reference somewhere accessible
-static obs_source_t *g_xbox_game_cover_src = NULL;
+static obs_source_t *g_game_cover_source = NULL;
 
 typedef struct xbox_game_cover_source {
     obs_source_t *source;
@@ -149,7 +149,7 @@ static void text_src_update_child(xbox_game_cover_source_t *s) {
  */
 static void refresh_page() {
 
-    if (!g_xbox_game_cover_src)
+    if (!g_game_cover_source)
         return;
 
     /*
@@ -157,7 +157,7 @@ static void refresh_page() {
      * properties need to be recreated. Returning true from the
      * button callback also helps trigger this.
      */
-    obs_source_update_properties(g_xbox_game_cover_src);
+    obs_source_update_properties(g_game_cover_source);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -306,7 +306,7 @@ static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
 
-    return "Game Cover";
+    return "Xbox Game Cover";
 }
 
 /**
@@ -317,7 +317,7 @@ static const char *source_get_name(void *unused) {
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
-    g_xbox_game_cover_src = source;
+    g_game_cover_source = source;
 
     xbox_game_cover_source_t *s = bzalloc(sizeof(*s));
     s->source                   = source;
@@ -343,6 +343,9 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  * @param data
  */
 static void on_source_destroy(void *data) {
+
+    g_game_cover_source = NULL;
+
     xbox_game_cover_source_t *source = data;
 
     if (!source) {

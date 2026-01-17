@@ -226,11 +226,12 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
-    src/sources/xbox/game_cover_source.c
-    src/sources/xbox/achievements_text_source.c
+    src/sources/xbox/game_cover.c
+    src/sources/xbox/gamerscore.c
     src/crypto/crypto.c
     src/common/types.c
     src/drawing/image.c
+    src/drawing/text.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
