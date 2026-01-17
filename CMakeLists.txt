@@ -226,6 +226,7 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
+    src/sources/xbox/account.c
     src/sources/xbox/game_cover.c
     src/sources/xbox/gamerscore.c
     src/crypto/crypto.c

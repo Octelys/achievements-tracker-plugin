@@ -1,6 +1,7 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "sources/xbox/account.h"
 #include "sources/xbox/game_cover.h"
 #include "sources/xbox/gamerscore.h"
 
@@ -13,6 +14,7 @@ bool obs_module_load(void) {
     obs_log(LOG_INFO, "loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
 
+    xbox_account_source_register();
     xbox_game_cover_source_register();
     xbox_gamerscore_source_register();
 

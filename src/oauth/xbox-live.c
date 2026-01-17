@@ -44,9 +44,10 @@ static void sleep_ms(unsigned int ms) {
 /* */
 typedef struct authentication_ctx {
     /* Input parameters */
-    const device_t                       *device;
-    pthread_t                             thread;
-    on_xbox_live_authenticate_completed_t on_completed;
+    const device_t              *device;
+    pthread_t                    thread;
+    on_xbox_live_authenticated_t on_completed;
+    void                        *on_completed_data;
 
     /* Parameters of the user token polling */
     char *device_code;
@@ -62,6 +63,15 @@ typedef struct authentication_ctx {
     token_t *device_token;
 
 } authentication_ctx_t;
+
+static void complete(authentication_ctx_t *ctx) {
+
+    if (!ctx->on_completed) {
+        return;
+    }
+
+    ctx->on_completed(ctx->on_completed_data);
+}
 
 /**
  * Retrieves the sisu token
@@ -246,9 +256,7 @@ cleanup:
     FREE(uhs);
     FREE(not_after_date);
 
-    if (ctx->on_completed) {
-        ctx->on_completed();
-    }
+    complete(ctx);
 }
 
 /**
@@ -399,9 +407,7 @@ cleanup:
     FREE(not_after_date);
 
     if (ctx->result.error_message) {
-        if (ctx->on_completed) {
-            ctx->on_completed();
-        }
+        complete(ctx);
     } else {
         retrieve_sisu_token(ctx);
     }
@@ -497,9 +503,7 @@ cleanup:
      * Either complete the process if an error has been encountered or go to the next step
      */
     if (!ctx->user_token) {
-        if (ctx->on_completed) {
-            ctx->on_completed();
-        }
+        complete(ctx);
     } else {
         retrieve_device_token(ctx);
     }
@@ -592,9 +596,7 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
      * Either complete the process if an error has been encountered or go to the next step
      */
     if (!ctx->user_token) {
-        if (ctx->on_completed) {
-            ctx->on_completed();
-        }
+        complete(ctx);
     } else {
         retrieve_device_token(ctx);
     }
@@ -742,20 +744,19 @@ cleanup:
     if (!ctx->result.error_message) {
         retrieve_device_token(ctx);
     } else {
-        if (ctx->on_completed) {
-            ctx->on_completed();
-        }
+        complete(ctx);
     }
 
     return (void *)false;
 }
 
-bool xbox_live_get_authenticate(const device_t *device, on_xbox_live_authenticate_completed_t callback) {
+bool xbox_live_authenticate(const device_t *device, void *data, on_xbox_live_authenticated_t callback) {
 
     /* Defines the structure that will filled up by the different authentication steps */
     authentication_ctx_t *ctx = bzalloc(sizeof(authentication_ctx_t));
     ctx->device               = device;
     ctx->on_completed         = callback;
+    ctx->on_completed_data    = data;
 
     return pthread_create(&ctx->thread, NULL, start_authentication_flow, ctx) == 0;
 }

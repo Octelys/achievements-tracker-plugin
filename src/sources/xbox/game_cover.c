@@ -16,12 +16,10 @@
 #include <net/http/http.h>
 
 // Store the source reference somewhere accessible
-static obs_source_t *g_game_cover_source = NULL;
+static obs_source_t *g_account_source = NULL;
 
 typedef struct xbox_game_cover_source {
     obs_source_t *source;
-    char         *text;
-    obs_source_t *child_text;
     uint32_t      width;
     uint32_t      height;
 } xbox_game_cover_source_t;
@@ -119,111 +117,9 @@ static void load_texture_from_file() {
     }
 }
 
-/**
- *
- * @param s
- */
-static void text_src_update_child(xbox_game_cover_source_t *s) {
-    if (!s || !s->child_text) {
-        return;
-    }
-
-    obs_data_t *st = obs_data_create();
-    obs_data_set_string(st, "text", s->text ? s->text : "");
-    obs_data_set_int(st, "color1", 0xFFFFFFFF); /* white */
-    obs_data_set_bool(st, "outline", false);
-    obs_data_set_int(st, "align", 0);  /* left */
-    obs_data_set_int(st, "valign", 0); /* top */
-    obs_source_update(s->child_text, st);
-    obs_data_release(st);
-}
-
-/**
- * Refreshes the properties page for the current Xbox achievements text source.
- * If the global source `g_xbox_achievements_text_src` is not initialized,
- * the function will return without performing any operation.
- *
- * This method signals OBS to recreate the properties UI, ensuring that
- * updates to the source are reflected in the UI. Returning true from
- * related button callbacks can also help trigger this behavior.
- */
-static void refresh_page() {
-
-    if (!g_game_cover_source)
-        return;
-
-    /*
-     * Force OBS to refresh the properties UI by signaling that
-     * properties need to be recreated. Returning true from the
-     * button callback also helps trigger this.
-     */
-    obs_source_update_properties(g_game_cover_source);
-}
-
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
 //  --------------------------------------------------------------------------------------------------------------------
-
-/**
- * Called when the Sign-out button is clicked
- *
- * Clears the tokens from the state.
- *
- * @param props
- * @param property
- * @param data
- * @return
- */
-static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
-
-    UNUSED_PARAMETER(props);
-    UNUSED_PARAMETER(property);
-    UNUSED_PARAMETER(data);
-
-    state_clear();
-
-    refresh_page();
-
-    return true;
-}
-
-/**
- * Handles the completion of Xbox sign-in.
- *
- * This function is triggered once the Xbox sign-in process is completed.
- * It invokes the refresh_page function to update the OBS properties UI
- * associated with the Xbox achievements text source.
- */
-static void on_xbox_sign_in_completed() {
-    refresh_page();
-}
-
-/**
- * Called when the Sign-in button is clicked.
- *
- * The method triggers the device oauth flow to register the device with Xbox
- * live.
- *
- * @param props
- * @param property
- * @param data
- *
- * @return
- */
-static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
-    UNUSED_PARAMETER(props);
-    UNUSED_PARAMETER(property);
-    UNUSED_PARAMETER(data);
-
-    device_t *device = state_get_device();
-
-    if (!xbox_live_get_authenticate(device, &on_xbox_sign_in_completed)) {
-        obs_log(LOG_WARNING, "Xbox sign-in failed");
-        return false;
-    }
-
-    return true;
-}
 
 /**
  * Called when a new game is being played.
@@ -231,46 +127,14 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
  */
 static void on_xbox_game_played(const game_t *game) {
 
+    //  TODO --> NEED TO BE REGISTER SOMEWHERE!
+
     char text[4096];
     snprintf(text, 4096, "Playing game %s (%s)", game->title, game->id);
     obs_log(LOG_INFO, text);
 
     const char *game_cover_url = xbox_get_game_cover(game);
     download_box_art_from_url(game_cover_url);
-}
-
-/**
- * Called when the xbox monitor's status changes.
- *
- * @param connected
- * @param error_message
- */
-static void on_xbox_monitoring_connection_status_changed(const bool connected, const char *error_message) {
-    if (connected) {
-        obs_log(LOG_WARNING, "Connected to Real-Time Activity endpoint");
-        xbox_subscribe();
-    } else {
-        obs_log(LOG_WARNING, error_message);
-    }
-}
-
-/**
- * Called when the monitoring button is clicked.
- *
- * @param props
- * @param property
- * @param data
- * @return
- */
-static bool on_monitoring_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
-    UNUSED_PARAMETER(props);
-    UNUSED_PARAMETER(property);
-    UNUSED_PARAMETER(data);
-
-    xbox_monitoring_start(&on_xbox_game_played, &on_xbox_monitoring_connection_status_changed);
-    obs_log(LOG_WARNING, "Monitoring started!");
-
-    return true;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -317,23 +181,14 @@ static const char *source_get_name(void *unused) {
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
-    g_game_cover_source = source;
+    UNUSED_PARAMETER(settings);
+
+    g_account_source = source;
 
     xbox_game_cover_source_t *s = bzalloc(sizeof(*s));
     s->source                   = source;
-
-    const char *t = obs_data_get_string(settings, "text");
-    s->text       = bstrdup(t ? t : "Hello from plugin");
-    s->width      = 800;
-    s->height     = 200;
-
-    /* Create built-in text source as a child */
-    obs_data_t *st = obs_data_create();
-    obs_data_set_string(st, "text", s->text);
-    s->child_text = obs_source_create_private("text_ft2_source", "child_text", st);
-    obs_data_release(st);
-
-    text_src_update_child(s);
+    s->width                    = 800;
+    s->height                   = 200;
 
     return s;
 }
@@ -344,16 +199,12 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    g_game_cover_source = NULL;
+    g_account_source = NULL;
 
     xbox_game_cover_source_t *source = data;
 
     if (!source) {
         return;
-    }
-
-    if (source->child_text) {
-        obs_source_release(source->child_text);
     }
 
     /* Free image resources */
@@ -363,7 +214,6 @@ static void on_source_destroy(void *data) {
         obs_leave_graphics();
     }
 
-    bfree(source->text);
     bfree(source);
 }
 
@@ -373,6 +223,11 @@ static void on_source_destroy(void *data) {
  * @param settings
  */
 static void on_source_update(void *data, obs_data_t *settings) {
+
+    UNUSED_PARAMETER(settings);
+    UNUSED_PARAMETER(data);
+
+    /*
     xbox_game_cover_source_t *s = data;
     const char               *t = obs_data_get_string(settings, "text");
 
@@ -380,6 +235,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
     s->text = bstrdup(t ? t : "");
 
     text_src_update_child(s);
+    */
 }
 
 /**
@@ -405,9 +261,11 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     /* Let the child (Text FT2) render into our source */
+    /*
     if (source->child_text) {
         obs_source_video_render(source->child_text);
     }
+    */
 }
 
 /**
@@ -425,7 +283,7 @@ static obs_properties_t *source_get_properties(void *data) {
 
     if (xbox_identity != NULL) {
         char status[4096];
-        snprintf(status, 4096, "Signed in as %s", xbox_identity->gamertag);
+        snprintf(status, 4096, "Connected to your xbox account as %s", xbox_identity->gamertag);
 
         int64_t gamerscore = 0;
         xbox_fetch_gamerscore(&gamerscore);
@@ -443,14 +301,11 @@ static obs_properties_t *source_get_properties(void *data) {
             snprintf(game_played, sizeof(game_played), "Playing %s (%s)", game->title, game->id);
             obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
         }
-
-        obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
-
-        /* Temporary */
-        obs_properties_add_button(p, "monitor", "Start monitoring", &on_monitoring_clicked);
     } else {
-        obs_properties_add_text(p, "disconnected_status_info", "You are not connected.", OBS_TEXT_INFO);
-        obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
+        obs_properties_add_text(p,
+                                "disconnected_status_info",
+                                "You are not connected to your xbox account",
+                                OBS_TEXT_INFO);
     }
 
     return p;
@@ -499,7 +354,7 @@ void xbox_game_cover_source_register(void) {
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (identity) {
-        xbox_monitoring_start(&on_xbox_game_played, &on_xbox_monitoring_connection_status_changed);
+        xbox_monitoring_start(&on_xbox_game_played);
         obs_log(LOG_INFO, "Monitoring started");
     }
 }

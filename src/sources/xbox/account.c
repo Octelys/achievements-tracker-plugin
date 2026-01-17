@@ -1,4 +1,4 @@
-#include "sources/xbox/gamerscore.h"
+#include "sources/xbox/account.h"
 
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
@@ -12,32 +12,76 @@
 #include "xbox/xbox_client.h"
 #include "xbox/xbox_monitoring.h"
 
-// Store the source reference somewhere accessible
-static obs_source_t *g_account_source = NULL;
-
 typedef struct xbox_account_source {
     obs_source_t *source;
     uint32_t      width;
     uint32_t      height;
 } xbox_account_source_t;
 
-static void refresh_page() {
-    if (!g_account_source)
+static void refresh_properties_on_main(void *data) {
+    obs_source_t *source = data;
+
+    if (source)
+        obs_source_update_properties(source);
+}
+
+static void schedule_refresh_properties(void *data) {
+    xbox_account_source_t *s = data;
+
+    if (!s || !s->source)
         return;
 
-    /*
-     * Force OBS to refresh the properties UI by signaling that
-     * properties need to be recreated. Returning true from the
-     * button callback also helps trigger this.
-     */
-    obs_source_update_properties(g_account_source);
+    // Force OBS to call source_get_properties() again, rebuilding the info texts.
+    obs_queue_task(OBS_TASK_UI, refresh_properties_on_main, s->source, false);
+}
+
+static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
+    UNUSED_PARAMETER(props);
+    UNUSED_PARAMETER(property);
+    UNUSED_PARAMETER(data);
+
+    state_clear();
+
+    schedule_refresh_properties(data);
+
+    return true;
+}
+
+static void on_xbox_signed_in(void *data) {
+    schedule_refresh_properties(data);
+}
+
+/**
+ * Called when the Sign-in button is called.
+ *
+ * The method triggers the device oauth flow to register the device with Xbox
+ * live.
+ *
+ * @param props
+ * @param property
+ * @param data
+ *
+ * @return
+ */
+static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *property, void *data) {
+    UNUSED_PARAMETER(props);
+    UNUSED_PARAMETER(property);
+    UNUSED_PARAMETER(data);
+
+    device_t *device = state_get_device();
+
+    if (!xbox_live_authenticate(device, data, &on_xbox_signed_in)) {
+        obs_log(LOG_WARNING, "Xbox sign-in failed");
+        return false;
+    }
+
+    return true;
 }
 
 static void on_xbox_game_played(const game_t *game) {
-
-    UNUSED_PARAMETER(game);
-
-    /* Saves the game information to load the cover on the next update */
+    char text[4096];
+    snprintf(text, 4096, "Playing game %s (%s)", game->title, game->id);
+    obs_log(LOG_WARNING, text);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -57,8 +101,6 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 }
 
 static void on_source_destroy(void *data) {
-
-    g_account_source = NULL;
 
     xbox_account_source_t *source = data;
 
@@ -90,10 +132,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 static obs_properties_t *source_get_properties(void *data) {
-
     UNUSED_PARAMETER(data);
-
-    /* TODO Share the logic */
 
     /* Finds out if there is a token available already */
     const xbox_identity_t *xbox_identity = state_get_xbox_identity();
@@ -103,7 +142,7 @@ static obs_properties_t *source_get_properties(void *data) {
 
     if (xbox_identity != NULL) {
         char status[4096];
-        snprintf(status, 4096, "Signed in to your xbox account as %s", xbox_identity->gamertag);
+        snprintf(status, 4096, "Signed in as %s", xbox_identity->gamertag);
 
         int64_t gamerscore = 0;
         xbox_fetch_gamerscore(&gamerscore);
@@ -122,30 +161,23 @@ static obs_properties_t *source_get_properties(void *data) {
             obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
         }
 
+        obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
     } else {
-        obs_properties_add_text(p,
-                                "disconnected_status_info",
-                                "You are not connected to your xbox account.",
-                                OBS_TEXT_INFO);
+        obs_properties_add_text(p, "disconnected_status_info", "You are not connected.", OBS_TEXT_INFO);
+        obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
     }
 
     return p;
 }
 
-/**
- * Gets the name of the source
- *
- * @param unused
- * @return
- */
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Gamerscore";
+    return "Xbox Account";
 }
 
 static struct obs_source_info xbox_gamerscore_source = {
-    .id             = "xbox_gamerscore_source",
+    .id             = "xbox_account_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = source_get_name,
@@ -172,11 +204,22 @@ static const struct obs_source_info *xbox_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
+ * Registers the Xbox account source with the system.
  *
+ * This function registers the Xbox account source and initializes monitoring
+ * for game activity and connection status if the user is already logged in.
+ * The monitoring callbacks are set up to handle events and log the monitoring
+ * status.
  */
-void xbox_gamerscore_source_register(void) {
+void xbox_account_source_register(void) {
 
     obs_register_source(xbox_source_get());
 
-    /* TODO Register for game played notifications */
+    /* Starts the monitoring if the user is already logged in */
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (identity) {
+        xbox_monitoring_start(&on_xbox_game_played);
+        obs_log(LOG_INFO, "Monitoring started");
+    }
 }

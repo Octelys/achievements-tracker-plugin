@@ -8,9 +8,9 @@
 extern "C" {
 #endif
 
-typedef void (*on_xbox_live_authenticate_completed_t)();
+typedef void (*on_xbox_live_authenticated_t)(void *);
 
-bool xbox_live_get_authenticate(const device_t *device, on_xbox_live_authenticate_completed_t callback);
+bool xbox_live_authenticate(const device_t *device, void *data, on_xbox_live_authenticated_t callback);
 
 #ifdef __cplusplus
 }

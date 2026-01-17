@@ -47,6 +47,91 @@ static xbox_monitoring_ctx_t *g_ctx = NULL;
 
 static game_t *g_current_game = NULL;
 
+/**
+ * Send a message over the WebSocket connection
+ * @param message The message to send
+ * @return true if message was queued for sending, false otherwise
+ */
+static bool send_websocket_message(const char *message) {
+    if (!g_ctx || !g_ctx->wsi || !g_ctx->connected) {
+        obs_log(LOG_ERROR, "Xbox RTA: Cannot send message - not connected");
+        return false;
+    }
+
+    size_t len = strlen(message);
+
+    /* Allocate buffer with LWS_PRE padding */
+    unsigned char *buf = (unsigned char *)bmalloc(LWS_PRE + len);
+    if (!buf) {
+        obs_log(LOG_ERROR, "Xbox RTA: Failed to allocate send buffer");
+        return false;
+    }
+
+    memcpy(buf + LWS_PRE, message, len);
+
+    int written = lws_write(g_ctx->wsi, buf + LWS_PRE, len, LWS_WRITE_TEXT);
+    bfree(buf);
+
+    if (written < (int)len) {
+        obs_log(LOG_ERROR, "Xbox RTA: Failed to send message (wrote %d of %zu bytes)", written, len);
+        return false;
+    }
+
+    obs_log(LOG_DEBUG, "Xbox RTA: Sent message: %s", message);
+    return true;
+}
+
+static bool xbox_subscribe() {
+
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (!identity) {
+        obs_log(LOG_ERROR, "Xbox RTA: Invalid Xbox identity for subscription");
+        return false;
+    }
+
+    if (!g_ctx || !g_ctx->connected) {
+        obs_log(LOG_ERROR, "Xbox RTA: Cannot subscribe - not connected");
+        return false;
+    }
+
+    /* RTA subscription message format:
+     * [<sequence_id>, <subscribe_action>, "<resource_uri>"]
+     * Action 1 = subscribe
+     * Resource URI format: https://notify.xboxlive.com/users/xuid(<xuid>)/deviceId/current/titleId/current
+     */
+    char message[512];
+    snprintf(message,
+             sizeof(message),
+             "[1,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]",
+             identity->xid);
+
+    obs_log(LOG_INFO, "Xbox RTA: Subscribing for XUID %s", identity->xid);
+    return send_websocket_message(message);
+}
+
+static bool xbox_unsubscribe(const char *subscription_id) {
+    if (!subscription_id || !*subscription_id) {
+        obs_log(LOG_ERROR, "Xbox RTA: Invalid subscription ID for unsubscribe");
+        return false;
+    }
+
+    if (!g_ctx || !g_ctx->connected) {
+        obs_log(LOG_ERROR, "Xbox RTA: Cannot unsubscribe - not connected");
+        return false;
+    }
+
+    /* RTA unsubscribe message format:
+     * [<sequence_id>, <unsubscribe_action>, "<subscription_id>"]
+     * Action 2 = unsubscribe
+     */
+    char message[256];
+    snprintf(message, sizeof(message), "[2,2,\"%s\"]", subscription_id);
+
+    obs_log(LOG_INFO, "Xbox RTA: Unsubscribing from %s", subscription_id);
+    return send_websocket_message(message);
+}
+
 static void progress_buffer(const char *buffer, on_xbox_game_played_t on_xbox_game_played) {
 
     if (!buffer) {
@@ -182,6 +267,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
         obs_log(LOG_INFO, "Xbox RTA: WebSocket connection established");
         ctx->connected = true;
+        xbox_subscribe();
         if (ctx->on_status) {
             ctx->on_status(true, NULL);
         }
@@ -318,7 +404,11 @@ static void *monitoring_thread(void *arg) {
     return NULL;
 }
 
-bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_connection_status_t on_status) {
+//  --------------------------------------------------------------------------------------------------------------------
+//	Public functions
+//  --------------------------------------------------------------------------------------------------------------------
+
+bool xbox_monitoring_start(on_xbox_game_played_t on_game_played) {
 
     if (g_ctx) {
         obs_log(LOG_WARNING, "Xbox RTA: Monitoring already active");
@@ -342,7 +432,7 @@ bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_con
     snprintf(auth_header, sizeof(auth_header), "XBL3.0 x=%s;%s", identity->uhs, identity->token->value);
 
     g_ctx->on_game_played = on_game_played;
-    g_ctx->on_status      = on_status;
+    g_ctx->on_status      = NULL;
     g_ctx->running        = true;
     g_ctx->connected      = false;
     g_ctx->auth_token     = bstrdup(auth_header);
@@ -406,91 +496,6 @@ bool xbox_monitoring_is_active(void) {
     return g_ctx != NULL && g_ctx->running;
 }
 
-/**
- * Send a message over the WebSocket connection
- * @param message The message to send
- * @return true if message was queued for sending, false otherwise
- */
-static bool send_websocket_message(const char *message) {
-    if (!g_ctx || !g_ctx->wsi || !g_ctx->connected) {
-        obs_log(LOG_ERROR, "Xbox RTA: Cannot send message - not connected");
-        return false;
-    }
-
-    size_t len = strlen(message);
-
-    /* Allocate buffer with LWS_PRE padding */
-    unsigned char *buf = (unsigned char *)bmalloc(LWS_PRE + len);
-    if (!buf) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to allocate send buffer");
-        return false;
-    }
-
-    memcpy(buf + LWS_PRE, message, len);
-
-    int written = lws_write(g_ctx->wsi, buf + LWS_PRE, len, LWS_WRITE_TEXT);
-    bfree(buf);
-
-    if (written < (int)len) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to send message (wrote %d of %zu bytes)", written, len);
-        return false;
-    }
-
-    obs_log(LOG_DEBUG, "Xbox RTA: Sent message: %s", message);
-    return true;
-}
-
-bool xbox_subscribe() {
-
-    xbox_identity_t *identity = state_get_xbox_identity();
-
-    if (!identity) {
-        obs_log(LOG_ERROR, "Xbox RTA: Invalid Xbox identity for subscription");
-        return false;
-    }
-
-    if (!g_ctx || !g_ctx->connected) {
-        obs_log(LOG_ERROR, "Xbox RTA: Cannot subscribe - not connected");
-        return false;
-    }
-
-    /* RTA subscription message format:
-     * [<sequence_id>, <subscribe_action>, "<resource_uri>"]
-     * Action 1 = subscribe
-     * Resource URI format: https://notify.xboxlive.com/users/xuid(<xuid>)/deviceId/current/titleId/current
-     */
-    char message[512];
-    snprintf(message,
-             sizeof(message),
-             "[1,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]",
-             identity->xid);
-
-    obs_log(LOG_INFO, "Xbox RTA: Subscribing for XUID %s", identity->xid);
-    return send_websocket_message(message);
-}
-
-bool xbox_unsubscribe(const char *subscription_id) {
-    if (!subscription_id || !*subscription_id) {
-        obs_log(LOG_ERROR, "Xbox RTA: Invalid subscription ID for unsubscribe");
-        return false;
-    }
-
-    if (!g_ctx || !g_ctx->connected) {
-        obs_log(LOG_ERROR, "Xbox RTA: Cannot unsubscribe - not connected");
-        return false;
-    }
-
-    /* RTA unsubscribe message format:
-     * [<sequence_id>, <unsubscribe_action>, "<subscription_id>"]
-     * Action 2 = unsubscribe
-     */
-    char message[256];
-    snprintf(message, sizeof(message), "[2,2,\"%s\"]", subscription_id);
-
-    obs_log(LOG_INFO, "Xbox RTA: Unsubscribing from %s", subscription_id);
-    return send_websocket_message(message);
-}
-
 const game_t *get_current_game() {
     return g_current_game;
 }
@@ -499,9 +504,8 @@ const game_t *get_current_game() {
 
 /* Stub implementations when libwebsockets is not available */
 
-bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_connection_status_t on_status) {
+bool xbox_monitoring_start(on_xbox_game_played_t on_game_played) {
     (void)on_game_played;
-    (void)on_status;
 
     obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, monitoring not started");
 
@@ -511,17 +515,6 @@ bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_con
 void xbox_monitoring_stop(void) {}
 
 bool xbox_monitoring_is_active(void) {
-    return false;
-}
-
-bool xbox_subscribe() {
-    obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, cannot subscribe");
-    return false;
-}
-
-bool xbox_unsubscribe(const char *subscription_id) {
-    (void)subscription_id;
-    obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, cannot unsubscribe");
     return false;
 }
 

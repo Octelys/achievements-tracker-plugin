@@ -34,7 +34,7 @@ const game_t *get_current_game();
  * @param on_status Callback for connection status changes
  * @return true if monitoring started successfully, false otherwise
  */
-bool xbox_monitoring_start(on_xbox_game_played_t on_game_played, on_xbox_rta_connection_status_t on_status);
+bool xbox_monitoring_start(on_xbox_game_played_t on_game_played);
 
 /**
  * Stop monitoring Xbox Live RTA endpoint
@@ -46,21 +46,6 @@ void xbox_monitoring_stop(void);
  * @return true if monitoring is active, false otherwise
  */
 bool xbox_monitoring_is_active(void);
-
-/**
- * Start subscribing to Xbox Live RTA notifications
- * Sends the subscription message over the WebSocket connection
- * @return true if subscription request was sent, false otherwise
- */
-bool xbox_subscribe();
-
-/**
- * Stop subscribing to Xbox Live RTA notifications
- * Sends the unsubscribe message over the WebSocket connection
- * @param subscription_id The subscription ID returned from the subscribe response
- * @return true if unsubscribe request was sent, false otherwise
- */
-bool xbox_unsubscribe(const char *subscription_id);
 
 #ifdef __cplusplus
 }
