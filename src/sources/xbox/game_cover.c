@@ -15,9 +15,6 @@
 
 #include <net/http/http.h>
 
-// Store the source reference somewhere accessible
-static obs_source_t *g_account_source = NULL;
-
 typedef struct xbox_game_cover_source {
     obs_source_t *source;
     uint32_t      width;
@@ -141,31 +138,16 @@ static void on_xbox_game_played(const game_t *game) {
 //	Source callbacks
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * Returns the configured width of the source.
- *
- * @param data
- * @return
- */
 static uint32_t source_get_width(void *data) {
     const xbox_game_cover_source_t *s = data;
     return s->width;
 }
 
-/**
- * Returns the configured height of the source.
- *
- * @param data
- * @return
- */
 static uint32_t source_get_height(void *data) {
     const xbox_game_cover_source_t *s = data;
     return s->height;
 }
 
-/**
- *  Gets the name of the source.
- */
 static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
@@ -173,17 +155,9 @@ static const char *source_get_name(void *unused) {
     return "Xbox Game Cover";
 }
 
-/**
- *
- * @param settings
- * @param source
- * @return
- */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
-
-    g_account_source = source;
 
     xbox_game_cover_source_t *s = bzalloc(sizeof(*s));
     s->source                   = source;
@@ -193,13 +167,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     return s;
 }
 
-/**
- *
- * @param data
- */
 static void on_source_destroy(void *data) {
-
-    g_account_source = NULL;
 
     xbox_game_cover_source_t *source = data;
 
@@ -238,12 +206,6 @@ static void on_source_update(void *data, obs_data_t *settings) {
     */
 }
 
-/**
- * Draws the image.
- *
- * @param data
- * @param effect
- */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
     xbox_game_cover_source_t *source = data;
@@ -268,9 +230,6 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     */
 }
 
-/**
- * Configuration of the Xbox game cover source.
- */
 static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
@@ -329,11 +288,6 @@ static struct obs_source_info xbox_game_cover_source_info = {
     .video_tick     = NULL,
 };
 
-/**
- * Returns the configuration of the Xbox game cover source.
- *
- * @return The configuration of the Xbox game cover source.
- */
 static const struct obs_source_info *xbox_game_cover_source_get(void) {
     return &xbox_game_cover_source_info;
 }

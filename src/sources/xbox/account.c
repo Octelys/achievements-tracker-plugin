@@ -191,10 +191,6 @@ static struct obs_source_info xbox_gamerscore_source = {
     .video_render   = on_source_video_render,
 };
 
-/**
- *
- * @return
- */
 static const struct obs_source_info *xbox_source_get(void) {
     return &xbox_gamerscore_source;
 }

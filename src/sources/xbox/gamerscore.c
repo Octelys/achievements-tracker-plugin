@@ -12,26 +12,15 @@
 #include "xbox/xbox_client.h"
 #include "xbox/xbox_monitoring.h"
 
-// Store the source reference somewhere accessible
-static obs_source_t *g_account_source = NULL;
-
 typedef struct xbox_account_source {
     obs_source_t *source;
     uint32_t      width;
     uint32_t      height;
 } xbox_account_source_t;
 
-static void refresh_page() {
-    if (!g_account_source)
-        return;
-
-    /*
-     * Force OBS to refresh the properties UI by signaling that
-     * properties need to be recreated. Returning true from the
-     * button callback also helps trigger this.
-     */
-    obs_source_update_properties(g_account_source);
-}
+//  --------------------------------------------------------------------------------------------------------------------
+//	Private functions
+//  --------------------------------------------------------------------------------------------------------------------
 
 static void on_xbox_game_played(const game_t *game) {
 
@@ -57,8 +46,6 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 }
 
 static void on_source_destroy(void *data) {
-
-    g_account_source = NULL;
 
     xbox_account_source_t *source = data;
 
