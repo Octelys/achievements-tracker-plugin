@@ -94,8 +94,8 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     xbox_account_source_t *s = bzalloc(sizeof(*s));
     s->source                = source;
-    s->width                 = 800;
-    s->height                = 200;
+    s->width                 = 10;
+    s->height                = 10;
 
     return s;
 }
