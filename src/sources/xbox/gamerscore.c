@@ -9,7 +9,7 @@
 
 #include "oauth/xbox-live.h"
 #include "xbox/xbox_client.h"
-#include "xbox/xbox_monitoring.h"
+#include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
 

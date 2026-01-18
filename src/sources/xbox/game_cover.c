@@ -11,7 +11,7 @@
 #include "oauth/xbox-live.h"
 #include "crypto/crypto.h"
 #include "xbox/xbox_client.h"
-#include "xbox/xbox_monitoring.h"
+#include "xbox/xbox_monitor.h"
 
 #include <net/http/http.h>
 

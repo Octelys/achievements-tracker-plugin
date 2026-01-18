@@ -239,10 +239,11 @@ target_sources(
     src/oauth/util.c
     src/oauth/xbox-live.c
     src/xbox/xbox_client.c
-    src/xbox/xbox_monitoring.c
+    src/xbox/xbox_monitor.c
     src/io/state.c
     src/encoding/base64.c
     src/util/uuid.c
+    src/text/parsers.c
     src/time/time.c
 )
 

@@ -1,4 +1,4 @@
-#include "xbox_monitoring.h"
+#include "xbox_monitor.h"
 
 #include <obs-module.h>
 #include <diagnostics/log.h>
