@@ -1,0 +1,96 @@
+name: Coverage
+
+on:
+  workflow_call:
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  coverage-linux:
+    name: Unit test coverage (Ubuntu)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            lcov \
+            gcovr
+
+      - name: Configure (coverage)
+        run: |
+          cmake -S . -B build_coverage \
+            -G Ninja \
+            -DBUILD_TESTING=ON \
+            -DENABLE_COVERAGE=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build tests
+        run: |
+          cmake --build build_coverage --target test_encoder test_crypto test_time test_parsers
+
+      - name: Run tests
+        run: |
+          ctest --test-dir build_coverage --output-on-failure
+
+      - name: Generate coverage reports (lcov + gcovr)
+        run: |
+          mkdir -p build_coverage/coverage
+
+          # Capture and filter with lcov (HTML)
+          lcov --capture --directory build_coverage --output-file build_coverage/coverage/coverage.info
+          lcov --remove build_coverage/coverage/coverage.info \
+            '/usr/*' \
+            '${{ github.workspace }}/external/*' \
+            '${{ github.workspace }}/_deps/*' \
+            '${{ github.workspace }}/test/*' \
+            --output-file build_coverage/coverage/coverage.filtered.info
+          genhtml build_coverage/coverage/coverage.filtered.info --output-directory build_coverage/coverage/html
+
+          # Cobertura XML (for GitHub annotations / external services)
+          gcovr -r . build_coverage \
+            --exclude 'external/' \
+            --exclude '_deps/' \
+            --exclude 'test/' \
+            --cobertura-pretty \
+            --xml build_coverage/coverage/coverage.xml
+
+          # Text summary for job logs
+          gcovr -r . build_coverage \
+            --exclude 'external/' \
+            --exclude '_deps/' \
+            --exclude 'test/' \
+            --print-summary
+
+      - name: Upload coverage artifact (HTML + XML)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ubuntu
+          path: |
+            build_coverage/coverage/html
+            build_coverage/coverage/coverage.xml
+            build_coverage/coverage/coverage.filtered.info
+
+      - name: Add summary
+        run: |
+          echo '### Coverage artifacts' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '- Download **coverage-ubuntu** artifact to view HTML report locally (open `index.html`).' >> $GITHUB_STEP_SUMMARY
+          echo '- Cobertura XML: `build_coverage/coverage/coverage.xml`' >> $GITHUB_STEP_SUMMARY
+

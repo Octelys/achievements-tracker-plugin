@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.28...3.30)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/common/bootstrap.cmake" NO_POLICY_SCOPE)
 
+option(ENABLE_COVERAGE "Enable code coverage instrumentation for unit tests (GCC/Clang)" OFF)
+if(ENABLE_COVERAGE)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/Coverage.cmake")
+endif()
+
 # Prefer universal OpenSSL when present (macOS)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalOpenSSL.cmake")
 
@@ -277,6 +282,10 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
   )
 
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_encoder)
+  endif()
+
   target_include_directories(
     test_encoder
     PRIVATE
@@ -342,6 +351,10 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
   )
 
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_crypto)
+  endif()
+
   target_include_directories(
     test_crypto
     PRIVATE
@@ -394,6 +407,10 @@ if(BUILD_TESTING)
   # ------------------------------
   add_executable(test_time test/test_time.c ${unity_SOURCE_DIR}/src/unity.c src/time/time.c test/stubs/bmem_stub.c)
 
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_time)
+  endif()
+
   target_include_directories(
     test_time
     PRIVATE
@@ -440,6 +457,10 @@ if(BUILD_TESTING)
     src/text/parsers.c
     test/stubs/bmem_stub.c
   )
+
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_parsers)
+  endif()
 
   target_include_directories(
     test_parsers
