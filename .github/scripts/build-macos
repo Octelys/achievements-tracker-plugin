@@ -56,6 +56,8 @@ build() {
   local config='RelWithDebInfo'
   local -r -a _valid_configs=(Debug RelWithDebInfo Release MinSizeRel)
   local -i codesign=0
+  local -i run_tests=0
+  local -i coverage=0
 
   local -a args
   while (( # )) {
@@ -79,6 +81,8 @@ build() {
         shift 2
         ;;
       -s|--codesign) codesign=1; shift ;;
+      --run-tests) run_tests=1; shift ;;
+      --coverage) coverage=1; run_tests=1; shift ;;
       --debug) debug=1; shift ;;
       *) log_error "Unknown option: %B${1}%b"; exit 2 ;;
     }
@@ -102,6 +106,16 @@ build() {
   if (( debug )) cmake_args+=(--debug-output)
 
   cmake_args+=(--preset 'macos-ci')
+
+  # Enable testing if requested
+  if (( run_tests )) {
+    cmake_args+=(-DBUILD_TESTING=ON)
+  }
+
+  # Enable coverage if requested
+  if (( coverage )) {
+    cmake_args+=(-DENABLE_COVERAGE=ON)
+  }
 
   typeset -gx NSUnbufferedIO=YES
 
@@ -142,6 +156,37 @@ build() {
   pushd build_macos
   run_xcodebuild ${build_args}
   popd
+
+  # Run tests if requested
+  if (( run_tests )) {
+    log_group "Building test targets..."
+    cmake --build build_macos --config ${config} --target test_encoder test_crypto test_time test_parsers
+
+    log_group "Running tests..."
+    ctest --test-dir build_macos --build-config ${config} --output-on-failure
+
+    if (( coverage )) {
+      # Generate coverage HTML report
+      if command -v gcovr &> /dev/null; then
+        log_group "Generating coverage report..."
+        mkdir -p build_macos/coverage/html
+        gcovr -r ${project_root} build_macos \
+          --exclude 'external/' \
+          --exclude '_deps/' \
+          --exclude 'test/' \
+          --html --html-details -o build_macos/coverage/html/index.html
+
+        log_group "Coverage Summary"
+        gcovr -r ${project_root} build_macos \
+          --exclude 'external/' \
+          --exclude '_deps/' \
+          --exclude 'test/' \
+          --print-summary
+      else
+        log_info "gcovr not found, skipping coverage report generation"
+      fi
+    }
+  }
 
   log_group "Installing ${product_name}..."
   cmake --install build_macos --config ${config} --prefix "${project_root}/release/${config}"

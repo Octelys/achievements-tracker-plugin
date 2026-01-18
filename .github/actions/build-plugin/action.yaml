@@ -20,6 +20,14 @@ inputs:
     description: Team ID for application codesigning (macOS only)
     required: false
     default: ''
+  coverage:
+    description: Enable code coverage (Linux only)
+    required: false
+    default: 'false'
+  runTests:
+    description: Run unit tests after build
+    required: false
+    default: 'false'
   workingDirectory:
     description: Working directory for packaging
     required: false
@@ -27,6 +35,13 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Install Coverage Tools (macOS) 📊
+      if: runner.os == 'macOS' && inputs.coverage == 'true'
+      shell: bash
+      run: |
+        : Install Coverage Tools
+        brew install gcovr
+
     - name: Run macOS Build
       if: runner.os == 'macOS'
       shell: zsh --no-rcs --errexit --pipefail {0}
@@ -42,6 +57,8 @@ runs:
         if (( ${+RUNNER_DEBUG} )) build_args+=(--debug)
 
         if [[ '${{ inputs.codesign }}' == 'true' ]] build_args+=(--codesign)
+        if [[ '${{ inputs.runTests }}' == 'true' ]] build_args+=(--run-tests)
+        if [[ '${{ inputs.coverage }}' == 'true' ]] build_args+=(--coverage)
 
         .github/scripts/build-macos ${build_args}
 
@@ -55,6 +72,14 @@ runs:
         echo "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin" >> $GITHUB_PATH
         brew install --quiet zsh
         echo ::endgroup::
+
+    - name: Install Coverage Tools 📊
+      if: runner.os == 'Linux' && inputs.coverage == 'true'
+      shell: bash
+      run: |
+        : Install Coverage Tools
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends gcovr
 
     - name: Run Ubuntu Build
       if: runner.os == 'Linux'
@@ -70,6 +95,8 @@ runs:
           --config ${{ inputs.config }}
         )
         if (( ${+RUNNER_DEBUG} )) build_args+=(--debug)
+
+        if [[ '${{ inputs.coverage }}' == 'true' ]] build_args+=(--coverage)
 
         .github/scripts/build-ubuntu ${build_args}
 
