@@ -249,6 +249,9 @@ target_sources(
 
 # Link vendored deps
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE cjson)
+if(UNIX AND NOT APPLE)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE m)
+endif()
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
@@ -289,6 +292,9 @@ if(BUILD_TESTING)
 
   # Link vendored deps
   target_link_libraries(test_encoder PRIVATE cjson)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(test_encoder PRIVATE m)
+  endif()
 
   if(WIN32)
     target_link_libraries(test_encoder PRIVATE Rpcrt4)
@@ -350,6 +356,9 @@ if(BUILD_TESTING)
 
   # Link vendored deps
   target_link_libraries(test_crypto PRIVATE cjson)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(test_crypto PRIVATE m)
+  endif()
 
   if(WIN32)
     target_link_libraries(test_crypto PRIVATE Rpcrt4)
@@ -398,6 +407,9 @@ if(BUILD_TESTING)
 
   # Link vendored deps
   target_link_libraries(test_time PRIVATE cjson)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(test_time PRIVATE m)
+  endif()
 
   # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
   if(TARGET OpenSSL::Crypto)
@@ -442,6 +454,9 @@ if(BUILD_TESTING)
 
   # Link vendored deps
   target_link_libraries(test_parsers PRIVATE cjson)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(test_parsers PRIVATE m)
+  endif()
 
   # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
   if(TARGET OpenSSL::Crypto)
