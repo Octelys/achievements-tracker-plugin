@@ -25,9 +25,3 @@ jobs:
     secrets: inherit
     permissions:
       contents: read
-
-  coverage:
-    name: Coverage 📈
-    uses: ./.github/workflows/coverage.yaml
-    permissions:
-      contents: read
