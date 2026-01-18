@@ -57,7 +57,7 @@ static void is_presence_message__message_is_achievement_false_returned(void) {
 static void is_presence_message__message_is_presence_true_returned(void) {
     //  Arrange.
     const char *message =
-        "{\"devicetype\":\"XboxOne\",\"titleid\":0,\"string1\":\"Vu en dernier il y a 1 min : Application Xbox\",\"string2\":\"\",\"presenceState\":\"Offline\",\"presenceText\":\"Vu en dernier il y a 1 min : Application Xbox\",\"presenceDetails\":[{\"isBroadcasting\":false,\"device\":\"iOS\",\"presenceText\":\"Vu en dernier il y a 1 min : Application Xbox\",\"state\":\"LastSeen\",\"titleId\":\"328178078\",\"isGame\":false,\"isPrimary\":true,\"richPresenceText\":\"\"}],\"xuid\":2533274953419891}";
+        "{\"devicetype\":\"XboxOne\",\"titleid\":0,\"string1\":\"The Outer Worlds 2\",\"string2\":\"\",\"presenceState\":\"Online\",\"presenceText\":\"The Outer Worlds 2\",\"presenceDetails\":[{\"isBroadcasting\":false,\"device\":\"Scarlett\",\"presenceText\":\"Accueil\",\"state\":\"Active\",\"titleId\":\"750323071\",\"isGame\":false,\"isPrimary\":false,\"richPresenceText\":\"\"},{\"isBroadcasting\":false,\"device\":\"Scarlett\",\"presenceText\":\"The Outer Worlds 2\",\"state\":\"Active\",\"titleId\":\"1879711255\",\"isGame\":true,\"isPrimary\":true,\"richPresenceText\":\"\"}],\"xuid\":2533274953419891}";
 
     //  Act.
     bool actual = is_presence_message(message);
@@ -116,7 +116,7 @@ static void is_achievement_message__message_is_achievement_true_returned(void) {
 static void is_achievement_message__message_is_presence_false_returned(void) {
     //  Arrange.
     const char *message =
-        "{\"devicetype\":\"XboxOne\",\"titleid\":0,\"string1\":\"Vu en dernier il y a 1 min : Application Xbox\",\"string2\":\"\",\"presenceState\":\"Offline\",\"presenceText\":\"Vu en dernier il y a 1 min : Application Xbox\",\"presenceDetails\":[{\"isBroadcasting\":false,\"device\":\"iOS\",\"presenceText\":\"Vu en dernier il y a 1 min : Application Xbox\",\"state\":\"LastSeen\",\"titleId\":\"328178078\",\"isGame\":false,\"isPrimary\":true,\"richPresenceText\":\"\"}],\"xuid\":2533274953419891}";
+        "{\"devicetype\":\"XboxOne\",\"titleid\":0,\"string1\":\"The Outer Worlds 2\",\"string2\":\"\",\"presenceState\":\"Online\",\"presenceText\":\"The Outer Worlds 2\",\"presenceDetails\":[{\"isBroadcasting\":false,\"device\":\"Scarlett\",\"presenceText\":\"Accueil\",\"state\":\"Active\",\"titleId\":\"750323071\",\"isGame\":false,\"isPrimary\":false,\"richPresenceText\":\"\"},{\"isBroadcasting\":false,\"device\":\"Scarlett\",\"presenceText\":\"The Outer Worlds 2\",\"state\":\"Active\",\"titleId\":\"1879711255\",\"isGame\":true,\"isPrimary\":true,\"richPresenceText\":\"\"}],\"xuid\":2533274953419891}";
 
     //  Act.
     bool actual = is_achievement_message(message);
@@ -175,13 +175,15 @@ static void parse_game__message_is_achievement_null_returned(void) {
 static void parse_game__message_is_presence_game_returned(void) {
     //  Arrange.
     const char *message =
-        "{\"devicetype\":\"XboxOne\",\"titleid\":0,\"string1\":\"Vu en dernier il y a 1 min : Application Xbox\",\"string2\":\"\",\"presenceState\":\"Offline\",\"presenceText\":\"Vu en dernier il y a 1 min : Application Xbox\",\"presenceDetails\":[{\"isBroadcasting\":false,\"device\":\"iOS\",\"presenceText\":\"Vu en dernier il y a 1 min : Application Xbox\",\"state\":\"LastSeen\",\"titleId\":\"328178078\",\"isGame\":false,\"isPrimary\":true,\"richPresenceText\":\"\"}],\"xuid\":2533274953419891}";
+        "{\"devicetype\":\"XboxOne\",\"titleid\":0,\"string1\":\"The Outer Worlds 2\",\"string2\":\"\",\"presenceState\":\"Online\",\"presenceText\":\"The Outer Worlds 2\",\"presenceDetails\":[{\"isBroadcasting\":false,\"device\":\"Scarlett\",\"presenceText\":\"Accueil\",\"state\":\"Active\",\"titleId\":\"750323071\",\"isGame\":false,\"isPrimary\":false,\"richPresenceText\":\"\"},{\"isBroadcasting\":false,\"device\":\"Scarlett\",\"presenceText\":\"The Outer Worlds 2\",\"state\":\"Active\",\"titleId\":\"1879711255\",\"isGame\":true,\"isPrimary\":true,\"richPresenceText\":\"\"}],\"xuid\":2533274953419891}";
 
     //  Act.
     game_t *actual = parse_game(message);
 
     //  Assert.
     TEST_ASSERT_NOT_NULL(actual);
+    TEST_ASSERT_EQUAL_STRING(actual->id, "1879711255");
+    TEST_ASSERT_EQUAL_STRING(actual->title, "The Outer Worlds 2");
 }
 
 int main(void) {
