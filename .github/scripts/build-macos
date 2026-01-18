@@ -163,21 +163,28 @@ build() {
     cmake --build build_macos --config ${config} --target test_encoder test_crypto test_time test_parsers
 
     log_group "Running tests..."
-    if (( coverage )) {
-      # Run tests via coverage target (generates HTML report)
-      cmake --build build_macos --config ${config} --target coverage
+    ctest --test-dir build_macos --build-config ${config} --output-on-failure
 
-      # Generate text summary for CI
+    if (( coverage )) {
+      # Generate coverage HTML report
       if command -v gcovr &> /dev/null; then
+        log_group "Generating coverage report..."
+        mkdir -p build_macos/coverage/html
+        gcovr -r ${project_root} build_macos \
+          --exclude 'external/' \
+          --exclude '_deps/' \
+          --exclude 'test/' \
+          --html --html-details -o build_macos/coverage/html/index.html
+
         log_group "Coverage Summary"
         gcovr -r ${project_root} build_macos \
           --exclude 'external/' \
           --exclude '_deps/' \
           --exclude 'test/' \
           --print-summary
+      else
+        log_info "gcovr not found, skipping coverage report generation"
       fi
-    } else {
-      ctest --test-dir build_macos --build-config ${config} --output-on-failure
     }
   }
 
