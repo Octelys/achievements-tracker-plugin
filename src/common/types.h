@@ -67,13 +67,13 @@ typedef struct gamerscore_configuration {
 // Application
 // Xbox","state":"LastSeen","titleId":"328178078","isGame":false,"isPrimary":true,"richPresenceText":""}],"xuid":2533274953419891}]
 typedef struct media_asset {
-    const char               *url;
-    const struct media_asset *next;
+    const char         *url;
+    struct media_asset *next;
 } media_asset_t;
 
 typedef struct reward {
-    const char          *value;
-    const struct reward *next;
+    const char    *value;
+    struct reward *next;
 } reward_t;
 
 typedef struct achievement {
@@ -85,7 +85,8 @@ typedef struct achievement {
     bool                 is_secret;
     const char          *description;
     const char          *locked_description;
-    const media_asset_t *rewards;
+    const reward_t      *rewards;
+    struct achievement  *next;
 } achievement_t;
 
 typedef struct achievements_progress {

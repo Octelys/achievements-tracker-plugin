@@ -12,6 +12,31 @@
 //  Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
+static const char *get_node_string(cJSON *json_root, int achievement_index, const char *property_name) {
+
+    char property_key[512] = "";
+    snprintf(property_key, sizeof(property_key), "/achievements/%d/%s", achievement_index, property_name);
+
+    cJSON *property_node = cJSONUtils_GetPointer(json_root, property_key);
+
+    if (!property_node) {
+        return NULL;
+    }
+
+    return property_node->valuestring;
+}
+
+static bool get_node_bool(cJSON *json_root, int achievement_index, const char *property_name) {
+
+    const char *property_value = get_node_string(json_root, achievement_index, property_name);
+
+    if (!property_value) {
+        return false;
+    }
+
+    return strcmp(property_value, "true") == 0;
+}
+
 static bool contains_node(const char *json_string, const char *node_key) {
 
     cJSON *json_message  = NULL;
@@ -198,4 +223,148 @@ cleanup:
     FREE_JSON(json_root);
 
     return achievement_progress;
+}
+
+achievement_t *parse_achievements(const char *json_string) {
+
+    cJSON         *json_root    = NULL;
+    achievement_t *achievements = NULL;
+
+    if (!json_string || strlen(json_string) == 0) {
+        return NULL;
+    }
+
+    json_root = cJSON_Parse(json_string);
+
+    if (!json_root) {
+        return NULL;
+    }
+
+    for (int achievement_index = 0;; achievement_index++) {
+
+        const char *id = get_node_string(json_root, achievement_index, "id");
+
+        if (!id) {
+            /* There is nothing more */
+            obs_log(LOG_DEBUG, "No more achievement at %d", achievement_index);
+            break;
+        }
+
+        achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+        achievement->id                 = id;
+        achievement->service_config_id  = get_node_string(json_root, achievement_index, "serviceConfigId");
+        achievement->name               = get_node_string(json_root, achievement_index, "name");
+        achievement->progress_state     = get_node_string(json_root, achievement_index, "progressState");
+        achievement->description        = get_node_string(json_root, achievement_index, "description");
+        achievement->locked_description = get_node_string(json_root, achievement_index, "lockedDescription");
+        achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
+        achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
+
+        /* Reads the media assets */
+        media_asset_t *media_assets = NULL;
+
+        for (int media_asset_index = 0;; media_asset_index++) {
+
+            char media_asset_url_key[512] = "";
+            snprintf(media_asset_url_key,
+                     sizeof(media_asset_url_key),
+                     "/achievements/%d/mediaAssets/%d/url",
+                     achievement_index,
+                     media_asset_index);
+
+            cJSON *media_asset_url_node = cJSONUtils_GetPointer(json_root, media_asset_url_key);
+
+            if (!media_asset_url_node) {
+                /* There is nothing more */
+                obs_log(LOG_DEBUG, "No more media asset at %d/%d", achievement_index, media_asset_index);
+                break;
+            }
+
+            media_asset_t *media_asset = bzalloc(sizeof(media_asset_t));
+            media_asset->url           = strdup(media_asset_url_node->valuestring);
+            media_asset->next          = NULL;
+
+            if (!media_assets) {
+                media_assets = media_asset;
+            } else {
+                media_asset_t *last_media_asset = media_assets;
+                while (last_media_asset->next) {
+                    last_media_asset = last_media_asset->next;
+                }
+                last_media_asset->next = media_asset;
+            }
+        }
+
+        achievement->media_assets = media_assets;
+
+        /* Reads the rewards */
+        reward_t *rewards = NULL;
+
+        for (int reward_index = 0;; reward_index++) {
+
+            char reward_type_key[512] = "";
+            snprintf(reward_type_key,
+                     sizeof(reward_type_key),
+                     "/achievements/%d/rewards/%d/type",
+                     achievement_index,
+                     reward_index);
+
+            cJSON *reward_type_node = cJSONUtils_GetPointer(json_root, reward_type_key);
+
+            if (!reward_type_node) {
+                /* There is nothing more */
+                obs_log(LOG_DEBUG, "No more reward at %d/%d", achievement_index, reward_index);
+                break;
+            }
+
+            if (!reward_type_node->type || strcasecmp(reward_type_node->valuestring, "Gamerscore") != 0) {
+                /* Ignores the non-gamerscore reward */
+                obs_log(LOG_DEBUG, "Not a Gamerscore reward at %d/%d", achievement_index, reward_index);
+                continue;
+            }
+
+            char reward_value_key[512] = "";
+            snprintf(reward_value_key,
+                     sizeof(reward_value_key),
+                     "/achievements/%d/rewards/%d/value",
+                     achievement_index,
+                     reward_index);
+
+            cJSON *reward_value_node = cJSONUtils_GetPointer(json_root, reward_value_key);
+
+            if (!reward_value_node) {
+                obs_log(LOG_DEBUG, "No value in reward at %d/%d", achievement_index, reward_index);
+                continue;
+            }
+
+            reward_t *reward = bzalloc(sizeof(reward_t));
+            reward->value    = reward_type_node->valuestring;
+
+            if (!rewards) {
+                rewards = reward;
+            } else {
+                reward_t *last_reward = rewards;
+                while (last_reward->next) {
+                    last_reward = last_reward->next;
+                }
+                last_reward->next = reward;
+            }
+        }
+
+        achievement->rewards = rewards;
+
+        if (!achievements) {
+            achievements = achievement;
+        } else {
+            achievement_t *last_achievement = achievements;
+            while (last_achievement->next) {
+                last_achievement = last_achievement->next;
+            }
+            last_achievement->next = achievement;
+        }
+    }
+
+    FREE_JSON(json_root);
+
+    return achievements;
 }
