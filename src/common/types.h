@@ -98,6 +98,8 @@ typedef struct achievements_progress {
 
 bool is_token_expired(const token_t *token);
 
+int count_achievements(const achievement_t *achievements);
+
 #ifdef __cplusplus
 }
 #endif

@@ -25,6 +25,9 @@
 
 #define PROTOCOL "rta.xboxlive.com.V2"
 
+#define SUBSCRIBE 1
+#define UNSUBSCRIBE 1
+
 typedef struct game_played_subscription {
     on_xbox_game_played_t            callback;
     struct game_played_subscription *next;
@@ -62,8 +65,9 @@ typedef struct monitoring_context {
     size_t rx_buffer_used;
 } monitoring_context_t;
 
-static monitoring_context_t *g_monitoring_context = NULL;
-static game_t               *g_current_game       = NULL;
+static monitoring_context_t *g_monitoring_context        = NULL;
+static game_t               *g_current_game              = NULL;
+static achievement_t        *g_current_game_achievements = NULL;
 
 static void notify_game_played(const game_t *game) {
     obs_log(LOG_INFO, "Notifying game played: %s (%s)", game->title, game->id);
@@ -75,7 +79,9 @@ static void notify_game_played(const game_t *game) {
         subscriptions = subscriptions->next;
     }
 }
+
 static void notify_achievements_progressed(const achievements_progress_t *achievements_progress) {
+
     obs_log(LOG_INFO, "Notifying achievements progress: %s", achievements_progress->service_config_id);
 
     achievements_updated_subscription_t *subscription = g_achievements_updated_subscriptions;
@@ -110,7 +116,7 @@ static void notify_connection_changed(bool connected, const char *error_message)
  */
 static bool send_websocket_message(const char *message) {
     if (!g_monitoring_context || !g_monitoring_context->wsi || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Xbox RTA: Cannot send message - not connected");
+        obs_log(LOG_ERROR, "Monitoring | Cannot send message - not connected");
         return false;
     }
 
@@ -119,7 +125,7 @@ static bool send_websocket_message(const char *message) {
     /* Allocate buffer with LWS_PRE padding */
     unsigned char *buf = (unsigned char *)bmalloc(LWS_PRE + len);
     if (!buf) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to allocate send buffer");
+        obs_log(LOG_ERROR, "Monitoring | Failed to allocate send buffer");
         return false;
     }
 
@@ -129,25 +135,25 @@ static bool send_websocket_message(const char *message) {
     bfree(buf);
 
     if (written < (int)len) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to send message (wrote %d of %zu bytes)", written, len);
+        obs_log(LOG_ERROR, "Monitoring | Failed to send message (wrote %d of %zu bytes)", written, len);
         return false;
     }
 
-    obs_log(LOG_INFO, "Xbox RTA: Sent message: %s", message);
+    obs_log(LOG_INFO, "Monitoring | Sent message: %s", message);
     return true;
 }
 
-static bool xbox_subscribe() {
+static bool xbox_presence_subscribe() {
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Xbox RTA: Invalid Xbox identity for subscription");
+        obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
         return false;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Xbox RTA: Cannot subscribe - not connected");
+        obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
         return false;
     }
 
@@ -159,21 +165,22 @@ static bool xbox_subscribe() {
     char message[512];
     snprintf(message,
              sizeof(message),
-             "[1,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]",
+             "[%d,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]",
+             SUBSCRIBE,
              identity->xid);
 
-    obs_log(LOG_INFO, "Xbox RTA: Subscribing for XUID %s", identity->xid);
+    obs_log(LOG_INFO, "Monitoring | Subscribing for presence changes for XUID %s", identity->xid);
     return send_websocket_message(message);
 }
 
-static bool xbox_unsubscribe(const char *subscription_id) {
+static bool xbox_presence_unsubscribe(const char *subscription_id) {
     if (!subscription_id || !*subscription_id) {
-        obs_log(LOG_ERROR, "Xbox RTA: Invalid subscription ID for unsubscribe");
+        obs_log(LOG_ERROR, "Monitoring | Invalid subscription ID for unsubscribe");
         return false;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Xbox RTA: Cannot unsubscribe - not connected");
+        obs_log(LOG_ERROR, "Monitoring | Cannot unsubscribe - not connected");
         return false;
     }
 
@@ -182,10 +189,119 @@ static bool xbox_unsubscribe(const char *subscription_id) {
      * Action 2 = unsubscribe
      */
     char message[256];
-    snprintf(message, sizeof(message), "[2,2,\"%s\"]", subscription_id);
+    snprintf(message, sizeof(message), "[%d,1,\"%s\"]", UNSUBSCRIBE, subscription_id);
 
-    obs_log(LOG_INFO, "Xbox RTA: Unsubscribing from %s", subscription_id);
+    obs_log(LOG_INFO, "Monitoring | Unsubscribing from %s", subscription_id);
     return send_websocket_message(message);
+}
+
+static bool xbox_achievements_progress_subscribe(const achievement_t *achievements) {
+
+    if (!achievements) {
+        obs_log(LOG_ERROR, "Monitoring | No achievements specified");
+        return false;
+    }
+
+    const char *service_config_id = achievements->service_config_id;
+
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (!identity) {
+        obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
+        return false;
+    }
+
+    if (!g_monitoring_context || !g_monitoring_context->connected) {
+        obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
+        return false;
+    }
+
+    char message[512];
+    snprintf(message,
+             sizeof(message),
+             "[%d,1,\"https://achievements.xboxlive.com/users/xuid(%s)/achievements/%s\"]",
+             SUBSCRIBE,
+             identity->xid,
+             service_config_id);
+
+    obs_log(LOG_INFO,
+            "Monitoring | Subscribing for achievement updates for service config id %s (XUID %s)",
+            service_config_id,
+            identity->xid);
+
+    return send_websocket_message(message);
+}
+
+static bool xbox_achievements_progress_unsubscribe(const achievement_t *achievements) {
+
+    if (!achievements) {
+        obs_log(LOG_ERROR, "Monitoring | No achievements specified");
+        return false;
+    }
+
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (!identity) {
+        obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
+        return false;
+    }
+
+    if (!g_monitoring_context || !g_monitoring_context->connected) {
+        obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
+        return false;
+    }
+
+    char message[512];
+    snprintf(message,
+             sizeof(message),
+             "[%d,1,\"https://achievements.xboxlive.com/users/xuid(%s)/achievements/%s\"]",
+             UNSUBSCRIBE,
+             identity->xid,
+             achievements->service_config_id);
+
+    obs_log(LOG_INFO,
+            "Monitoring | Unsubscribing from achievement updates for service config id %s (XUID %s)",
+            achievements->service_config_id,
+            identity->xid);
+
+    return send_websocket_message(message);
+}
+
+static void on_game_update_received(game_t *game) {
+
+    if (game && g_current_game && strcasecmp(game->id, g_current_game->id) == 0) {
+        /* No change */
+        return;
+    }
+
+    xbox_achievements_progress_unsubscribe(g_current_game_achievements);
+
+    /* Updates the current game and notifies the subscribers */
+    FREE(g_current_game_achievements);
+    g_current_game_achievements = NULL;
+
+    FREE(g_current_game);
+    g_current_game = game;
+
+    notify_game_played(game);
+
+    /* Let's get the achievements of the game */
+    if (game) {
+        g_current_game_achievements = xbox_get_game_achievements(game);
+        xbox_achievements_progress_subscribe(g_current_game_achievements);
+    }
+}
+
+static void on_achievements_progress_received(const achievements_progress_t *progress) {
+
+    if (!progress) {
+        /* No change */
+        return;
+    }
+
+    /* TODO Merge progress with g_current_game_achievements */
+
+    notify_achievements_progressed(progress);
 }
 
 static void progress_buffer(const char *buffer) {
@@ -228,23 +344,19 @@ static void progress_buffer(const char *buffer) {
     if (is_presence_message(message)) {
         obs_log(LOG_DEBUG, "Message is a presence message");
         game = parse_game(message);
-
-        FREE(g_current_game);
-        g_current_game = game;
-
-        notify_game_played(game);
+        on_game_update_received(game);
         goto cleanup;
     }
 
     if (is_achievement_message(message)) {
         obs_log(LOG_DEBUG, "Message is an achievement message");
-        /* TODO */
+        const achievements_progress_t *progress = parse_achievements_progress(message);
+        on_achievements_progress_received(progress);
     }
 
 cleanup:
     FREE(message);
-    FREE_JSON(presence_item);
-    cJSON_Delete(root);
+    FREE_JSON(root);
 }
 
 static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) {
@@ -271,23 +383,24 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
                                             strlen(ctx->auth_token),
                                             p,
                                             end)) {
-                obs_log(LOG_ERROR, "Xbox RTA: Failed to add Authorization header");
+                obs_log(LOG_ERROR, "Monitoring | Failed to add Authorization header");
                 return -1;
             }
 
-            obs_log(LOG_INFO, "Xbox RTA: Added Authorization header to handshake");
+            obs_log(LOG_DEBUG, "Monitoring | Added Authorization header to handshake");
         }
         break;
 
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
-        obs_log(LOG_INFO, "Xbox RTA: WebSocket connection established");
+        obs_log(LOG_DEBUG, "Monitoring | WebSocket connection established");
         ctx->connected = true;
-        xbox_subscribe();
+        xbox_presence_subscribe();
         notify_connection_changed(true, NULL);
+        xbox_achievements_progress_subscribe(g_current_game_achievements);
         break;
 
     case LWS_CALLBACK_CLIENT_RECEIVE:
-        obs_log(LOG_DEBUG, "Xbox RTA: Received %zu bytes", len);
+        obs_log(LOG_DEBUG, "Monitoring | Received %zu bytes", len);
 
         /* Ensure buffer has enough space */
         size_t needed = ctx->rx_buffer_used + len + 1;
@@ -295,7 +408,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
             size_t new_size   = needed * 2;
             char  *new_buffer = (char *)brealloc(ctx->rx_buffer, new_size);
             if (!new_buffer) {
-                obs_log(LOG_ERROR, "Xbox RTA: Failed to allocate receive buffer");
+                obs_log(LOG_ERROR, "Monitoring | Failed to allocate receive buffer");
                 return -1;
             }
             ctx->rx_buffer      = new_buffer;
@@ -310,7 +423,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         if (lws_is_final_fragment(wsi)) {
             ctx->rx_buffer[ctx->rx_buffer_used] = '\0';
 
-            obs_log(LOG_DEBUG, "Xbox RTA: Complete message received: %s", ctx->rx_buffer);
+            obs_log(LOG_DEBUG, "Monitoring | Complete message received: %s", ctx->rx_buffer);
 
             progress_buffer(ctx->rx_buffer);
 
@@ -320,13 +433,13 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         break;
 
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-        obs_log(LOG_ERROR, "Xbox RTA: Connection error: %s", in ? (char *)in : "unknown");
+        obs_log(LOG_ERROR, "Monitoring | Connection error: %s", in ? (char *)in : "unknown");
         ctx->connected = false;
         notify_connection_changed(false, in ? (char *)in : "Connection error");
         break;
 
     case LWS_CALLBACK_CLIENT_CLOSED:
-        obs_log(LOG_INFO, "Xbox RTA: Connection closed");
+        obs_log(LOG_INFO, "Monitoring | Connection closed");
         ctx->connected = false;
         ctx->wsi       = NULL;
         notify_connection_changed(false, NULL);
@@ -359,7 +472,7 @@ static void *monitoring_thread(void *arg) {
 
     ctx->context = lws_create_context(&info);
     if (!ctx->context) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to create WebSocket context");
+        obs_log(LOG_ERROR, "Monitoring | Failed to create WebSocket context");
         notify_connection_changed(false, "Failed to create WebSocket context");
         return NULL;
     }
@@ -376,11 +489,11 @@ static void *monitoring_thread(void *arg) {
     ccinfo.protocol       = "rta.xboxlive.com.V2";
     ccinfo.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 
-    obs_log(LOG_INFO, "Xbox RTA: Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
+    obs_log(LOG_INFO, "Monitoring | Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
 
     ctx->wsi = lws_client_connect_via_info(&ccinfo);
     if (!ctx->wsi) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to connect");
+        obs_log(LOG_ERROR, "Monitoring | Failed to connect");
         notify_connection_changed(false, "Failed to connect");
         lws_context_destroy(ctx->context);
         ctx->context = NULL;
@@ -388,10 +501,16 @@ static void *monitoring_thread(void *arg) {
     }
 
     /* Immediately retrieves the game */
-    game_t *current_game = xbox_get_current_game();
+    g_current_game = xbox_get_current_game();
 
-    if (current_game) {
-        notify_game_played(current_game);
+    if (g_current_game) {
+        notify_game_played(g_current_game);
+
+        g_current_game_achievements = xbox_get_game_achievements(g_current_game);
+
+        if (g_current_game_achievements) {
+            xbox_achievements_progress_subscribe(g_current_game_achievements);
+        }
     }
 
     /* Service the WebSocket connection */
@@ -399,7 +518,7 @@ static void *monitoring_thread(void *arg) {
         lws_service(ctx->context, 50);
     }
 
-    obs_log(LOG_INFO, "Xbox RTA: Monitoring thread shutting down");
+    obs_log(LOG_INFO, "Monitoring | Monitoring thread shutting down");
 
     if (ctx->context) {
         lws_context_destroy(ctx->context);
@@ -416,20 +535,20 @@ static void *monitoring_thread(void *arg) {
 bool xbox_monitoring_start() {
 
     if (g_monitoring_context) {
-        obs_log(LOG_WARNING, "Xbox RTA: Monitoring already active");
+        obs_log(LOG_WARNING, "Monitoring | Monitoring already active");
         return false;
     }
 
     /* Get the authorization token from state */
     xbox_identity_t *identity = state_get_xbox_identity();
     if (!identity) {
-        obs_log(LOG_ERROR, "Xbox RTA: No identity available");
+        obs_log(LOG_ERROR, "Monitoring | No identity available");
         return false;
     }
 
     g_monitoring_context = (monitoring_context_t *)bzalloc(sizeof(monitoring_context_t));
     if (!g_monitoring_context) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to allocate context");
+        obs_log(LOG_ERROR, "Monitoring | Failed to allocate context");
         return false;
     }
 
@@ -446,7 +565,7 @@ bool xbox_monitoring_start() {
     g_monitoring_context->rx_buffer_used = 0;
 
     if (!g_monitoring_context->rx_buffer) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to allocate receive buffer");
+        obs_log(LOG_ERROR, "Monitoring | Failed to allocate receive buffer");
         bfree(g_monitoring_context->auth_token);
         bfree(g_monitoring_context);
         g_monitoring_context = NULL;
@@ -454,7 +573,7 @@ bool xbox_monitoring_start() {
     }
 
     if (pthread_create(&g_monitoring_context->thread, NULL, monitoring_thread, g_monitoring_context) != 0) {
-        obs_log(LOG_ERROR, "Xbox RTA: Failed to create monitoring thread");
+        obs_log(LOG_ERROR, "Monitoring | Failed to create monitoring thread");
         bfree(g_monitoring_context->rx_buffer);
         bfree(g_monitoring_context->auth_token);
         bfree(g_monitoring_context);
@@ -462,7 +581,7 @@ bool xbox_monitoring_start() {
         return false;
     }
 
-    obs_log(LOG_INFO, "Xbox RTA: Monitoring started");
+    obs_log(LOG_INFO, "Monitoring | Monitoring started");
     return true;
 }
 
@@ -471,7 +590,7 @@ void xbox_monitoring_stop(void) {
         return;
     }
 
-    obs_log(LOG_INFO, "Xbox RTA: Stopping monitoring");
+    obs_log(LOG_INFO, "Monitoring | Stopping monitoring");
 
     g_monitoring_context->running = false;
 
@@ -492,7 +611,7 @@ void xbox_monitoring_stop(void) {
     bfree(g_monitoring_context);
     g_monitoring_context = NULL;
 
-    obs_log(LOG_INFO, "Xbox RTA: Monitoring stopped");
+    obs_log(LOG_INFO, "Monitoring | Monitoring stopped");
 }
 
 bool xbox_monitoring_is_active(void) {
@@ -505,6 +624,10 @@ bool xbox_monitoring_is_active(void) {
 
 const game_t *get_current_game() {
     return g_current_game;
+}
+
+const achievement_t *get_current_game_achievements() {
+    return g_current_game_achievements;
 }
 
 void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
@@ -571,7 +694,7 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
 bool xbox_monitoring_start(on_xbox_game_played_t on_game_played) {
     (void)on_game_played;
 
-    obs_log(LOG_WARNING, "Xbox RTA: WebSockets support not available, monitoring not started");
+    obs_log(LOG_WARNING, "Monitoring | WebSockets support not available, monitoring not started");
 
     return false;
 }

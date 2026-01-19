@@ -29,6 +29,8 @@ typedef void (*on_xbox_connection_changed_t)(bool connected, const char *error_m
 
 const game_t *get_current_game();
 
+const achievement_t *get_current_game_achievements();
+
 /**
  * Start monitoring Xbox Live RTA (Real-Time Activity) endpoint
  * Uses the authorization token from the current state
