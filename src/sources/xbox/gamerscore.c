@@ -50,13 +50,7 @@ static void load_font_sheet() {
     }
 }
 
-static void on_connection_changed(bool is_connected, const char *error_message) {
-
-    UNUSED_PARAMETER(error_message);
-
-    if (!is_connected) {
-        return;
-    }
+static void update_gamerscore() {
 
     if (!xbox_fetch_gamerscore(&g_gamerscore)) {
         g_gamerscore = 0;
@@ -65,6 +59,24 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     }
 
     obs_log(LOG_INFO, "Gamerscore is %" PRId64, g_gamerscore);
+}
+
+static void on_connection_changed(bool is_connected, const char *error_message) {
+
+    UNUSED_PARAMETER(error_message);
+
+    if (!is_connected) {
+        return;
+    }
+
+    update_gamerscore();
+}
+
+static void on_achievements_progressed(const achievements_progress_t *progress) {
+
+    UNUSED_PARAMETER(progress);
+
+    update_gamerscore();
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -242,4 +254,5 @@ void xbox_gamerscore_source_register(void) {
     load_font_sheet();
 
     xbox_subscribe_connected_changed(&on_connection_changed);
+    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
 }

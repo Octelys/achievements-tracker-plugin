@@ -18,6 +18,8 @@ typedef void (*on_xbox_rta_message_received_t)(const char *message);
  */
 typedef void (*on_xbox_game_played_t)(const game_t *game);
 
+typedef void (*on_xbox_achievements_progressed_t)(const achievements_progress_t *achievements_progress);
+
 /**
  * Callback function type for when the connection status changes
  * @param connected true if connected, false if disconnected
@@ -26,6 +28,8 @@ typedef void (*on_xbox_game_played_t)(const game_t *game);
 typedef void (*on_xbox_connection_changed_t)(bool connected, const char *error_message);
 
 const game_t *get_current_game();
+
+const achievement_t *get_current_game_achievements();
 
 /**
  * Start monitoring Xbox Live RTA (Real-Time Activity) endpoint
@@ -46,6 +50,8 @@ void xbox_monitoring_stop(void);
 bool xbox_monitoring_is_active(void);
 
 void xbox_subscribe_game_played(on_xbox_game_played_t callback);
+
+void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t callback);
 
 void xbox_subscribe_connected_changed(on_xbox_connection_changed_t callback);
 

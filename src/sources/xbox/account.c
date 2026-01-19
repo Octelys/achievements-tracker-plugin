@@ -80,8 +80,8 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 
 static void on_xbox_game_played(const game_t *game) {
     char text[4096];
-    snprintf(text, 4096, "Playing game %s (%s)", game->title, game->id);
-    obs_log(LOG_WARNING, text);
+    snprintf(text, 4096, "Playing game '%s' (%s)", game->title, game->id);
+    obs_log(LOG_INFO, text);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
