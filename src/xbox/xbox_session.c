@@ -135,7 +135,7 @@ int xbox_session_compute_gamerscore(const xbox_session_t *session) {
         return 0;
     }
 
-    int total_value = *gamerscore->base_value;
+    int total_value = gamerscore->base_value;
 
     const unlocked_achievement_t *current = gamerscore->unlocked_achievements;
 

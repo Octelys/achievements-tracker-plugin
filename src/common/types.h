@@ -103,7 +103,7 @@ typedef struct unlocked_achievement {
 } unlocked_achievement_t;
 
 typedef struct gamerscore {
-    int                    *base_value;
+    int                    base_value;
     unlocked_achievement_t *unlocked_achievements;
 } gamerscore_t;
 
