@@ -1,8 +1,8 @@
 #include "xbox/xbox_session.h"
 
-#include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "common/types.h"
 #include "util/bmem.h"
 #include "xbox/xbox_client.h"
 
@@ -25,63 +25,6 @@ static const achievement_t *find_achievement(const achievements_progress_t *prog
     }
 
     return NULL;
-}
-
-static void free_rewards(reward_t *reward) {
-
-    if (!reward) {
-        return;
-    }
-
-    reward_t *current = reward;
-
-    while (current) {
-        reward_t *next = current->next;
-        FREE(current->value);
-        FREE(current);
-        current = next;
-    }
-}
-
-static void free_media_assets(media_asset_t *media_asset) {
-
-    if (!media_asset) {
-        return;
-    }
-
-    media_asset_t *current = media_asset;
-
-    while (current) {
-        media_asset_t *next = current->next;
-        FREE(current->url);
-        FREE(current);
-        current = next;
-    }
-}
-
-static void free_achievements(achievement_t *achievements) {
-
-    if (!achievements) {
-        return;
-    }
-
-    achievement_t *current = achievements;
-
-    while (current) {
-        achievement_t *next = current->next;
-
-        FREE(current->service_config_id);
-        FREE(current->id);
-        FREE(current->name);
-        FREE(current->description);
-        FREE(current->locked_description);
-        FREE(current->progress_state)
-        free_media_assets((void *)current->media_assets);
-        free_rewards((void *)current->rewards);
-        FREE(current);
-
-        current = next;
-    }
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -110,16 +53,16 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game) {
         return;
     }
 
-    free_achievements(session->achievements);
-    session->achievements = NULL;
-
-    FREE(session->game);
-    session->game = game;
+    free_achievement(&session->achievements);
+    free_game(&session->game);
 
     /* Let's get the achievements of the game */
-    if (game) {
-        session->achievements = xbox_get_game_achievements(game);
+    if (!game) {
+        return;
     }
+
+    session->game         = copy_game(game);
+    session->achievements = xbox_get_game_achievements(game);
 }
 
 int xbox_session_compute_gamerscore(const xbox_session_t *session) {

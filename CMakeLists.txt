@@ -235,7 +235,6 @@ target_sources(
     src/sources/xbox/game_cover.c
     src/sources/xbox/gamerscore.c
     src/crypto/crypto.c
-    src/common/types.c
     src/drawing/image.c
     src/drawing/text.c
     src/net/browser/browser.c
@@ -251,6 +250,13 @@ target_sources(
     src/util/uuid.c
     src/text/parsers.c
     src/time/time.c
+    src/common/achievement.c
+    src/common/game.c
+    src/common/gamerscore.c
+    src/common/token.c
+    src/common/unlocked_achievement.c
+    src/common/xbox_identity.c
+    src/common/xbox_session.c
 )
 
 # Link vendored deps
@@ -453,6 +459,12 @@ if(BUILD_TESTING)
     test/test_xbox_session.c
     ${unity_SOURCE_DIR}/src/unity.c
     src/xbox/xbox_session.c
+    src/common/achievement.c
+    src/common/game.c
+    src/common/gamerscore.c
+    src/common/token.c
+    src/common/unlocked_achievement.c
+    src/common/xbox_session.c
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
   )

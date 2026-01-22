@@ -1,18 +1,13 @@
 #pragma once
 
 #include "common/types.h"
+#include "util/bmem.h"
 
 #include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct xbox_session {
-    game_t        *game;
-    gamerscore_t  *gamerscore;
-    achievement_t *achievements;
-} xbox_session_t;
 
 bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game);
 
