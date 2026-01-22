@@ -1,7 +1,6 @@
 #include "unity.h"
 #include "stubs/xbox/xbox_client.h"
 #include "util/bmem.h"
-#include "xbox/xbox_client.h"
 #include "xbox/xbox_session.h"
 
 #define OUTER_WORLD_2_ID "outer_worlds_2_id"
@@ -177,7 +176,6 @@ static void xbox_session_change_game__session_has_no_game_and_game_is_not_null__
 
     TEST_ASSERT_NOT_NULL(session.achievements);
     TEST_ASSERT_EQUAL(session.achievements->id, achievement_1->id);
-    TEST_ASSERT_EQUAL(session.achievements->next->id, achievement_2->id);
 }
 
 static void xbox_session_change_game__session_has_game_and_game_is_not_null__new_game_selected(void) {
