@@ -536,6 +536,31 @@ if(BUILD_TESTING)
 
   target_compile_definitions(test_xbox_session PRIVATE UNITY_INCLUDE_CONFIG_H)
 
+  # Link vendored deps
+  target_link_libraries(test_xbox_session PRIVATE cjson)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(test_xbox_session PRIVATE m)
+  endif()
+
+  # Use the same OpenSSL linkage policy as the plugin target (universal-safe on macOS).
+  if(TARGET OpenSSL::Crypto)
+    target_link_libraries(test_xbox_session PRIVATE OpenSSL::Crypto)
+    if(TARGET OpenSSL::SSL)
+      target_link_libraries(test_xbox_session PRIVATE OpenSSL::SSL)
+    endif()
+
+    # Ensure headers are available even if the imported targets don't propagate include dirs.
+    if(OPENSSL_INCLUDE_DIR)
+      target_include_directories(test_xbox_session PRIVATE ${OPENSSL_INCLUDE_DIR})
+    endif()
+  else()
+    target_include_directories(test_xbox_session PRIVATE ${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(test_xbox_session PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+    if(OPENSSL_SSL_LIBRARY)
+      target_link_libraries(test_xbox_session PRIVATE ${OPENSSL_SSL_LIBRARY})
+    endif()
+  endif()
+
   # ------------------------------
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
