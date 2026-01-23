@@ -6,6 +6,7 @@
 
 #include "common/memory.h"
 #include "common/achievement.h"
+#include "common/achievement_progress.h"
 #include "common/device.h"
 #include "common/game.h"
 #include "common/gamerscore.h"
@@ -53,13 +54,6 @@ typedef struct gamerscore_configuration {
     uint32_t    font_width;
     uint32_t    font_height;
 } gamerscore_configuration_t;
-
-typedef struct achievements_progress {
-    const char                   *service_config_id;
-    const char                   *id;
-    const char                   *progress_state;
-    struct achievements_progress *next;
-} achievements_progress_t;
 
 #ifdef __cplusplus
 }

@@ -251,6 +251,7 @@ target_sources(
     src/text/parsers.c
     src/time/time.c
     src/common/achievement.c
+    src/common/achievement_progress.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c
@@ -460,6 +461,7 @@ if(BUILD_TESTING)
     ${unity_SOURCE_DIR}/src/unity.c
     src/xbox/xbox_session.c
     src/common/achievement.c
+    src/common/achievement_progress.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c

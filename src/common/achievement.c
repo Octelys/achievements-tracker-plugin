@@ -91,10 +91,12 @@ void free_reward(reward_t **reward) {
 
         free_memory((void *)&current->value);
         current->next = NULL;
-        free_memory((void *)reward);
+        free_memory((void **)&current);
 
         current = next;
     }
+
+    *reward = NULL;
 }
 
 achievement_t *copy_achievement(const achievement_t *achievement) {

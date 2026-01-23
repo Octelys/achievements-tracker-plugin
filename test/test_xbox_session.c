@@ -10,15 +10,35 @@
 static game_t *game_outer_worlds_2;
 static game_t *game_fallout_4;
 
-static xbox_session_t *session;
-static achievement_t  *achievement_1;
-static achievement_t  *achievement_2;
+static xbox_session_t         *session;
+static achievement_t          *achievement_1;
+static achievement_t          *achievement_2;
+static achievement_progress_t *achievement_progress_1;
+static achievement_progress_t *achievement_progress_2;
+static gamerscore_t           *gamerscore;
+static reward_t               *reward_1;
+static reward_t               *reward_2;
 
 void setUp(void) {
+
+    gamerscore             = bzalloc(sizeof(gamerscore_t));
+    gamerscore->base_value = 1000;
+
     session               = bzalloc(sizeof(xbox_session_t));
     session->game         = NULL;
-    session->gamerscore   = NULL;
+    session->gamerscore   = copy_gamerscore(gamerscore);
     session->achievements = NULL;
+
+    reward_1        = bzalloc(sizeof(reward_t));
+    reward_1->value = bstrdup("80");
+    reward_1->next  = NULL;
+
+    reward_2        = bzalloc(sizeof(reward_t));
+    reward_2->value = bstrdup("500");
+    reward_2->next  = NULL;
+
+    gamerscore             = bzalloc(sizeof(gamerscore_t));
+    gamerscore->base_value = 1000;
 
     game_outer_worlds_2        = bzalloc(sizeof(game_t));
     game_outer_worlds_2->id    = bstrdup(OUTER_WORLD_2_ID);
@@ -36,7 +56,7 @@ void setUp(void) {
     achievement_2->locked_description = NULL;
     achievement_2->progress_state     = NULL;
     achievement_2->description        = NULL;
-    achievement_2->rewards            = NULL;
+    achievement_2->rewards            = copy_reward(reward_2);
     achievement_2->media_assets       = NULL;
     achievement_2->next               = NULL;
 
@@ -48,9 +68,21 @@ void setUp(void) {
     achievement_1->locked_description = NULL;
     achievement_1->progress_state     = NULL;
     achievement_1->description        = NULL;
-    achievement_1->rewards            = NULL;
+    achievement_1->rewards            = copy_reward(reward_1);
     achievement_1->media_assets       = NULL;
     achievement_1->next               = NULL;
+
+    achievement_progress_1                    = bzalloc(sizeof(achievement_progress_t));
+    achievement_progress_1->id                = bstrdup(achievement_1->id);
+    achievement_progress_1->progress_state    = bstrdup("Achieved");
+    achievement_progress_1->service_config_id = NULL;
+    achievement_progress_1->next              = NULL;
+
+    achievement_progress_2                    = bzalloc(sizeof(achievement_progress_t));
+    achievement_progress_2->id                = bstrdup(achievement_2->id);
+    achievement_progress_2->progress_state    = bstrdup("Achieved");
+    achievement_progress_2->service_config_id = NULL;
+    achievement_progress_2->next              = NULL;
 }
 
 void tearDown(void) {
@@ -63,6 +95,14 @@ void tearDown(void) {
 
     free_achievement(&achievement_2);
     free_achievement(&achievement_1);
+
+    free_achievement_progress(&achievement_progress_1);
+    free_achievement_progress(&achievement_progress_2);
+
+    free_reward(&reward_1);
+    free_reward(&reward_2);
+
+    free_gamerscore(&gamerscore);
 }
 
 //  Test xbox_session_is_game_played
@@ -200,10 +240,10 @@ static void xbox_session_compute_gamerscore__session_is_null__0_returned(void) {
     free_xbox_session(&session);
 
     //  Act.
-    int gamerscore = xbox_session_compute_gamerscore(session);
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
 
     //  Assert.
-    TEST_ASSERT_EQUAL(gamerscore, 0);
+    TEST_ASSERT_EQUAL(total_gamerscore, 0);
 }
 
 static void xbox_session_compute_gamerscore__session_has_no_unlocked_achievement__base_value_returned(void) {
@@ -213,10 +253,10 @@ static void xbox_session_compute_gamerscore__session_has_no_unlocked_achievement
     session->gamerscore->unlocked_achievements = NULL;
 
     //  Act.
-    int gamerscore = xbox_session_compute_gamerscore(session);
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
 
     //  Assert.
-    TEST_ASSERT_EQUAL(gamerscore, session->gamerscore->base_value);
+    TEST_ASSERT_EQUAL(total_gamerscore, session->gamerscore->base_value);
 }
 
 static void xbox_session_compute_gamerscore__session_has_one_unlocked_achievement__total_value_returned(void) {
@@ -229,10 +269,10 @@ static void xbox_session_compute_gamerscore__session_has_one_unlocked_achievemen
     session->gamerscore->unlocked_achievements->next  = NULL;
 
     //  Act.
-    int gamerscore = xbox_session_compute_gamerscore(session);
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
 
     //  Assert.
-    TEST_ASSERT_EQUAL(gamerscore, 1000 + 50);
+    TEST_ASSERT_EQUAL(total_gamerscore, 1000 + 50);
 }
 
 static void xbox_session_compute_gamerscore__session_has_two_unlocked_achievements__total_value_returned(void) {
@@ -248,18 +288,69 @@ static void xbox_session_compute_gamerscore__session_has_two_unlocked_achievemen
     session->gamerscore->unlocked_achievements->next->next  = NULL;
 
     //  Act.
-    int gamerscore = xbox_session_compute_gamerscore(session);
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
 
     //  Assert.
-    TEST_ASSERT_EQUAL(gamerscore, 1000 + 50 + 80);
+    TEST_ASSERT_EQUAL(total_gamerscore, 1000 + 50 + 80);
 }
 
 //   Test xbox_session_unlock_achievement
 
-static void xbox_session_unlock_achievement__(void) {
+static void xbox_session_unlock_achievement__one_achievement_unlocked__gamerscore_incremented(void) {
     //  Arrange.
+    achievement_t *achievements = copy_achievement(achievement_1);
+    achievements->next          = copy_achievement(achievement_2);
+
+    session->achievements = achievements;
 
     //  Act.
+    xbox_session_unlock_achievement(session, achievement_progress_2);
+
+    //  Assert.
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
+    TEST_ASSERT_EQUAL(total_gamerscore, 1000 + 500);
+}
+
+static void xbox_session_unlock_achievement__two_achievements_unlocked__gamerscore_incremented(void) {
+    //  Arrange.
+    achievement_t *achievements = copy_achievement(achievement_1);
+    achievements->next          = copy_achievement(achievement_2);
+
+    session->achievements = achievements;
+
+    //  Act.
+    xbox_session_unlock_achievement(session, achievement_progress_2);
+    xbox_session_unlock_achievement(session, achievement_progress_1);
+
+    //  Assert.
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
+    TEST_ASSERT_EQUAL(total_gamerscore, 1000 + 500 + 80);
+}
+
+static void xbox_session_unlock_achievement__unknown_achievements_unlocked__gamerscore_unchanged(void) {
+    //  Act.
+    xbox_session_unlock_achievement(session, achievement_progress_1);
+
+    //  Assert.
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
+    TEST_ASSERT_EQUAL(total_gamerscore, 1000);
+}
+
+static void xbox_session_unlock_achievement__no_reward_found__gamerscore_unchanged(void) {
+    //  Arrange.
+    achievement_t *achievements = copy_achievement(achievement_1);
+    achievements->next          = copy_achievement(achievement_2);
+
+    session->achievements = achievements;
+
+    free_reward((reward_t **)&achievements->rewards);
+
+    //  Act.
+    xbox_session_unlock_achievement(session, achievement_progress_1);
+
+    //  Assert.
+    int total_gamerscore = xbox_session_compute_gamerscore(session);
+    TEST_ASSERT_EQUAL(total_gamerscore, 1000);
 }
 
 int main(void) {
@@ -281,5 +372,9 @@ int main(void) {
     RUN_TEST(xbox_session_compute_gamerscore__session_has_one_unlocked_achievement__total_value_returned);
     RUN_TEST(xbox_session_compute_gamerscore__session_has_two_unlocked_achievements__total_value_returned);
     //   Test xbox_session_unlock_achievement
+    RUN_TEST(xbox_session_unlock_achievement__unknown_achievements_unlocked__gamerscore_unchanged);
+    RUN_TEST(xbox_session_unlock_achievement__no_reward_found__gamerscore_unchanged);
+    RUN_TEST(xbox_session_unlock_achievement__one_achievement_unlocked__gamerscore_incremented);
+    RUN_TEST(xbox_session_unlock_achievement__two_achievements_unlocked__gamerscore_incremented);
     return UNITY_END();
 }

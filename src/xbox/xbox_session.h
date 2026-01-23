@@ -15,7 +15,7 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game);
 
 int xbox_session_compute_gamerscore(const xbox_session_t *session);
 
-void xbox_session_unlock_achievement(const xbox_session_t *session, const achievements_progress_t *progress);
+void xbox_session_unlock_achievement(const xbox_session_t *session, const achievement_progress_t *progress);
 
 #ifdef __cplusplus
 }

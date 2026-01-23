@@ -10,8 +10,8 @@
 //  Private functions.
 //  --------------------------------------------------------------------------------------------------------------------
 
-static const achievement_t *find_achievement(const achievements_progress_t *progress,
-                                             const achievement_t           *achievements) {
+static const achievement_t *find_achievement(const achievement_progress_t *progress,
+                                             const achievement_t          *achievements) {
 
     const achievement_t *current = achievements;
 
@@ -89,7 +89,7 @@ int xbox_session_compute_gamerscore(const xbox_session_t *session) {
     return total_value;
 }
 
-void xbox_session_unlock_achievement(const xbox_session_t *session, const achievements_progress_t *progress) {
+void xbox_session_unlock_achievement(const xbox_session_t *session, const achievement_progress_t *progress) {
 
     if (!session || !progress) {
         return;
@@ -114,7 +114,7 @@ void xbox_session_unlock_achievement(const xbox_session_t *session, const achiev
     gamerscore_t *gamerscore = session->gamerscore;
 
     unlocked_achievement_t *unlocked_achievement = bzalloc(sizeof(unlocked_achievement_t));
-    unlocked_achievement->id                     = progress->id;
+    unlocked_achievement->id                     = bstrdup(progress->id);
     unlocked_achievement->value                  = atoi(reward->value);
 
     unlocked_achievement_t *unlocked_achievements = gamerscore->unlocked_achievements;
