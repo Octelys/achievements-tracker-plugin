@@ -465,8 +465,199 @@ static void copy_unlocked_achievement__unlocked_achievement_is_not_null__copy_re
     TEST_ASSERT_NULL(copy->next->next);
 }
 
+//  Tests achievement.c
+
+static void free_reward__reward_is_null__null_reward_returned(void) {
+    //  Arrange.
+    reward_t *reward = NULL;
+
+    //  Act.
+    free_reward(&reward);
+
+    //  Assert.
+    TEST_ASSERT_NULL(reward);
+}
+
+static void free_reward__one_reward___null_reward_returned(void) {
+    //  Arrange.
+    reward_t *reward = bzalloc(sizeof(reward_t));
+    reward->value    = bstrdup("1000");
+    reward->next     = NULL;
+
+    //  Act.
+    free_reward(&reward);
+
+    //  Assert.
+    TEST_ASSERT_NULL(reward);
+}
+
+static void free_reward__two_rewards___null_reward_returned(void) {
+    //  Arrange.
+    reward_t *reward2 = bzalloc(sizeof(reward_t));
+    reward2->value    = bstrdup("1000");
+    reward2->next     = NULL;
+
+    reward_t *reward1 = bzalloc(sizeof(reward_t));
+    reward1->value    = bstrdup("1000");
+    reward1->next     = reward2;
+
+    //  Act.
+    free_reward(&reward1);
+
+    //  Assert.
+    TEST_ASSERT_NULL(reward1);
+}
+
+static void copy_reward__reward_is_null__null_copy_returned(void) {
+    //  Arrange.
+    reward_t *reward = NULL;
+
+    //  Act.
+    const reward_t *copy = copy_reward(reward);
+
+    //  Assert.
+    TEST_ASSERT_NULL(copy);
+}
+
+static void copy_reward__one_reward__copy_returned(void) {
+    //  Arrange.
+    reward_t *reward = bzalloc(sizeof(reward_t));
+    reward->value    = bstrdup("1000");
+    reward->next     = NULL;
+
+    //  Act.
+    const reward_t *copy = copy_reward(reward);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(copy);
+    TEST_ASSERT_EQUAL_STRING(copy->value, reward->value);
+    TEST_ASSERT_NULL(copy->next);
+}
+
+static void copy_reward__two_rewards__copy_returned(void) {
+    //  Arrange.
+    reward_t *reward2 = bzalloc(sizeof(reward_t));
+    reward2->value    = bstrdup("1000");
+    reward2->next     = NULL;
+
+    reward_t *reward1 = bzalloc(sizeof(reward_t));
+    reward1->value    = bstrdup("1000");
+    reward1->next     = reward2;
+
+    //  Act.
+    const reward_t *copy = copy_reward(reward1);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(copy);
+    TEST_ASSERT_EQUAL_STRING(copy->value, reward1->value);
+    TEST_ASSERT_NOT_NULL(copy->next);
+    TEST_ASSERT_EQUAL_STRING(copy->next->value, reward2->value);
+    TEST_ASSERT_NULL(copy->next->next);
+}
+
+static void free_media_asset__media_asset_is_null__null_media_asset_returned(void) {
+    //  Arrange.
+    media_asset_t *media_asset = NULL;
+
+    //  Act.
+    free_media_asset(&media_asset);
+
+    //  Assert.
+    TEST_ASSERT_NULL(media_asset);
+}
+
+static void free_media_asset__one_media_asset__null_media_asset_returned(void) {
+    //  Arrange.
+    media_asset_t *media_asset = bzalloc(sizeof(media_asset_t));
+    media_asset->url           = bstrdup("https://www.example.com/image.png");
+
+    //  Act.
+    free_media_asset(&media_asset);
+
+    //  Assert.
+    TEST_ASSERT_NULL(media_asset);
+}
+
+static void free_media_asset__two_media_assets__null_media_asset_returned(void) {
+    //  Arrange.
+    media_asset_t *media_asset2 = bzalloc(sizeof(media_asset_t));
+    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+
+    media_asset_t *media_asset1 = bzalloc(sizeof(media_asset_t));
+    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next          = media_asset2;
+
+    //  Act.
+    free_media_asset(&media_asset1);
+
+    //  Assert.
+    TEST_ASSERT_NULL(media_asset1);
+}
+
+static void copy_media_asset__media_asset_is_null__null_copy_returned(void) {
+    //  Arrange.
+    media_asset_t *media_asset = NULL;
+
+    //  Act.
+    media_asset_t *copy = copy_media_asset(media_asset);
+
+    //  Assert.
+    TEST_ASSERT_NULL(copy);
+}
+
+static void copy_media_asset__one_media_asset__copy_returned(void) {
+    //  Arrange.
+    media_asset_t *media_asset = bzalloc(sizeof(media_asset_t));
+    media_asset->url           = bstrdup("https://www.example.com/image.png");
+
+    //  Act.
+    const media_asset_t *copy = copy_media_asset(media_asset);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(copy);
+    TEST_ASSERT_EQUAL_STRING(copy->url, media_asset->url);
+    TEST_ASSERT_NULL(copy->next);
+}
+
+static void copy_media_asset__two_media_assets__copy_returned(void) {
+    //  Arrange.
+    media_asset_t *media_asset2 = bzalloc(sizeof(media_asset_t));
+    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+
+    media_asset_t *media_asset1 = bzalloc(sizeof(media_asset_t));
+    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next          = media_asset2;
+
+    //  Act.
+    const media_asset_t *copy = copy_media_asset(media_asset1);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(copy);
+    TEST_ASSERT_EQUAL_STRING(copy->url, media_asset1->url);
+    TEST_ASSERT_NOT_NULL(copy->next);
+    TEST_ASSERT_EQUAL_STRING(copy->next->url, media_asset2->url);
+    TEST_ASSERT_NULL(copy->next->next);
+}
+
 int main(void) {
     UNITY_BEGIN();
+
+    //  Tests achievement.c
+    RUN_TEST(free_reward__reward_is_null__null_reward_returned);
+    RUN_TEST(free_reward__one_reward___null_reward_returned);
+    RUN_TEST(free_reward__two_rewards___null_reward_returned);
+
+    RUN_TEST(copy_reward__reward_is_null__null_copy_returned);
+    RUN_TEST(copy_reward__one_reward__copy_returned);
+    RUN_TEST(copy_reward__two_rewards__copy_returned);
+
+    RUN_TEST(free_media_asset__media_asset_is_null__null_media_asset_returned);
+    RUN_TEST(free_media_asset__one_media_asset__null_media_asset_returned);
+    RUN_TEST(free_media_asset__two_media_assets__null_media_asset_returned);
+
+    RUN_TEST(copy_media_asset__media_asset_is_null__null_copy_returned);
+    RUN_TEST(copy_media_asset__one_media_asset__copy_returned);
+    RUN_TEST(copy_media_asset__two_media_assets__copy_returned);
 
     //  Tests game.c
     RUN_TEST(free_game__game_is_null__null_game_returned);

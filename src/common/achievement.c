@@ -17,7 +17,10 @@ media_asset_t *copy_media_asset(const media_asset_t *media_asset) {
 
         media_asset_t *copy = bzalloc(sizeof(media_asset_t));
         copy->url           = bstrdup(current->url);
-        copy->next          = previous_copy;
+
+        if (previous_copy) {
+            previous_copy->next = copy;
+        }
 
         previous_copy = copy;
         current       = next;
@@ -64,8 +67,12 @@ reward_t *copy_reward(const reward_t *reward) {
         const reward_t *next = current->next;
 
         reward_t *copy = bzalloc(sizeof(reward_t));
-        copy->value    = bstrdup(current->value);
-        copy->next     = previous_copy;
+
+        copy->value = bstrdup(current->value);
+
+        if (previous_copy) {
+            previous_copy->next = copy;
+        }
 
         previous_copy = copy;
         current       = next;
@@ -87,10 +94,10 @@ void free_reward(reward_t **reward) {
     reward_t *current = *reward;
 
     while (current) {
+
         reward_t *next = current->next;
 
-        free_memory((void *)&current->value);
-        current->next = NULL;
+        free_memory((void **)&current->value);
         free_memory((void **)&current);
 
         current = next;
@@ -125,7 +132,9 @@ achievement_t *copy_achievement(const achievement_t *achievement) {
         copy->rewards            = copy_reward(current->rewards);
         copy->is_secret          = current->is_secret;
 
-        copy->next = previous_copy;
+        if (previous_copy) {
+            previous_copy->next = copy;
+        }
 
         previous_copy = copy;
         current       = next;
