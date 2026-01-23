@@ -337,7 +337,7 @@ game_t *xbox_get_current_game(void) {
     game->title = strdup(current_game_title);
 
 cleanup:
-    //FREE(response_json);
+    // FREE(response_json);
 
     return game;
 }

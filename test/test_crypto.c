@@ -633,7 +633,8 @@ void test_crypto_to_from_roundtrip(void) {
 static void crypto_from_string__key_loaded(void) {
 
     //  Arrange.
-    char json_string[] = "{\"kty\":\"EC\",\"x\":\"p4Y7keU3YH38axGATY7QwXoKm59dgZeOpIBUaSnNU50\",\"y\":\"HOrvv_Jkf-5iPzyTzTM7unesqNDRHmshYfdzgO_i3Nw\",\"d\":\"bWM7zSR7iRfHCNmyU5G3Fl2ACkBs-31-lo5x-N6J68Y\",\"crv\":\"P-256\",\"alg\":\"ES256\",\"use\":\"sig\"}";
+    char json_string[] =
+        "{\"kty\":\"EC\",\"x\":\"p4Y7keU3YH38axGATY7QwXoKm59dgZeOpIBUaSnNU50\",\"y\":\"HOrvv_Jkf-5iPzyTzTM7unesqNDRHmshYfdzgO_i3Nw\",\"d\":\"bWM7zSR7iRfHCNmyU5G3Fl2ACkBs-31-lo5x-N6J68Y\",\"crv\":\"P-256\",\"alg\":\"ES256\",\"use\":\"sig\"}";
 
     //  Act.
     EVP_PKEY *pkey = crypto_from_string(json_string, true);

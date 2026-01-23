@@ -1,3 +1,6 @@
+#include "cJSON.h"
+#include "cJSON_Utils.h"
+
 #include <openssl/evp.h>
 #include <openssl/ec.h>
 #include <openssl/pem.h>
@@ -13,7 +16,6 @@
 #include <diagnostics/log.h>
 
 #include "common/types.h"
-#include "net/json/json.h"
 
 void crypto_print_keys(const EVP_PKEY *pkey) {
 
@@ -307,60 +309,63 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
 
     obs_log(LOG_WARNING, "JSON key: %s", key_json);
 
-    EVP_PKEY *pkey      = NULL;
-    char     *kty       = NULL;
-    char     *crv       = NULL;
-    char     *x64       = NULL;
-    char     *y64       = NULL;
-    char     *d64_local = NULL;
+    cJSON    *json_root      = NULL;
+    cJSON    *d64_local_node = NULL;
+    EVP_PKEY *pkey           = NULL;
 
-    //  Remove the JSON and use cJSON
-    kty = json_read_string(key_json, "kty");
+    json_root = cJSON_Parse(key_json);
 
-    if (!kty) {
+    if (!json_root) {
         return NULL;
     }
 
-    if (strcmp(kty, "EC") != 0) {
+    //  Remove the JSON and use cJSON
+    cJSON *kty_node = cJSONUtils_GetPointer(json_root, "/kty");
+
+    if (!kty_node) {
         goto done;
     }
 
-    crv = json_read_string(key_json, "crv");
-
-    if (!crv) {
+    if (strcmp(kty_node->valuestring, "EC") != 0) {
         goto done;
     }
 
-    if (strcmp(crv, "P-256") != 0) {
+    cJSON *crv_node = cJSONUtils_GetPointer(json_root, "/crv");
+
+    if (!crv_node) {
         goto done;
     }
 
-    x64 = json_read_string(key_json, "x");
-
-    if (!x64) {
+    if (strcmp(crv_node->valuestring, "P-256") != 0) {
         goto done;
     }
 
-    y64 = json_read_string(key_json, "y");
+    cJSON *x64_node = cJSONUtils_GetPointer(json_root, "/x");
 
-    if (!y64) {
+    if (!x64_node) {
+        goto done;
+    }
+
+    cJSON *y64_node = cJSONUtils_GetPointer(json_root, "/y");
+
+    if (!y64_node) {
         goto done;
     }
 
     if (expect_private) {
-        d64_local = json_read_string(key_json, "d");
+        d64_local_node = cJSONUtils_GetPointer(json_root, "/d");
 
-        if (!d64_local) {
+        if (!d64_local_node) {
             goto done;
         }
     }
 
     uint8_t x[32], y[32];
-    if (!b64url_decode_32(x64, x)) {
+    if (!b64url_decode_32(x64_node->valuestring, x)) {
         goto done;
     }
 
-    if (!b64url_decode_32(y64, y)) {
+    if (!b64url_decode_32(y64_node->valuestring, y)) {
         goto done;
     }
 
@@ -371,7 +376,7 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
 
     uint8_t priv[32];
     if (expect_private) {
-        if (!b64url_decode_32(d64_local, priv))
+        if (!b64url_decode_32(d64_local_node->valuestring, priv))
             goto done;
     }
 
@@ -439,12 +444,7 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
     EVP_PKEY_CTX_free(ctx);
 
 done:
-    free_memory((void**)&kty);
-    free_memory((void**)&crv);
-    free_memory((void**)&x64);
-    free_memory((void**)&y64);
-    if (expect_private)
-        free_memory((void**)&d64_local);
+    FREE_JSON(json_root);
 
     return pkey;
 }
