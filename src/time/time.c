@@ -51,6 +51,10 @@ static int64_t get_days_from_civil(int y, unsigned m, unsigned d) {
     return days_1970;
 }
 
+time_t now() {
+    return time(NULL);
+}
+
 bool time_iso8601_utc_to_unix(const char *iso8601, int64_t *out_unix_seconds, int32_t *out_fraction_ns) {
     if (!iso8601 || !out_unix_seconds || !out_fraction_ns)
         return false;

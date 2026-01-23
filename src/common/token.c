@@ -1,6 +1,7 @@
 #include "token.h"
 
 #include "memory.h"
+#include "time/time.h"
 
 #include <obs-module.h>
 #include <time.h>
@@ -35,7 +36,7 @@ void free_token(token_t **token) {
 
 bool token_is_expired(const token_t *token) {
 
-    time_t current_time = time(NULL);
+    time_t current_time = now();
 
     return difftime(current_time, token->expires) >= 0;
 }

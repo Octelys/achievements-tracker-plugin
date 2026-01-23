@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void mock_time(time_t current_time);
+void mock_now(time_t current_time);
 
 #ifdef __cplusplus
 }

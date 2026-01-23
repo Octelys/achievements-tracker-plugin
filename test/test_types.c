@@ -201,7 +201,7 @@ static void token_is_expired__token_is_expired__true_returned(void) {
     token->expires = 123;
 
     time_t current_time = 200;
-    mock_time(current_time);
+    mock_now(current_time);
 
     //  Act.
     bool is_expired = token_is_expired(token);
@@ -216,7 +216,7 @@ static void token_is_expired__token_just_expired__true_returned(void) {
     token->expires = 200;
 
     time_t current_time = 200;
-    mock_time(current_time);
+    mock_now(current_time);
 
     //  Act.
     bool is_expired = token_is_expired(token);
@@ -231,7 +231,7 @@ static void token_is_expired__token_is_not_expired__false_returned(void) {
     token->expires = 250;
 
     time_t current_time = 200;
-    mock_time(current_time);
+    mock_now(current_time);
 
     //  Act.
     bool is_expired = token_is_expired(token);
