@@ -358,7 +358,6 @@ achievement_t *parse_achievements(const char *json_string) {
                 achievement->rewards ? achievement->rewards->value : "no reward",
                 achievement->progress_state);
 
-
         if (!achievements) {
             achievements = achievement;
         } else {
