@@ -168,6 +168,18 @@ static void xbox_session_is_game_played__session_has_game_and_game_is_the_same__
 
 //  Test xbox_session_change_game
 
+static void xbox_session_change_game__session_is_null__no_game_selected(void) {
+    //  Arrange.
+    free_xbox_session(&session);
+    game_t *game = NULL;
+
+    //  Act.
+    xbox_session_change_game(session, game);
+
+    //  Assert.
+    TEST_ASSERT_NULL(session);
+}
+
 static void xbox_session_change_game__session_has_no_game_and_game_is_null__no_game_selected(void) {
     //  Arrange.
     game_t *game = NULL;
@@ -361,6 +373,7 @@ int main(void) {
     RUN_TEST(xbox_session_is_game_played__session_has_game_and_game_is_different__false_returned);
     RUN_TEST(xbox_session_is_game_played__session_has_game_and_game_is_the_same__true_returned);
     //  Test xbox_session_change_game
+    RUN_TEST(xbox_session_change_game__session_is_null__no_game_selected);
     RUN_TEST(xbox_session_change_game__session_has_no_game_and_game_is_null__no_game_selected);
     RUN_TEST(xbox_session_change_game__session_has_game_and_game_is_null__no_game_selected);
     RUN_TEST(xbox_session_change_game__session_has_no_game_and_game_is_not_null__game_selected);
