@@ -864,6 +864,101 @@ static void copy_achievement__two_achievements__copy_returned(void) {
     TEST_ASSERT_NULL(copy->next->next);
 }
 
+static void count_achievements__achievement_is_null__0_returned(void) {
+    //  Arrange.
+    achievement_t *achievement = NULL;
+
+    //  Act.
+    int total = count_achievements(achievement);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(total, 0);
+}
+
+static void count_achievements__one_achievement__1_returned(void) {
+    //  Arrange.
+    reward_t *reward2 = bzalloc(sizeof(reward_t));
+    reward2->value    = bstrdup("1000");
+    reward2->next     = NULL;
+
+    reward_t *reward1 = bzalloc(sizeof(reward_t));
+    reward1->value    = bstrdup("1000");
+    reward1->next     = reward2;
+
+    media_asset_t *media_asset2 = bzalloc(sizeof(media_asset_t));
+    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+
+    media_asset_t *media_asset1 = bzalloc(sizeof(media_asset_t));
+    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next          = media_asset2;
+
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->service_config_id  = bstrdup("service-config-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->progress_state     = bstrdup("unlocked");
+    achievement->is_secret          = false;
+    achievement->description        = bstrdup("Achievement Description");
+    achievement->locked_description = bstrdup("Locked Description");
+    achievement->media_assets       = media_asset1;
+    achievement->rewards            = reward1;
+    achievement->next               = NULL;
+
+    //  Act.
+    int total = count_achievements(achievement);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(total, 1);
+}
+
+static void count_achievements__two_achievements__2_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id");
+    achievement2->service_config_id  = bstrdup("service-config-id");
+    achievement2->name               = bstrdup("Achievement Name");
+    achievement2->progress_state     = bstrdup("unlocked");
+    achievement2->is_secret          = false;
+    achievement2->description        = bstrdup("Achievement Description");
+    achievement2->locked_description = bstrdup("Locked Description");
+    achievement2->media_assets       = NULL;
+    achievement2->rewards            = NULL;
+    achievement2->next               = NULL;
+
+    reward_t *reward2 = bzalloc(sizeof(reward_t));
+    reward2->value    = bstrdup("1000");
+    reward2->next     = NULL;
+
+    reward_t *reward1 = bzalloc(sizeof(reward_t));
+    reward1->value    = bstrdup("1000");
+    reward1->next     = reward2;
+
+    media_asset_t *media_asset2 = bzalloc(sizeof(media_asset_t));
+    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+
+    media_asset_t *media_asset1 = bzalloc(sizeof(media_asset_t));
+    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next          = media_asset2;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id");
+    achievement1->service_config_id  = bstrdup("service-config-id");
+    achievement1->name               = bstrdup("Achievement Name");
+    achievement1->progress_state     = bstrdup("unlocked");
+    achievement1->is_secret          = false;
+    achievement1->description        = bstrdup("Achievement Description");
+    achievement1->locked_description = bstrdup("Locked Description");
+    achievement1->media_assets       = media_asset1;
+    achievement1->rewards            = reward1;
+    achievement1->next               = achievement2;
+
+    //  Act.
+    int total = count_achievements(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(total, 2);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -891,6 +986,9 @@ int main(void) {
     RUN_TEST(copy_achievement__achievement_is_null__null_copy_returned);
     RUN_TEST(copy_achievement__one_achievement__copy_returned);
     RUN_TEST(copy_achievement__two_achievements__copy_returned);
+
+    RUN_TEST(count_achievements__achievement_is_null__0_returned);
+    RUN_TEST(count_achievements__one_achievement__1_returned);
 
     //  Tests game.c
     RUN_TEST(free_game__game_is_null__null_game_returned);
