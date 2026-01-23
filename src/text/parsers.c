@@ -22,7 +22,7 @@ static const char *get_node_string(cJSON *json_root, int achievement_index, cons
         return NULL;
     }
 
-    return strdup(property_node->valuestring);
+    return bstrdup(property_node->valuestring);
 }
 
 static bool get_node_bool(cJSON *json_root, int achievement_index, const char *property_name) {
@@ -258,13 +258,6 @@ achievement_t *parse_achievements(const char *json_string) {
         achievement->locked_description = get_node_string(json_root, achievement_index, "lockedDescription");
         achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
 
-        obs_log(LOG_WARNING,
-                "%s | Achievement %s (%s) is %s",
-                achievement->service_config_id,
-                achievement->name,
-                achievement->id,
-                achievement->progress_state);
-
         /* Reads the media assets */
         media_asset_t *media_assets = NULL;
 
@@ -286,7 +279,7 @@ achievement_t *parse_achievements(const char *json_string) {
             }
 
             media_asset_t *media_asset = bzalloc(sizeof(media_asset_t));
-            media_asset->url           = strdup(media_asset_url_node->valuestring);
+            media_asset->url           = bstrdup(media_asset_url_node->valuestring);
             media_asset->next          = NULL;
 
             if (!media_assets) {
@@ -343,7 +336,7 @@ achievement_t *parse_achievements(const char *json_string) {
             }
 
             reward_t *reward = bzalloc(sizeof(reward_t));
-            reward->value    = reward_type_node->valuestring;
+            reward->value    = bstrdup(reward_value_node->valuestring);
 
             if (!rewards) {
                 rewards = reward;
@@ -357,6 +350,14 @@ achievement_t *parse_achievements(const char *json_string) {
         }
 
         achievement->rewards = rewards;
+
+        obs_log(LOG_INFO,
+                "%s | Achievement %s (%s G) is %s",
+                achievement->service_config_id,
+                achievement->name,
+                achievement->rewards ? achievement->rewards->value : "no reward",
+                achievement->progress_state);
+
 
         if (!achievements) {
             achievements = achievement;

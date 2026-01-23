@@ -87,6 +87,8 @@ void xbox_session_unlock_achievement(const xbox_session_t *session, const achiev
         return;
     }
 
+    obs_log(LOG_DEBUG, "Found reward %s", reward->value);
+
     gamerscore_t *gamerscore = session->gamerscore;
 
     unlocked_achievement_t *unlocked_achievement = bzalloc(sizeof(unlocked_achievement_t));
@@ -106,5 +108,5 @@ void xbox_session_unlock_achievement(const xbox_session_t *session, const achiev
         last_unlocked_achievement->next = unlocked_achievement;
     }
 
-    obs_log(LOG_INFO, "New achievement unlocked! Gamerscore is now %d", xbox_session_compute_gamerscore(session));
+    obs_log(LOG_INFO, "New achievement unlocked: %s (%d G)! Gamerscore is now %d", achievement->name, unlocked_achievement->value, xbox_session_compute_gamerscore(session));
 }

@@ -1,5 +1,7 @@
 #include "gamerscore.h"
 
+#include "diagnostics/log.h"
+
 #include <obs-module.h>
 #include <stdlib.h>
 

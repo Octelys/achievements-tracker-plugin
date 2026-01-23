@@ -33,6 +33,7 @@ void free_xbox_session(xbox_session_t **session) {
 }
 
 int xbox_session_compute_gamerscore(const xbox_session_t *session) {
+
     if (!session) {
         return 0;
     }
