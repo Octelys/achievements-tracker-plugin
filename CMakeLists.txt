@@ -507,6 +507,7 @@ if(BUILD_TESTING)
     src/common/xbox_session.c
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
+    test/stubs/time/time_stub.c
   )
 
   add_test(NAME test_types COMMAND test_types)

@@ -31,7 +31,7 @@ void free_token(token_t **token) {
     *token = NULL;
 }
 
-bool is_token_expired(const token_t *token) {
+bool token_is_expired(const token_t *token) {
 
     time_t current_time = time(NULL);
 

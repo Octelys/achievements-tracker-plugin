@@ -2,6 +2,8 @@
 
 #include "common/types.h"
 
+#include "test/stubs/time/time_stub.h"
+
 #include <string.h>
 
 void setUp(void) {}
@@ -170,7 +172,6 @@ static void copy_token__token_is_not_null__token_returned(void) {
     token_t *token = bzalloc(sizeof(token_t));
     token->value   = bstrdup("default-access-token");
     token->expires = 123;
-    ;
 
     //  Act.
     const token_t *copy = copy_token(token);
@@ -178,7 +179,7 @@ static void copy_token__token_is_not_null__token_returned(void) {
     //  Assert.
     TEST_ASSERT_NOT_NULL(copy);
     TEST_ASSERT_EQUAL_STRING(copy->value, token->value);
-    TEST_ASSERT_EQUAL_STRING(copy->expires, token->expires);
+    TEST_ASSERT_EQUAL_INT(copy->expires, token->expires);
 }
 
 static void copy_token__token_value_is_not_null__token_returned(void) {
@@ -193,7 +194,52 @@ static void copy_token__token_value_is_not_null__token_returned(void) {
     //  Assert.
     TEST_ASSERT_NOT_NULL(copy);
     TEST_ASSERT_EQUAL_STRING(copy->value, token->value);
-    TEST_ASSERT_EQUAL_STRING(copy->expires, token->expires);
+    TEST_ASSERT_EQUAL_INT(copy->expires, token->expires);
+}
+
+static void token_is_expired__token_is_expired__true_returned(void) {
+    //  Arrange.
+    token_t *token = bzalloc(sizeof(token_t));
+    token->expires = 123;
+
+    time_t current_time = 200;
+    mock_time(current_time);
+
+    //  Act.
+    bool is_expired = token_is_expired(token);
+
+    //  Assert.
+    TEST_ASSERT_TRUE(is_expired);
+}
+
+static void token_is_expired__token_just_expired__true_returned(void) {
+    //  Arrange.
+    token_t *token = bzalloc(sizeof(token_t));
+    token->expires = 200;
+
+    time_t current_time = 200;
+    mock_time(current_time);
+
+    //  Act.
+    bool is_expired = token_is_expired(token);
+
+    //  Assert.
+    TEST_ASSERT_TRUE(is_expired);
+}
+
+static void token_is_expired__token_is_not_expired__false_returned(void) {
+    //  Arrange.
+    token_t *token = bzalloc(sizeof(token_t));
+    token->expires = 250;
+
+    time_t current_time = 200;
+    mock_time(current_time);
+
+    //  Act.
+    bool is_expired = token_is_expired(token);
+
+    //  Assert.
+    TEST_ASSERT_FALSE(is_expired);
 }
 
 int main(void) {
@@ -217,6 +263,10 @@ int main(void) {
     RUN_TEST(copy_token__token_is_null__null_token_returned);
     RUN_TEST(copy_token__token_is_not_null__token_returned);
     RUN_TEST(copy_token__token_value_is_not_null__token_returned);
+
+    RUN_TEST(token_is_expired__token_is_expired__true_returned);
+    RUN_TEST(token_is_expired__token_is_not_expired__false_returned);
+    RUN_TEST(token_is_expired__token_is_not_expired__false_returned);
 
     return UNITY_END();
 }

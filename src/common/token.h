@@ -16,7 +16,7 @@ typedef struct token {
 
 token_t *copy_token(const token_t *token);
 void     free_token(token_t **token);
-bool     is_token_expired(const token_t *token);
+bool     token_is_expired(const token_t *token);
 
 #ifdef __cplusplus
 }
