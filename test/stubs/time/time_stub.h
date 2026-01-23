@@ -10,8 +10,6 @@ extern "C" {
 
 void mock_time(time_t current_time);
 
-time_t time(time_t *);
-
 #ifdef __cplusplus
 }
 #endif

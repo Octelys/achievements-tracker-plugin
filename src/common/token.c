@@ -1,5 +1,7 @@
 #include "token.h"
+
 #include "memory.h"
+
 #include <obs-module.h>
 #include <time.h>
 
