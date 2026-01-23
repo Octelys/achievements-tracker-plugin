@@ -491,9 +491,47 @@ if(BUILD_TESTING)
   target_link_test_deps(test_xbox_session)
 
   # ------------------------------
+  # test_types
+  # ------------------------------
+  add_executable(
+          test_types
+          test/test_types.c
+          ${unity_SOURCE_DIR}/src/unity.c
+          src/xbox/xbox_session.c
+          src/common/achievement.c
+          src/common/achievement_progress.c
+          src/common/game.c
+          src/common/gamerscore.c
+          src/common/token.c
+          src/common/unlocked_achievement.c
+          src/common/xbox_session.c
+          test/stubs/bmem_stub.c
+          test/stubs/xbox/xbox_client_stub.c
+  )
+
+  add_test(NAME test_types COMMAND test_types)
+
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_types)
+  endif()
+
+  target_include_directories(
+          test_types
+          PRIVATE
+          ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+          ${CMAKE_CURRENT_SOURCE_DIR}/src
+          ${unity_SOURCE_DIR}/src
+          ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_types PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  target_link_test_deps(test_types)
+
+  # ------------------------------
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
   if(ENABLE_COVERAGE)
-    add_coverage_target(test_encoder test_crypto test_time test_parsers test_xbox_session)
+    add_coverage_target(test_encoder test_crypto test_time test_parsers test_xbox_session test_types)
   endif()
 endif()

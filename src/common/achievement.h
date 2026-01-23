@@ -31,11 +31,14 @@ typedef struct achievement {
 
 media_asset_t *copy_media_asset(const media_asset_t *media_asset);
 void           free_media_asset(media_asset_t **media_asset);
-reward_t      *copy_reward(const reward_t *reward);
-void           free_reward(reward_t **reward);
+
+reward_t *copy_reward(const reward_t *reward);
+void      free_reward(reward_t **reward);
+
 achievement_t *copy_achievement(const achievement_t *achievement);
 void           free_achievement(achievement_t **achievement);
-int            count_achievements(const achievement_t *achievements);
+
+int count_achievements(const achievement_t *achievements);
 
 #ifdef __cplusplus
 }

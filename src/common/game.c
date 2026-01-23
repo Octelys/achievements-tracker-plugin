@@ -22,9 +22,9 @@ void free_game(game_t **game) {
 
     game_t *current = *game;
 
-    free_memory((void *)&current->id);
-    free_memory((void *)&current->title);
+    free_memory((void **)&current->id);
+    free_memory((void **)&current->title);
 
-    free(current);
+    bfree(current);
     *game = NULL;
 }

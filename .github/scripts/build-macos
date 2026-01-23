@@ -160,7 +160,7 @@ build() {
   # Run tests if requested
   if (( run_tests )) {
     log_group "Building test targets..."
-    cmake --build build_macos --config ${config} --target test_encoder test_crypto test_time test_parsers test_xbox_session
+    cmake --build build_macos --config ${config} --target test_encoder test_crypto test_time test_parsers test_xbox_session test_types
 
     log_group "Running tests..."
     ctest --test-dir build_macos --build-config ${config} --output-on-failure
