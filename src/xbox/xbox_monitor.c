@@ -28,6 +28,7 @@
 #define SUBSCRIBE 1
 #define UNSUBSCRIBE 1
 
+/* Manages all the subscriptions to the `game_played` event */
 typedef struct game_played_subscription {
     on_xbox_game_played_t            callback;
     struct game_played_subscription *next;
@@ -35,6 +36,7 @@ typedef struct game_played_subscription {
 
 static game_played_subscription_t *g_game_played_subscriptions = NULL;
 
+/* Manages all the subscriptions to the `achievements_updated` event */
 typedef struct achievements_updated_subscription {
     on_xbox_achievements_progressed_t         callback;
     struct achievements_updated_subscription *next;
@@ -42,6 +44,7 @@ typedef struct achievements_updated_subscription {
 
 static achievements_updated_subscription_t *g_achievements_updated_subscriptions = NULL;
 
+/* Manages all the subscriptions to the `connection_changed` event */
 typedef struct connection_changed_subscription {
     on_xbox_connection_changed_t            callback;
     struct connection_changed_subscription *next;
@@ -49,6 +52,7 @@ typedef struct connection_changed_subscription {
 
 static connection_changed_subscription_t *g_connection_changed_subscriptions = NULL;
 
+/* Keep track of the monitoring */
 typedef struct monitoring_context {
     struct lws_context *context;
     struct lws         *wsi;
@@ -71,6 +75,12 @@ static monitoring_context_t *g_monitoring_context = NULL;
 static xbox_session_t g_current_session;
 
 static void notify_game_played(const game_t *game) {
+
+    if (!game) {
+        obs_log(LOG_DEBUG, "No notification to be sent: no game is being played");
+        return;
+    }
+
     obs_log(LOG_INFO, "Notifying game played: %s (%s)", game->title, game->id);
 
     game_played_subscription_t *subscriptions = g_game_played_subscriptions;
@@ -81,14 +91,14 @@ static void notify_game_played(const game_t *game) {
     }
 }
 
-static void notify_achievements_progressed(const achievements_progress_t *achievements_progress) {
+static void notify_achievements_progressed(const achievement_progress_t *achievements_progress) {
 
     obs_log(LOG_INFO, "Notifying achievements progress: %s", achievements_progress->service_config_id);
 
     achievements_updated_subscription_t *subscription = g_achievements_updated_subscriptions;
 
     while (subscription) {
-        subscription->callback(achievements_progress);
+        subscription->callback(g_current_session.gamerscore, achievements_progress);
         subscription = subscription->next;
     }
 }
@@ -105,7 +115,7 @@ static void notify_connection_changed(bool connected, const char *error_message)
     connection_changed_subscription_t *node = g_connection_changed_subscriptions;
 
     while (node) {
-        node->callback(connected, error_message);
+        node->callback(connected, g_current_session.gamerscore, error_message);
         node = node->next;
     }
 }
@@ -300,19 +310,29 @@ static void on_game_update_received(game_t *game) {
     xbox_change_game(game);
 }
 
-static void on_achievements_progress_received(const achievements_progress_t *progress) {
+static void on_achievement_progress_received(const achievement_progress_t *progress) {
 
     if (!progress) {
         /* No change */
         return;
     }
 
-    /* TODO Merge progress with g_current_game_achievements */
+    /* TODO Progress is not necessarily achieved */
+
+    xbox_session_unlock_achievement(&g_current_session, progress);
 
     notify_achievements_progressed(progress);
 }
 
 static void on_websocket_connected() {
+
+    int64_t gamerscore_value;
+    xbox_fetch_gamerscore(&gamerscore_value);
+
+    if (!g_current_session.gamerscore) {
+        g_current_session.gamerscore             = bzalloc(sizeof(gamerscore_t));
+        g_current_session.gamerscore->base_value = (int)gamerscore_value;
+    }
 
     xbox_presence_subscribe();
 
@@ -372,8 +392,8 @@ static void on_buffer_received(const char *buffer) {
 
     if (is_achievement_message(message)) {
         obs_log(LOG_DEBUG, "Message is an achievement message");
-        const achievements_progress_t *progress = parse_achievements_progress(message);
-        on_achievements_progress_received(progress);
+        const achievement_progress_t *progress = parse_achievement_progress(message);
+        on_achievement_progress_received(progress);
     }
 
 cleanup:
@@ -704,7 +724,9 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
     new_node->next                     = g_connection_changed_subscriptions;
     g_connection_changed_subscriptions = new_node;
 
-    callback(g_monitoring_context->connected, "");
+    if (g_monitoring_context) {
+        callback(g_monitoring_context->connected, g_current_session.gamerscore, "");
+    }
 }
 
 #else /* !HAVE_LIBWEBSOCKETS */

@@ -193,7 +193,7 @@ static void parse_achievements_progress__message_is_null_null_returned(void) {
     const char *message = NULL;
 
     //  Act.
-    achievements_progress_t *actual = parse_achievements_progress(message);
+    achievements_progress_t *actual = parse_achievement_progress(message);
 
     //  Assert.
     TEST_ASSERT_NULL(actual);
@@ -204,7 +204,7 @@ static void parse_achievements_progress__message_is_empty_null_returned(void) {
     const char *message = " ";
 
     //  Act.
-    achievements_progress_t *actual = parse_achievements_progress(message);
+    achievements_progress_t *actual = parse_achievement_progress(message);
 
     //  Assert.
     TEST_ASSERT_NULL(actual);
@@ -215,7 +215,7 @@ static void parse_achievements_progress__message_is_not_json_null_returned(void)
     const char *message = "this-is-not-a-json";
 
     //  Act.
-    achievements_progress_t *actual = parse_achievements_progress(message);
+    achievements_progress_t *actual = parse_achievement_progress(message);
 
     //  Assert.
     TEST_ASSERT_NULL(actual);
@@ -227,7 +227,7 @@ static void parse_achievements_progress__message_is_achievement_achievement_retu
         "{\"serviceConfigId\":\"00000000-0000-0000-0000-00007972ac43\",\"progression\":[{\"id\":\"1\",\"requirements\":[{\"id\":\"00000000-0000-0000-0000-000000000000\",\"current\":\"100\",\"target\":\"100\",\"operationType\":\"Sum\",\"valueType\":\"Integer\",\"ruleParticipationType\":\"Individual\"}],\"progressState\":\"Achieved\",\"timeUnlocked\":\"2026-01-18T02:48:21.707Z\"}],\"contractVersion\":1}";
 
     //  Act.
-    achievements_progress_t *actual = parse_achievements_progress(message);
+    achievements_progress_t *actual = parse_achievement_progress(message);
 
     //  Assert.
     TEST_ASSERT_NOT_NULL(actual);
@@ -243,7 +243,7 @@ static void parse_achievements_progress__message_is_multiple_achievements_achiev
         "{\"serviceConfigId\":\"00000000-0000-0000-0000-00007972ac43\",\"progression\":[{\"id\":\"1\",\"requirements\":[{\"id\":\"00000000-0000-0000-0000-000000000000\",\"current\":\"100\",\"target\":\"100\",\"operationType\":\"Sum\",\"valueType\":\"Integer\",\"ruleParticipationType\":\"Individual\"}],\"progressState\":\"Achieved\",\"timeUnlocked\":\"2026-01-18T02:48:21.707Z\"}, {\"id\":\"2\",\"requirements\":[{\"id\":\"00000000-0000-0000-0000-000000000000\",\"current\":\"100\",\"target\":\"100\",\"operationType\":\"Sum\",\"valueType\":\"Integer\",\"ruleParticipationType\":\"Individual\"}],\"progressState\":\"NotAchieved\",\"timeUnlocked\":\"2026-01-18T02:48:21.707Z\"}],\"contractVersion\":1}";
 
     //  Act.
-    achievements_progress_t *actual = parse_achievements_progress(message);
+    achievements_progress_t *actual = parse_achievement_progress(message);
 
     //  Assert.
     TEST_ASSERT_NOT_NULL(actual);

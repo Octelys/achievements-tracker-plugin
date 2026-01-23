@@ -16,7 +16,8 @@ typedef struct xbox_session {
     achievement_t *achievements;
 } xbox_session_t;
 
-xbox_session_t *copy_xbox_session(xbox_session_t *session);
+xbox_session_t *copy_xbox_session(const xbox_session_t *session);
+int             xbox_session_compute_gamerscore(const xbox_session_t *session);
 
 void free_xbox_session(xbox_session_t **session);
 

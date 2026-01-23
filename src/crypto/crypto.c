@@ -305,6 +305,8 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
     if (!key_json)
         return NULL;
 
+    obs_log(LOG_WARNING, "JSON key: %s", key_json);
+
     EVP_PKEY *pkey      = NULL;
     char     *kty       = NULL;
     char     *crv       = NULL;
@@ -312,6 +314,7 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
     char     *y64       = NULL;
     char     *d64_local = NULL;
 
+    //  Remove the JSON and use cJSON
     kty = json_read_string(key_json, "kty");
 
     if (!kty) {
@@ -436,12 +439,12 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
     EVP_PKEY_CTX_free(ctx);
 
 done:
-    FREE(kty);
-    FREE(crv);
-    FREE(x64);
-    FREE(y64);
+    free_memory((void**)&kty);
+    free_memory((void**)&crv);
+    free_memory((void**)&x64);
+    free_memory((void**)&y64);
     if (expect_private)
-        FREE(d64_local);
+        free_memory((void**)&d64_local);
 
     return pkey;
 }

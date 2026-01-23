@@ -215,8 +215,8 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     }
 
 cleanup:
-    FREE(json);
-    FREE(gamerscore_text);
+    /*FREE(json);*/
+    /*FREE(gamerscore_text);*/
     /*FREE(end);*/
 
     return result;
@@ -337,7 +337,7 @@ game_t *xbox_get_current_game(void) {
     game->title = strdup(current_game_title);
 
 cleanup:
-    FREE(response_json);
+    //FREE(response_json);
 
     return game;
 }

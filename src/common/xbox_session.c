@@ -2,7 +2,7 @@
 
 #include <obs-module.h>
 
-xbox_session_t *copy_xbox_session(xbox_session_t *session) {
+xbox_session_t *copy_xbox_session(const xbox_session_t *session) {
 
     if (!session) {
         return NULL;
@@ -30,4 +30,12 @@ void free_xbox_session(xbox_session_t **session) {
 
     free(current);
     *session = NULL;
+}
+
+int xbox_session_compute_gamerscore(const xbox_session_t *session) {
+    if (!session) {
+        return 0;
+    }
+
+    return gamerscore_compute(session->gamerscore);
 }

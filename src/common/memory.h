@@ -1,5 +1,6 @@
 #pragma once
 
+#include <obs-module.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus
@@ -9,7 +10,7 @@ extern "C" {
 #define FREE(p)	                \
 if (p) {			            \
     void *pointer = (void*)p;   \
-    free(pointer);              \
+    bfree(pointer);              \
 }
 
 static void free_memory(void **ptr) {
@@ -18,7 +19,7 @@ static void free_memory(void **ptr) {
         return;
     }
 
-    free(*ptr);
+    bfree(*ptr);
     *ptr = NULL;
 }
 

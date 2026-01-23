@@ -12,7 +12,7 @@ bool is_achievement_message(const char *json_string);
 
 game_t *parse_game(const char *json_string);
 
-achievements_progress_t *parse_achievements_progress(const char *json_string);
+achievement_progress_t *parse_achievement_progress(const char *json_string);
 
 achievement_t *parse_achievements(const char *json_string);
 

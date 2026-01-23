@@ -65,30 +65,6 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game) {
     session->achievements = xbox_get_game_achievements(game);
 }
 
-int xbox_session_compute_gamerscore(const xbox_session_t *session) {
-
-    if (!session) {
-        return 0;
-    }
-
-    const gamerscore_t *gamerscore = session->gamerscore;
-
-    if (!gamerscore) {
-        return 0;
-    }
-
-    int total_value = gamerscore->base_value;
-
-    const unlocked_achievement_t *current = gamerscore->unlocked_achievements;
-
-    while (current) {
-        total_value += current->value;
-        current = current->next;
-    }
-
-    return total_value;
-}
-
 void xbox_session_unlock_achievement(const xbox_session_t *session, const achievement_progress_t *progress) {
 
     if (!session || !progress) {

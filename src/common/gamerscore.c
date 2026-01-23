@@ -3,7 +3,7 @@
 #include <obs-module.h>
 #include <stdlib.h>
 
-gamerscore_t *copy_gamerscore(gamerscore_t *gamerscore) {
+gamerscore_t *copy_gamerscore(const gamerscore_t *gamerscore) {
 
     gamerscore_t *copy          = bzalloc(sizeof(gamerscore_t));
     copy->base_value            = gamerscore->base_value;
@@ -22,4 +22,22 @@ void free_gamerscore(gamerscore_t **gamerscore) {
 
     free(current);
     *gamerscore = NULL;
+}
+
+int gamerscore_compute(const gamerscore_t *gamerscore) {
+
+    if (!gamerscore) {
+        return 0;
+    }
+
+    int total_value = gamerscore->base_value;
+
+    const unlocked_achievement_t *current = gamerscore->unlocked_achievements;
+
+    while (current) {
+        total_value += current->value;
+        current = current->next;
+    }
+
+    return total_value;
 }

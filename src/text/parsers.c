@@ -152,10 +152,10 @@ cleanup:
     return game;
 }
 
-achievements_progress_t *parse_achievements_progress(const char *json_string) {
+achievement_progress_t *parse_achievement_progress(const char *json_string) {
 
-    cJSON                   *json_root            = NULL;
-    achievements_progress_t *achievement_progress = NULL;
+    cJSON                  *json_root            = NULL;
+    achievement_progress_t *achievement_progress = NULL;
 
     if (!json_string || strlen(json_string) == 0) {
         return NULL;
@@ -201,16 +201,16 @@ achievements_progress_t *parse_achievements_progress(const char *json_string) {
             continue;
         }
 
-        achievements_progress_t *progress = bzalloc(sizeof(achievements_progress_t));
-        progress->service_config_id       = strdup(current_service_config_id);
-        progress->id                      = strdup(id_node->valuestring);
-        progress->progress_state          = strdup(progress_state_node->valuestring);
-        progress->next                    = NULL;
+        achievement_progress_t *progress = bzalloc(sizeof(achievement_progress_t));
+        progress->service_config_id      = strdup(current_service_config_id);
+        progress->id                     = strdup(id_node->valuestring);
+        progress->progress_state         = strdup(progress_state_node->valuestring);
+        progress->next                   = NULL;
 
         if (!achievement_progress) {
             achievement_progress = progress;
         } else {
-            achievements_progress_t *last_progress = achievement_progress;
+            achievement_progress_t *last_progress = achievement_progress;
             while (last_progress->next) {
                 last_progress = last_progress->next;
             }

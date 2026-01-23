@@ -5,7 +5,6 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 #include <curl/curl.h>
-#include <inttypes.h>
 
 #include "oauth/xbox-live.h"
 #include "xbox/xbox_client.h"
@@ -50,18 +49,14 @@ static void load_font_sheet() {
     }
 }
 
-static void update_gamerscore() {
+static void update_gamerscore(const gamerscore_t *gamerscore) {
 
-    if (!xbox_fetch_gamerscore(&g_gamerscore)) {
-        g_gamerscore = 0;
-        obs_log(LOG_ERROR, "Unable to fetch gamerscore after connection established");
-        return;
-    }
+    g_gamerscore = gamerscore_compute(gamerscore);
 
     obs_log(LOG_INFO, "Gamerscore is %" PRId64, g_gamerscore);
 }
 
-static void on_connection_changed(bool is_connected, const char *error_message) {
+static void on_connection_changed(bool is_connected, const gamerscore_t *gamerscore, const char *error_message) {
 
     UNUSED_PARAMETER(error_message);
 
@@ -69,15 +64,14 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
         return;
     }
 
-    update_gamerscore();
+    update_gamerscore(gamerscore);
 }
 
-static void on_achievements_progressed(const achievements_progress_t *progress) {
+static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
 
     UNUSED_PARAMETER(progress);
 
-    /* TODO: Just because the achievement progressed, doesn't mean the gamerscore changed immediately */
-    update_gamerscore();
+    update_gamerscore(gamerscore);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
