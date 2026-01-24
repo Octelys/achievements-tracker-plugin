@@ -244,15 +244,15 @@ ${_usage_host:-}"
         log_group "Generating coverage report..."
         mkdir -p ${build_dir}/coverage/html
         gcovr -r ${project_root} ${build_dir} \
-          --exclude 'build_*/external/' \
-          --exclude '_deps/' \
+          --exclude 'external/' \
+          --exclude 'build_x86_64/_deps/' \
           --exclude 'test/' \
           --html --html-details -o ${build_dir}/coverage/html/index.html
 
         log_group "Coverage Summary"
         gcovr -r ${project_root} ${build_dir} \
-          --exclude 'build_*/external/' \
-          --exclude '_deps/' \
+          --exclude 'external/' \
+          --exclude 'build_x86_64/_deps/' \
           --exclude 'test/' \
           --print-summary
       else

@@ -171,15 +171,15 @@ build() {
         log_group "Generating coverage report..."
         mkdir -p build_macos/coverage/html
         gcovr -r ${project_root} build_macos \
-          --exclude 'build_*/external/' \
-          --exclude '_deps/' \
+          --exclude 'external/' \
+          --exclude 'build_macos/_deps/' \
           --exclude 'test/' \
           --html --html-details -o build_macos/coverage/html/index.html
 
         log_group "Coverage Summary"
         gcovr -r ${project_root} build_macos \
-          --exclude 'build_*/external/' \
-          --exclude '_deps/' \
+          --exclude 'external/' \
+          --exclude 'build_macos/_deps/' \
           --exclude 'test/' \
           --print-summary
       else

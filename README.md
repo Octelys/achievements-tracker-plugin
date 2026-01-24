@@ -27,29 +27,22 @@ A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement
 
 1. **Sign in to Xbox Live**:
    - Open OBS Studio
-   - Add a new **Source** → **Achievements Tracker**
+   - Add a new **Source** → **Xbox Account**
    - Click the **Sign in with Xbox Live** button in the source properties
    - A browser window will open; sign in with your Microsoft account
    - Grant the requested permissions
    - The plugin will automatically retrieve and cache your XSTS token
 
-2. **Customize Appearance** (Soon) : 
-   - **Font**: Select font family and size
-   - **Color**: Choose text color
-   - **Display Mode**: Toggle between achievements count and gamer score
-
 ### Usage
 
 Once configured, the source will automatically display:
-- **Achievements Mode**: Current game's unlocked achievements count (e.g., "15 / 50 Achievements")
-- **Gamer Score Mode**: Total gamer score (e.g., "12,450 G")
+- Using the **Xbox Cover** source, the cover of the game currently active on your Xbox One console will be shown
+- Using the **Xbox Gamerscore** source: your current gamerscore will be shown
+- TBD **Achievements Mode**: Current game's unlocked achievements count (e.g., "15 / 50 Achievements")
 
-The plugin polls Xbox Live periodically to detect:
+The plugin subscribes Xbox Live to get real-time updates of:
 - The currently active game
 - Achievement unlock events
-- Updated gamer score
-
-To switch between display modes, open the source properties and change the **Display Mode** dropdown.
 
 ---
 
@@ -61,34 +54,63 @@ To switch between display modes, open the source properties and change the **Dis
 achievements-tracker-plugin/
 ├── src/
 │   ├── main.c                          # Plugin entry point, module registration
-│   ├── sources/
-│   │   └── xbox_achievements_text_source.c  # OBS text source implementation
-│   ├── oauth/
-│   │   ├── xbox-live.c                 # Xbox Live OAuth & XSTS token flows
-│   │   └── util.c                      # OAuth helpers (PKCE, code exchange)
+│   ├── common/                         # Shared data types and utilities
+│   │   ├── achievement.c/h             # Achievement type (copy/free/count)
+│   │   ├── achievement_progress.c/h    # Achievement progress tracking
+│   │   ├── device.h                    # Device identity (UUID, keys)
+│   │   ├── game.c/h                    # Game descriptor (id, title)
+│   │   ├── gamerscore.c/h              # Gamerscore container & computation
+│   │   ├── memory.h                    # Memory allocation helpers (FREE, free_memory)
+│   │   ├── token.c/h                   # Auth token with expiration
+│   │   ├── types.h                     # Umbrella header, macros, platform helpers
+│   │   ├── unlocked_achievement.c/h    # Unlocked achievement tracking
+│   │   ├── xbox_identity.c/h           # Xbox identity (gamertag, xuid, uhs, token)
+│   │   └── xbox_session.c/h            # Xbox session state container
 │   ├── crypto/
-│   │   └── crypto.c                    # EC key generation, signing (Proof-of-Possession)
-│   ├── net/
-│   │   ├── http/http.c                 # libcurl HTTP GET/POST wrappers
-│   │   ├── json/json.c                 # Minimal JSON parsing helpers
-│   │   └── browser/browser.c           # Platform-specific browser launch
-│   ├── io/
-│   │   └── state.c                     # Persistent state (tokens, device keys)
-│   ├── xbox/
-│   │   └── client.c                    # Xbox Live API client (profile, achievements)
+│   │   └── crypto.c/h                  # EC key generation, signing (Proof-of-Possession)
+│   ├── diagnostics/
+│   │   ├── log.c.in                    # Logging (CMake-configured)
+│   │   └── log.h                       # Logging API
+│   ├── drawing/
+│   │   ├── image.c/h                   # Image rendering helpers
+│   │   └── text.c/h                    # Text rendering helpers
 │   ├── encoding/
-│   │   └── base64.c                    # Base64 URL-safe encoding
+│   │   └── base64.c/h                  # Base64 URL-safe encoding
+│   ├── io/
+│   │   └── state.c/h                   # Persistent state (tokens, device keys)
+│   ├── net/
+│   │   ├── browser/browser.c/h         # Platform-specific browser launch
+│   │   ├── http/http.c/h               # libcurl HTTP GET/POST wrappers
+│   │   └── json/json.c/h               # JSON parsing helpers
+│   ├── oauth/
+│   │   ├── util.c/h                    # OAuth helpers (PKCE, code exchange)
+│   │   └── xbox-live.c/h               # Xbox Live OAuth & XSTS token flows
+│   ├── sources/xbox/                   # OBS source implementations
+│   │   ├── account.c/h                 # Xbox Account source
+│   │   ├── game_cover.c/h              # Xbox Game Cover source
+│   │   └── gamerscore.c/h              # Xbox Gamerscore source
+│   ├── text/
+│   │   └── parsers.c/h                 # Text/response parsing utilities
 │   ├── time/
-│   │   └── time.c                      # ISO-8601 timestamp parsing
-│   └── util/
-│       └── uuid.c                      # Cross-platform UUID generation
+│   │   └── time.c/h                    # ISO-8601 timestamp parsing
+│   ├── util/
+│   │   └── uuid.c/h                    # Cross-platform UUID generation
+│   └── xbox/
+│       ├── xbox_client.c/h             # Xbox Live API client (profile, achievements)
+│       ├── xbox_monitor.c/h            # Real-time activity monitoring
+│       └── xbox_session.c/h            # Session management
 ├── test/
-│   ├── test_encoder.c                  # Base64 encoding tests
 │   ├── test_crypto.c                   # Cryptographic signing tests
+│   ├── test_encoder.c                  # Base64 encoding tests
+│   ├── test_parsers.c                  # Text parser tests
 │   ├── test_time.c                     # ISO-8601 parsing tests
-│   └── stubs/                          # Test stubs (bmem_stub.c, etc.)
+│   ├── test_types.c                    # Common types tests
+│   ├── test_xbox_session.c             # Xbox session tests
+│   ├── unity_config.h                  # Unity test framework config
+│   └── stubs/                          # Test stubs (bmem_stub.c, mocks, etc.)
 ├── cmake/                              # Build configuration helpers
 ├── data/locale/                        # Localization files
+├── external/cjson/                     # cJSON library (vendored)
 └── CMakeLists.txt                      # Main build configuration
 ```
 
@@ -96,37 +118,46 @@ achievements-tracker-plugin/
 
 The plugin implements the Xbox Live authentication flow with Proof-of-Possession (PoP) signing:
 
-#### 1. **Microsoft OAuth 2.0 (Authorization Code Flow with PKCE)**
-   - Generate PKCE `code_verifier` and `code_challenge`
-   - Open system browser to Microsoft login: `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize`
-   - User signs in and consents
-   - Microsoft redirects to `http://localhost:<port>/callback?code=...`
-   - Plugin exchanges `code` for an **Access Token** via `https://login.microsoftonline.com/consumers/oauth2/v2.0/token`
+#### 1. **Microsoft OAuth 2.0 (Device Code Flow)**
+   - POST to `https://login.live.com/oauth20_connect.srf` with:
+     - `client_id`: Application client ID
+     - `response_type`: `device_code`
+     - `scope`: `service::user.auth.xboxlive.com::MBI_SSL`
+   - Receive `device_code`, `user_code`, `interval`, and `expires_in`
+   - Open system browser to `https://login.live.com/oauth20_remoteconnect.srf?otc=<user_code>`
+   - User signs in and enters the displayed code
+   - Plugin polls `https://login.live.com/oauth20_token.srf` at the specified interval until:
+     - User completes authentication → receive **Access Token** and **Refresh Token**
+     - Or timeout expires
 
 #### 2. **Xbox Live Device Token**
    - Generate an EC P-256 key pair (device Proof-of-Possession key)
    - POST to `https://device.auth.xboxlive.com/device/authenticate` with:
-     - Device UUID (random, cached)
-     - Public key (JWK format)
-     - Signature header (signed with private key)
-   - Receive **Device Token**
+     - Device UUID and serial number (random, cached)
+     - Public key (JWK format) in `ProofKey`
+     - `signature` header (request signed with private key)
+   - Receive **Device Token** (JWT) with expiration (`NotAfter`)
 
 #### 3. **Xbox Live SISU Authorization** (Single Sign-In, Single Sign-Out)
    - POST to `https://sisu.xboxlive.com/authorize` with:
-     - Microsoft Access Token
+     - Microsoft Access Token (as `AccessToken`: `t=<token>`)
      - Device Token
-     - Public key (JWK)
-     - Signature header
+     - App ID (client ID)
+     - Public key (JWK) in `ProofKey`
+     - `signature` header (request signed with private key)
    - Receive:
-     - **User Token**
-     - **Title Token**
-     - **XSTS Token** (Xbox Secure Token Service token)
-     - User identity: `gamertag`, `xuid` (Xbox User ID), `uhs` (User Hash)
+     - **Authorization Token** (XSTS token at `AuthorizationToken.Token`)
+     - User identity: `gtg` (gamertag), `xid` (Xbox User ID), `uhs` (User Hash)
+     - Token expiration (`NotAfter`)
 
 #### 4. **Token Storage & Refresh**
    - All tokens are cached in `~/.config/obs-studio/plugin_config/achievements-tracker/state.json`
    - Device keys are persisted (EC private key, PEM format)
-   - XSTS token is used for subsequent Xbox Live API calls
+   - On startup:
+     1. If valid **User Token** exists → use it
+     2. Else if **Refresh Token** exists → exchange for new Access Token via token endpoint
+     3. Else → start Device Code Flow from step 1
+   - Device Token is also cached and reused if still valid
 
 #### 5. **Authenticated API Calls**
    - All Xbox Live API requests include the header:
