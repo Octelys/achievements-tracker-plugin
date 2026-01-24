@@ -244,16 +244,16 @@ ${_usage_host:-}"
         log_group "Generating coverage report..."
         mkdir -p ${build_dir}/coverage/html
         gcovr -r ${project_root} ${build_dir} \
-          --exclude 'external/' \
-          --exclude '_deps/' \
-          --exclude 'test/' \
+          --exclude '*/external/*' \
+          --exclude '*/_deps/*' \
+          --exclude '*/test/*' \
           --html --html-details -o ${build_dir}/coverage/html/index.html
 
         log_group "Coverage Summary"
         gcovr -r ${project_root} ${build_dir} \
-          --exclude 'external/' \
-          --exclude '_deps/' \
-          --exclude 'test/' \
+          --exclude '*/external/*' \
+          --exclude '*/_deps/*' \
+          --exclude '*/test/*' \
           --print-summary
       else
         log_info "gcovr not found, skipping coverage report generation"

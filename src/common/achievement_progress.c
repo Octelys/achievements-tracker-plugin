@@ -3,6 +3,19 @@
 #include "memory.h"
 #include <obs-module.h>
 
+/**
+ * @brief Deep-copies a linked list of achievement progress entries.
+ *
+ * Allocates a new list where each node is duplicated and all strings are copied.
+ * The returned list is independent from the input list.
+ *
+ * @param achievement_progress Head of the source @c achievement_progress_t linked
+ *        list (may be NULL).
+ *
+ * @return Head of the newly allocated list, or NULL if @p achievement_progress is
+ *         NULL. The caller owns the returned list and must free it with
+ *         @ref free_achievement_progress.
+ */
 achievement_progress_t *copy_achievement_progress(const achievement_progress_t *achievement_progress) {
 
     if (!achievement_progress) {
@@ -37,6 +50,15 @@ achievement_progress_t *copy_achievement_progress(const achievement_progress_t *
     return root_copy;
 }
 
+/**
+ * @brief Frees a linked list of achievement progress entries and sets the caller's
+ * pointer to NULL.
+ *
+ * Frees each node's internal strings and then the node itself.
+ * Safe to call with NULL or with @c *achievement_progress == NULL.
+ *
+ * @param[in,out] achievement_progress Address of the head pointer to free.
+ */
 void free_achievement_progress(achievement_progress_t **achievement_progress) {
 
     if (!achievement_progress || !*achievement_progress) {
