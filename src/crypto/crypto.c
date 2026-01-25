@@ -17,6 +17,18 @@
 
 #include "common/types.h"
 
+/**
+ * @brief Debug helper that exports an EC keypair to PEM and logs/prints it.
+ *
+ * This function writes the public key (SubjectPublicKeyInfo) and then the
+ * private key (PKCS#8) to a memory BIO, and logs/prints the PEM blocks.
+ *
+ * @warning This is intended for local debugging only. It logs / prints private
+ *          key material, which is unsafe for production builds.
+ *
+ * @param pkey The key to export. Must be an EC P-256 keypair (public-only keys
+ *             will export only the public portion).
+ */
 void crypto_print_keys(const EVP_PKEY *pkey) {
 
     if (!pkey) {
@@ -31,7 +43,7 @@ void crypto_print_keys(const EVP_PKEY *pkey) {
     }
 
     /* Export public key (SPKI format) */
-    obs_log(LOG_WARNING, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
+    obs_log(LOG_INFO, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
     printf("=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
     if (PEM_write_bio_PUBKEY(bio, pkey)) {
         char *pem_data = NULL;
@@ -52,7 +64,7 @@ void crypto_print_keys(const EVP_PKEY *pkey) {
     BIO_reset(bio);
 
     /* Export private key (PKCS8 format) */
-    obs_log(LOG_WARNING, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
+    obs_log(LOG_INFO, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
     printf("=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
     if (PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, NULL, NULL)) {
         char *pem_data = NULL;
@@ -72,6 +84,16 @@ void crypto_print_keys(const EVP_PKEY *pkey) {
     BIO_free(bio);
 }
 
+/**
+ * @brief Base64url-encodes a byte buffer without padding.
+ *
+ * Uses the RFC 4648 base64url alphabet ("-" and "_") and omits '=' padding.
+ *
+ * @param in Input buffer.
+ * @param inlen Number of bytes in @p in.
+ * @return Newly allocated NUL-terminated string on success (caller must free with
+ *         free()), or NULL on allocation failure.
+ */
 static char *b64url_encode(const unsigned char *in, size_t inlen) {
     static const char tbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -110,8 +132,20 @@ static char *b64url_encode(const unsigned char *in, size_t inlen) {
     return out;
 }
 
-/* Extract uncompressed EC public point (04 || X || Y) from an EVP_PKEY using
- * OpenSSL 3 params API. */
+/**
+ * @brief Extract the uncompressed EC public point from an EVP_PKEY.
+ *
+ * Reads OSSL_PKEY_PARAM_PUB_KEY via the OpenSSL params API and returns the raw
+ * octet string as stored by OpenSSL. For P-256, this is expected to be the
+ * uncompressed form: 0x04 || X (32 bytes) || Y (32 bytes).
+ *
+ * @param pkey    Source key.
+ * @param out     Output buffer.
+ * @param out_size Size of @p out in bytes.
+ * @param out_len Receives the number of bytes written.
+ *
+ * @return 1 on success, 0 on failure.
+ */
 static int get_ec_public_point_uncompressed(const EVP_PKEY *pkey, unsigned char *out, size_t out_size,
                                             size_t *out_len) {
     if (out_len)
@@ -137,12 +171,17 @@ static int get_ec_public_point_uncompressed(const EVP_PKEY *pkey, unsigned char 
     return 1;
 }
 
-/*
- * Extract the P-256 private scalar as a fixed 32-byte big-endian value.
+/**
+ * @brief Extract the P-256 private scalar as a fixed-width 32-byte big-endian value.
  *
- * Some OpenSSL builds/providers don't expose OSSL_PKEY_PARAM_PRIV_KEY via the params
- * API for all EVP_PKEY instances, even if a private key is present. In that case,
- * fall back to the legacy EC_KEY accessor.
+ * On OpenSSL 3+, the preferred method is to read OSSL_PKEY_PARAM_PRIV_KEY via
+ * the params API (EVP_PKEY_get_bn_param). On OpenSSL 1.1.x, it falls back to
+ * legacy EC_KEY accessors.
+ *
+ * @param pkey  Source keypair.
+ * @param out32 Output buffer of exactly 32 bytes.
+ * @return 1 on success, 0 on failure (e.g., key has no private component or the
+ *         provider does not expose the scalar).
  */
 static int get_p256_private_scalar_32(const EVP_PKEY *pkey, unsigned char out32[32]) {
     if (!pkey || !out32)
@@ -178,10 +217,20 @@ static int get_p256_private_scalar_32(const EVP_PKEY *pkey, unsigned char out32[
 }
 
 /**
+ * @brief Serialize an EC P-256 key to a compact JSON structure.
  *
- * @param pkey
- * @param include_private
- * @return
+ * The returned JSON is a JWK-like object:
+ *  - kty: "EC"
+ *  - crv: "P-256"
+ *  - x, y: base64url-encoded affine coordinates (32 bytes each)
+ *  - d: base64url-encoded private scalar (optional)
+ *  - alg/use: fixed metadata used by the caller
+ *
+ * @param pkey            Source key.
+ * @param include_private If true, include the private scalar field "d".
+ *
+ * @return Heap-allocated JSON string (caller must free with bfree()), or NULL
+ *         on error.
  */
 char *crypto_to_string(const EVP_PKEY *pkey, bool include_private) {
     unsigned char point[1 + 32 + 32];
@@ -244,7 +293,18 @@ done:
     return returned_key_json;
 }
 
-/* Minimal base64url decode for unpadded input. Returns 1 on success. */
+/**
+ * @brief Decode a base64url string into exactly 32 bytes.
+ *
+ * This is a strict decoder used for P-256 coordinates/scalars. It expects:
+ *  - base64url alphabet (A-Z a-z 0-9 '-' '_')
+ *  - no '=' padding
+ *  - the decoded output length to be exactly 32 bytes
+ *
+ * @param in  NUL-terminated base64url string.
+ * @param out Output buffer (32 bytes).
+ * @return 1 on success, 0 on failure.
+ */
 static int b64url_decode_32(const char *in, uint8_t out[32]) {
     if (!in || !out)
         return 0;
@@ -295,12 +355,21 @@ static int b64url_decode_32(const char *in, uint8_t out[32]) {
 }
 
 /**
- * Parses an EC P-256 key from a JSON string and generates an EVP_PKEY structure.
+ * @brief Parse a JSON-serialized EC P-256 key into an OpenSSL EVP_PKEY.
  *
- * @param key_json A JSON string containing the key attributes. It must include at least "kty", "crv", "x", and "y".
- *                 If `expect_private` is true, it must also contain "d".
- * @param expect_private A boolean flag indicating whether to expect a private key ("d" attribute) in the JSON string.
- * @return A pointer to an `EVP_PKEY` structure representing the parsed key if successful, or NULL on failure.
+ * The input JSON is expected to be compatible with the output of
+ * crypto_to_string(): it must include "kty":"EC", "crv":"P-256" and the
+ * base64url fields "x" and "y". If @p expect_private is true, it must also
+ * include the private scalar field "d".
+ *
+ * Public keys are imported via EVP_PKEY_fromdata with EVP_PKEY_PUBLIC_KEY.
+ * Private keys are imported as a keypair (public point + private scalar) via
+ * EVP_PKEY_fromdata with EVP_PKEY_KEYPAIR.
+ *
+ * @param key_json        JSON string.
+ * @param expect_private  If true, require and import the private scalar.
+ * @return A newly created EVP_PKEY on success (caller owns it and must free via
+ *         EVP_PKEY_free), or NULL on failure.
  */
 EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
 
@@ -450,9 +519,12 @@ done:
 }
 
 /**
- * Generates a new EC P-256 key pair.
+ * @brief Generate a fresh EC P-256 keypair.
  *
- * @return
+ * Uses OpenSSL EVP_PKEY keygen APIs with curve NID_X9_62_prime256v1.
+ *
+ * @return Newly generated EVP_PKEY on success (caller must EVP_PKEY_free), or
+ *         NULL on failure.
  */
 EVP_PKEY *crypto_generate_keys(void) {
     EVP_PKEY     *pkey = NULL;
@@ -484,12 +556,22 @@ fail:
     return NULL;
 }
 
+/**
+ * @brief Convert Unix epoch seconds to a Windows FILETIME-like timestamp.
+ *
+ * Windows timestamps are expressed as the number of 100-nanosecond intervals
+ * since 1601-01-01. This helper converts Unix seconds (since 1970-01-01) to
+ * that representation.
+ */
 static uint64_t unix_seconds_to_windows_100ns(uint64_t unix_seconds) {
     /* Windows epoch starts at 1601-01-01; Unix at 1970-01-01. */
     const uint64_t EPOCH_DIFF_SECONDS = 11644473600ULL;
     return (unix_seconds + EPOCH_DIFF_SECONDS) * 10000000ULL;
 }
 
+/**
+ * @brief Write a 32-bit integer in big-endian order.
+ */
 static void write_u32_be(uint8_t *dst, uint32_t v) {
     dst[0] = (uint8_t)((v >> 24) & 0xff);
     dst[1] = (uint8_t)((v >> 16) & 0xff);
@@ -497,6 +579,9 @@ static void write_u32_be(uint8_t *dst, uint32_t v) {
     dst[3] = (uint8_t)(v & 0xff);
 }
 
+/**
+ * @brief Write a 64-bit integer in big-endian order.
+ */
 static void write_u64_be(uint8_t *dst, uint64_t v) {
     dst[0] = (uint8_t)((v >> 56) & 0xff);
     dst[1] = (uint8_t)((v >> 48) & 0xff);
@@ -508,6 +593,19 @@ static void write_u64_be(uint8_t *dst, uint64_t v) {
     dst[7] = (uint8_t)(v & 0xff);
 }
 
+/**
+ * @brief Extract the URL path and query from a URL string.
+ *
+ * This is a minimal parser used for signing. It finds the first '/' following
+ * the optional scheme://host[:port] prefix. If no '/' is present, it returns
+ * "/".
+ *
+ * @param url       Input URL.
+ * @param out_begin Receives a pointer into @p url (or a pointer to the literal
+ *                  string "/" if no path exists).
+ * @param out_len   Receives the length in bytes of the path+query portion.
+ * @return true on success, false on invalid parameters.
+ */
 static bool parse_url_path_and_query(const char *url, const char **out_begin, size_t *out_len) {
     if (!out_begin || !out_len) {
         return false;
@@ -541,6 +639,19 @@ static bool parse_url_path_and_query(const char *url, const char **out_begin, si
     return true;
 }
 
+/**
+ * @brief Sign a buffer with ECDSA P-256 + SHA-256 and output a P1363 signature.
+ *
+ * OpenSSL produces ECDSA signatures as DER-encoded (r,s). This helper signs using
+ * EVP_DigestSign* then converts the DER signature into the fixed-width IEEE P1363
+ * representation: r (32 bytes big-endian) || s (32 bytes big-endian).
+ *
+ * @param pkey      Private key.
+ * @param data      Data to sign.
+ * @param data_len  Data length.
+ * @param out_sig64 Output signature buffer (64 bytes).
+ * @return true on success, false on failure.
+ */
 static bool ecdsa_sign_p1363_sha256(const EVP_PKEY *pkey, const uint8_t *data, size_t data_len, uint8_t out_sig64[64]) {
 
     bool           ok       = false;
@@ -612,14 +723,30 @@ done:
 }
 
 /**
- * Creates a signature header for the given request parameters.
+ * @brief Create the binary signature header required by the Xbox request policy.
  *
- * @param private_key
- * @param url
- * @param authorization_token
- * @param payload
- * @param out_len
- * @return
+ * This function builds the "to-be-signed" buffer from:
+ *  - policy version (u32, BE)
+ *  - a 0 byte delimiter
+ *  - timestamp (u64, BE) in Windows 100ns units
+ *  - a 0 byte delimiter
+ *  - HTTP method "POST" + NUL
+ *  - URL path+query + NUL
+ *  - authorization token + NUL
+ *  - JSON payload + NUL
+ *
+ * It then signs the buffer using ECDSA over P-256 with SHA-256, and returns a
+ * header blob:
+ *  - policy version (u32, BE)
+ *  - timestamp (u64, BE)
+ *  - signature (64 bytes, P1363)
+ *
+ * @param private_key         EC P-256 private key.
+ * @param url                 Full request URL.
+ * @param authorization_token Authorization token string.
+ * @param payload             Request payload string.
+ * @param out_len             Receives the length of the returned header.
+ * @return Newly allocated header buffer (caller must bfree()), or NULL on error.
  */
 uint8_t *crypto_sign(const EVP_PKEY *private_key, const char *url, const char *authorization_token, const char *payload,
                      size_t *out_len) {
