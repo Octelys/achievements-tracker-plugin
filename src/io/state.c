@@ -27,14 +27,34 @@
 #define XBOX_TOKEN "xbox_token"
 #define XBOX_TOKEN_EXPIRY "xbox_token_expiry"
 
+/**
+ * @brief Global in-memory persisted state.
+ *
+ * The state is backed by an OBS obs_data_t object loaded from and saved to
+ * JSON on disk. Most getters return pointers to strings owned by this object.
+ *
+ * @note This must be initialized by calling io_load() before any state_* APIs
+ *       are used.
+ */
 static obs_data_t *g_state = NULL;
 
+/**
+ * @brief Build the full path to the persisted JSON state file.
+ *
+ * The state is stored under OBS's module config directory:
+ *   <OBS config dir>/plugins/<plugin_name>/achievements-tracker-state.json
+ *
+ * The directory is created if it doesn't exist.
+ *
+ * @return Newly allocated path string (caller must bfree()), or NULL on failure.
+ */
 static char *get_state_path(void) {
     /* Put state under: <OBS config dir>/plugins/<plugin_name>/ */
     char *dir = obs_module_config_path("");
 
-    if (!dir)
+    if (!dir) {
         return NULL;
+    }
 
     /* Ensure directory exists */
     os_mkdirs(dir);
@@ -47,22 +67,27 @@ static char *get_state_path(void) {
 }
 
 /**
- * Reads the state from the disk.
+ * @brief Read the persisted state from disk.
  *
- * @return
+ * If the state file doesn't exist or cannot be parsed, this returns a new empty
+ * object.
+ *
+ * @return Newly created obs_data_t object (caller owns it), or NULL on allocation
+ *         failure.
  */
 static obs_data_t *load_state(void) {
     char *path = get_state_path();
 
-    if (!path)
+    if (!path) {
         return NULL;
+    }
 
     obs_log(LOG_INFO, "loading state from %s", path);
 
     obs_data_t *data = obs_data_create_from_json_file(path);
     bfree(path);
 
-    /* If file doesn’t exist yet, return an empty object */
+    /* If the file does not exist yet, return an empty object */
     if (!data) {
         obs_log(LOG_INFO, "no state found: creating a new one");
         data = obs_data_create();
@@ -72,23 +97,36 @@ static obs_data_t *load_state(void) {
 }
 
 /**
- * Persists the state to disk
+ * @brief Persist the current state to disk.
  *
- * @param data
+ * Uses obs_data_save_json_safe() to write the JSON file with a temporary file and
+ * backup.
+ *
+ * @param data State object to save. No-op if NULL.
  */
 static void save_state(obs_data_t *data) {
-    if (!data)
+
+    if (!data) {
         return;
+    }
 
     char *path = get_state_path();
 
-    if (!path)
+    if (!path) {
         return;
+    }
 
     obs_data_save_json_safe(data, path, ".tmp", ".bak");
     bfree(path);
 }
 
+/**
+ * @brief Initialize the state subsystem.
+ *
+ * Loads the persisted state from disk into the global in-memory cache.
+ *
+ * @note Call once during plugin startup before using state_get_* / state_set_*.
+ */
 void io_load(void) {
     g_state = load_state();
 
@@ -100,6 +138,13 @@ void io_load(void) {
     (void)last_sync;
 }
 
+/**
+ * @brief Clear volatile/authentication state.
+ *
+ * This clears OAuth/Xbox tokens and identity fields from the persisted state and
+ * saves the file. Device-identifying values (UUID/serial/keys) are intentionally
+ * kept stable.
+ */
 void state_clear(void) {
     /* Considering how sensitive the Xbox live API appears, let's always keep the UUID / Serial / Keys constant */
     /*obs_data_set_string(g_state, DEVICE_UUID, "");*/
@@ -118,6 +163,11 @@ void state_clear(void) {
     save_state(g_state);
 }
 
+/**
+ * @brief Generate and persist a new device UUID.
+ *
+ * @return Pointer to the stored UUID string owned by the internal state object.
+ */
 static const char *create_device_uuid() {
     /* Generate a random device UUID */
     char new_device_uuid[37];
@@ -130,6 +180,11 @@ static const char *create_device_uuid() {
     return obs_data_get_string(g_state, DEVICE_UUID);
 }
 
+/**
+ * @brief Generate and persist a new device serial number.
+ *
+ * @return Pointer to the stored serial number string owned by the internal state object.
+ */
 static const char *create_device_serial_number() {
     /* Generate a random device UUID */
     char new_device_serial_number[37];
@@ -142,6 +197,14 @@ static const char *create_device_serial_number() {
     return obs_data_get_string(g_state, DEVICE_SERIAL_NUMBER);
 }
 
+/**
+ * @brief Generate and persist a new EC keypair for the emulated device.
+ *
+ * Generates a P-256 keypair, serializes it to JSON (including the private part)
+ * and stores it in the state.
+ *
+ * @return Pointer to the stored serialized key string owned by the internal state object.
+ */
 static const char *create_device_keys() {
     /* Generate a random key pair */
     EVP_PKEY *device_key = crypto_generate_keys();
@@ -159,9 +222,21 @@ static const char *create_device_keys() {
 }
 
 /**
- * Gets an existing device or create one if needed.
+ * @brief Get the current device identity/key material, creating it if missing.
  *
- * @return Device UUID
+ * The device UUID/serial and keypair are stored persistently. If any are missing,
+ * they are generated and saved.
+ *
+ * Ownership/lifetime:
+ *  - The returned device_t is allocated with bzalloc() and must be freed by the
+ *    caller.
+ *  - device->uuid and device->serial_number point to strings owned by the
+ *    internal obs_data_t state; they must not be freed and remain valid while
+ *    g_state remains loaded.
+ *  - device->keys is a newly created EVP_PKEY that must be freed by the caller
+ *    with EVP_PKEY_free().
+ *
+ * @return Newly allocated device_t on success, or NULL on failure.
  */
 device_t *state_get_device(void) {
 
@@ -193,6 +268,7 @@ device_t *state_get_device(void) {
         obs_log(LOG_ERROR, "Could not load device keys from state");
         return NULL;
     }
+
     device_t *device      = (device_t *)bzalloc(sizeof(device_t));
     device->uuid          = device_uuid;
     device->serial_number = device_serial_number;
@@ -201,11 +277,25 @@ device_t *state_get_device(void) {
     return device;
 }
 
+/**
+ * @brief Store the device token.
+ *
+ * @param device_token Token to store. The value is persisted.
+ */
 void state_set_device_token(const token_t *device_token) {
     obs_data_set_string(g_state, DEVICE_TOKEN, device_token->value);
     save_state(g_state);
 }
 
+/**
+ * @brief Retrieve the device token from the state.
+ *
+ * Ownership/lifetime:
+ *  - Returns a token_t allocated with bzalloc() that the caller must free.
+ *  - token->value points to a string owned by the internal state object.
+ *
+ * @return Token wrapper, or NULL if missing/expired.
+ */
 token_t *state_get_device_token(void) {
 
     const char *device_token = obs_data_get_string(g_state, DEVICE_TOKEN);
@@ -226,11 +316,21 @@ token_t *state_get_device_token(void) {
     return token;
 }
 
+/**
+ * @brief Store the SISU token.
+ *
+ * @param sisu_token Token to store. The value is persisted.
+ */
 void state_set_sisu_token(const token_t *sisu_token) {
     obs_data_set_string(g_state, SISU_TOKEN, sisu_token->value);
     save_state(g_state);
 }
 
+/**
+ * @brief Retrieve the SISU token from the state.
+ *
+ * @return Token wrapper allocated with bzalloc(), or NULL if missing/expired.
+ */
 token_t *state_get_sisu_token(void) {
 
     const char *sisu_token = obs_data_get_string(g_state, SISU_TOKEN);
@@ -251,6 +351,12 @@ token_t *state_get_sisu_token(void) {
     return token;
 }
 
+/**
+ * @brief Store the user access token and refresh token.
+ *
+ * @param user_token    Access token (value + expiry).
+ * @param refresh_token Refresh token.
+ */
 void state_set_user_token(const token_t *user_token, const token_t *refresh_token) {
     obs_data_set_string(g_state, USER_ACCESS_TOKEN, user_token->value);
     obs_data_set_int(g_state, USER_ACCESS_TOKEN_EXPIRY, user_token->expires);
@@ -258,6 +364,11 @@ void state_set_user_token(const token_t *user_token, const token_t *refresh_toke
     save_state(g_state);
 }
 
+/**
+ * @brief Retrieve the user access token from the state.
+ *
+ * @return Token wrapper allocated with bzalloc(), or NULL if missing/expired.
+ */
 token_t *state_get_user_token(void) {
 
     const char *user_token = obs_data_get_string(g_state, USER_ACCESS_TOKEN);
@@ -278,6 +389,11 @@ token_t *state_get_user_token(void) {
     return token;
 }
 
+/**
+ * @brief Retrieve the user refresh token from the state.
+ *
+ * @return Token wrapper allocated with bzalloc(), or NULL if missing.
+ */
 token_t *state_get_user_refresh_token(void) {
     const char *refresh_token = obs_data_get_string(g_state, USER_REFRESH_TOKEN);
 
@@ -292,6 +408,13 @@ token_t *state_get_user_refresh_token(void) {
     return token;
 }
 
+/**
+ * @brief Store the Xbox identity and associated Xbox token.
+ *
+ * Persists gamertag, xid, uhs, and the Xbox token+expiry.
+ *
+ * @param xbox_identity Identity object containing user details and token.
+ */
 void state_set_xbox_identity(const xbox_identity_t *xbox_identity) {
     obs_data_set_string(g_state, XBOX_IDENTITY_GTG, xbox_identity->gamertag);
     obs_data_set_string(g_state, XBOX_IDENTITY_ID, xbox_identity->xid);
@@ -301,6 +424,17 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity) {
     save_state(g_state);
 }
 
+/**
+ * @brief Retrieve the Xbox identity from the state.
+ *
+ * Ownership/lifetime:
+ *  - Returns an xbox_identity_t allocated with bzalloc() which the caller must
+ *    free, plus a nested token_t allocated with bzalloc().
+ *  - identity->gamertag/xid/uhs and token->value point to strings owned by the
+ *    internal state object.
+ *
+ * @return Identity object on success, or NULL if missing fields.
+ */
 xbox_identity_t *state_get_xbox_identity(void) {
 
     const char *gtg = obs_data_get_string(g_state, XBOX_IDENTITY_GTG);
