@@ -6,10 +6,14 @@
 #include <stdlib.h>
 
 /**
- * Opens the page at the URL in a browser.
+ * @brief Open a URL in the user's default web browser.
  *
- * @param url
- * @return
+ * Implementation notes:
+ *  - On macOS, this uses the shell command: open '<url>'
+ *  - On other platforms, it currently logs a warning and returns false.
+ *
+ * @param url NUL-terminated URL string to open. Must be non-NULL and non-empty.
+ * @return true on success, false on failure.
  */
 bool open_url(const char *url) {
     if (!url || !*url)

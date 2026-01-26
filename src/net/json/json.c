@@ -5,6 +5,35 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @file json.c
+ * @brief Implementation of lightweight JSON string extraction helpers.
+ *
+ * These functions intentionally avoid bringing in a full JSON DOM parser for a
+ * few narrow extraction cases (reading known fields from API responses).
+ *
+ * @warning This is not a full JSON parser. Limitations include:
+ *  - No array support.
+ *  - Only very simple key lookup and object traversal.
+ *  - No decoding of JSON escape sequences in returned strings.
+ *  - First-match semantics when a key appears multiple times.
+ *
+ * Ownership:
+ *  - All returned strings / values are allocated with OBS' allocator and must be
+ *    freed with bfree().
+ */
+
+/**
+ * @brief Read a JSON string property by key.
+ *
+ * This is a lightweight, best-effort string-based extractor. It searches for the
+ * first occurrence of the key (as "<key>") and then expects a ':' followed by a
+ * double-quoted string value.
+ *
+ * @param json JSON text.
+ * @param key  Property name to search.
+ * @return Newly allocated string value (caller must bfree()), or NULL if not found.
+ */
 char *json_read_string(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
@@ -50,6 +79,15 @@ char *json_read_string(const char *json, const char *key) {
     return out;
 }
 
+/**
+ * @brief Read a JSON integer property by key.
+ *
+ * Searches for the key and parses an unquoted base-10 integer using strtol().
+ *
+ * @param json JSON text.
+ * @param key  Property name to search.
+ * @return Newly allocated long* (caller must bfree()), or NULL if missing or not an integer.
+ */
 long *json_read_long(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
@@ -89,6 +127,13 @@ long *json_read_long(const char *json, const char *key) {
     return out_value;
 }
 
+/**
+ * @brief Duplicate a character range into a newly allocated NUL-terminated string.
+ *
+ * @param start First character in the range (inclusive).
+ * @param end   One past the last character in the range (exclusive).
+ * @return Newly allocated string (caller must bfree()), or NULL on invalid range.
+ */
 static char *dup_range(const char *start, const char *end) {
     if (!start || !end || end < start)
         return NULL;
@@ -100,20 +145,41 @@ static char *dup_range(const char *start, const char *end) {
     return out;
 }
 
+/**
+ * @brief Extract an object value (as a JSON substring) for a given key.
+ *
+ * Returns a substring that starts at '{' and ends right after the matching '}'.
+ * Handles nested objects and skips over quoted strings so braces inside strings
+ * don't affect depth counting.
+ *
+ * @param json JSON text.
+ * @param key  Object key to extract.
+ * @return Newly allocated JSON substring (caller must bfree()), or NULL on failure.
+ */
 static char *json_read_object_subjson(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
 
-    char *needle = bzalloc(strlen(key) + 32);
-    snprintf(needle, sizeof(needle), "\"%s\"", key);
+    const size_t needle_cap = strlen(key) + 3; /* quotes + NUL */
+    char        *needle     = bzalloc(needle_cap);
+    if (!needle)
+        return NULL;
+
+    snprintf(needle, needle_cap, "\"%s\"", key);
 
     const char *p = strstr(json, needle);
-    if (!p)
+    if (!p) {
+        bfree(needle);
         return NULL;
+    }
 
     p = strchr(p + strlen(needle), ':');
-    if (!p)
+    if (!p) {
+        bfree(needle);
         return NULL;
+    }
+
+    bfree(needle);
 
     p++; /* after ':' */
     while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
@@ -159,6 +225,16 @@ static char *json_read_object_subjson(const char *json, const char *key) {
     return NULL;
 }
 
+/**
+ * @brief Read a JSON string property using a dotted path.
+ *
+ * Traverses object keys by repeatedly extracting the object substring at each
+ * segment and then reading the final segment as a string.
+ *
+ * @param json JSON text.
+ * @param path Dot-separated path (e.g. "a.b.c").
+ * @return Newly allocated string value (caller must bfree()), or NULL if not found.
+ */
 char *json_read_string_from_path(const char *json, const char *path) {
     if (!json || !path || !*path)
         return NULL;
@@ -206,5 +282,6 @@ char *json_read_string_from_path(const char *json, const char *path) {
 cleanup:
     if (current_json)
         bfree(current_json);
+
     return result;
 }

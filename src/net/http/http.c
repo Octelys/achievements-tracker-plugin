@@ -6,22 +6,39 @@
 #include <curl/curl.h>
 #include <string.h>
 
+#define VERBOSE 0L
 #define DEFAULT_USER_AGENT "achievements-tracker-obs-plugin/1.0"
 
+/**
+ * @brief Growable NUL-terminated character buffer used for HTTP response bodies.
+ */
 struct http_buffer {
     char  *ptr;
     size_t len;
 };
 
+/**
+ * @brief Growable byte buffer used for binary downloads.
+ */
 struct image_buffer {
     uint8_t *data;
     size_t   size;
     size_t   capacity;
 };
 
+/**
+ * @brief libcurl write callback that appends received bytes into a growable buffer.
+ *
+ * The callback assumes @p userp points to a struct with a `ptr` member that is
+ * managed via OBS' allocators (brealloc/bfree). The buffer is always kept
+ * NUL-terminated so it can be treated as a C string.
+ *
+ * @return Number of bytes taken. Returning 0 signals an out-of-memory condition
+ *         to libcurl.
+ */
 static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t              realsize = size * nmemb;
-    struct http_buffer *mem      = (struct http_buffer *)userp;
+    struct http_buffer *mem      = userp;
 
     char *p = brealloc(mem->ptr, mem->len + realsize + 1);
 
@@ -35,6 +52,12 @@ static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *use
     return realsize;
 }
 
+/**
+ * @brief libcurl debug callback used when CURLOPT_VERBOSE is enabled.
+ *
+ * Logs text and HTTP headers at LOG_DEBUG. Data payloads are intentionally
+ * omitted because they can be large/noisy.
+ */
 static int curl_debug_cb(CURL *handle, curl_infotype type, char *data, size_t size, void *userptr) {
     (void)handle;
     (void)userptr;
@@ -53,6 +76,15 @@ static int curl_debug_cb(CURL *handle, curl_infotype type, char *data, size_t si
     return 0;
 }
 
+/**
+ * @brief POST application/x-www-form-urlencoded data.
+ *
+ * @param url           Target URL.
+ * @param post_fields   Form-encoded request body.
+ * @param out_http_code Optional output for HTTP status code.
+ * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
+ *         or NULL on libcurl failure.
+ */
 char *http_post_form(const char *url, const char *post_fields, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -69,7 +101,7 @@ char *http_post_form(const char *url, const char *post_fields, long *out_http_co
     struct curl_slist *headers = NULL;
     headers                    = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
     curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
     curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
 
@@ -106,6 +138,16 @@ char *http_post_form(const char *url, const char *post_fields, long *out_http_co
     return chunk.ptr;
 }
 
+/**
+ * @brief POST a raw request body with optional extra headers.
+ *
+ * @param url           Target URL.
+ * @param body          Request body (may be NULL).
+ * @param extra_headers Optional additional headers, one per line (LF or CRLF).
+ * @param out_http_code Optional output for HTTP status code.
+ * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
+ *         or NULL on libcurl failure.
+ */
 char *http_post(const char *url, const char *body, const char *extra_headers, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -150,7 +192,7 @@ char *http_post(const char *url, const char *body, const char *extra_headers, lo
         bfree(dup);
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
     curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
     curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
 
@@ -185,6 +227,18 @@ char *http_post(const char *url, const char *body, const char *extra_headers, lo
     return chunk.ptr;
 }
 
+/**
+ * @brief POST a JSON request body with optional extra headers.
+ *
+ * Automatically adds "Content-Type: application/json".
+ *
+ * @param url           Target URL.
+ * @param json_body     JSON request body.
+ * @param extra_headers Optional additional headers, one per line (LF or CRLF).
+ * @param out_http_code Optional output for HTTP status code.
+ * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
+ *         or NULL on libcurl failure.
+ */
 char *http_post_json(const char *url, const char *json_body, const char *extra_headers, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -230,7 +284,7 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
         bfree(dup);
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
     curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
     curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
 
@@ -266,6 +320,16 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
     return chunk.ptr;
 }
 
+/**
+ * @brief Perform an HTTP GET request with optional headers.
+ *
+ * @param url           Target URL.
+ * @param extra_headers Optional additional headers, one per line (LF or CRLF).
+ * @param post_fields   Optional body passed to libcurl via CURLOPT_POSTFIELDS.
+ * @param out_http_code Optional output for HTTP status code.
+ * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
+ *         or NULL on libcurl failure.
+ */
 char *http_get(const char *url, const char *extra_headers, const char *post_fields, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -311,7 +375,7 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
         bfree(dup);
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
     curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
     curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
 
@@ -349,6 +413,14 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
     return chunk.ptr;
 }
 
+/**
+ * @brief URL-encode a string (percent-encoding).
+ *
+ * Uses libcurl's escaping rules and returns a copy allocated with bstrdup.
+ *
+ * @param in Input string.
+ * @return Newly allocated encoded string (caller must bfree()), or NULL on error.
+ */
 char *http_urlencode(const char *in) {
     if (!in)
         return NULL;
@@ -369,6 +441,14 @@ char *http_urlencode(const char *in) {
     return out;
 }
 
+/**
+ * @brief Download a resource into a raw byte buffer.
+ *
+ * @param url      Resource URL.
+ * @param out_data Receives a newly allocated buffer. Caller must bfree().
+ * @param out_size Receives the number of bytes written into @p out_data.
+ * @return true on success, false on failure.
+ */
 bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
 
     if (!url || !out_data || !out_size)
