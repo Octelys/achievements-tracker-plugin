@@ -1,15 +1,11 @@
 #include "parsers.h"
 
-#include "cJSON.h"
-#include "cJSON_Utils.h"
-
 #include <obs-module.h>
-#include <diagnostics/log.h>
-
-#include <stdio.h>
+#include <cJSON.h>
+#include <cJSON_Utils.h>
 #include <string.h>
-#include <strings.h>
-#include <stdlib.h>
+#include <common/types.h>
+#include <diagnostics/log.h>
 
 /**
  * @file parsers.c
