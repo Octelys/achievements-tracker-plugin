@@ -1,5 +1,27 @@
 #include "oauth/xbox-live.h"
 
+/**
+ * @file xbox-live.c
+ * @brief Xbox Live authentication flow implementation.
+ *
+ * High-level flow:
+ *  1) Acquire a user access token via Microsoft device-code flow.
+ *     - Prefer cached access token if available.
+ *     - Otherwise, prefer cached refresh token.
+ *     - Otherwise, request a device_code/user_code and open the browser for the user.
+ *     - Poll TOKEN_ENDPOINT until the user authorizes and tokens are returned.
+ *  2) Acquire a device token (Proof-of-Possession) using the emulated device identity.
+ *     - Prefer cached device token if available and not expired.
+ *  3) Acquire a SISU token and persist the Xbox identity data.
+ *
+ * The work is performed on a background pthread; completion is reported via the
+ * callback provided to xbox_live_authenticate().
+ *
+ * @note This module relies on other helpers for persistence (state_*), JSON
+ *       extraction (json_*), HTTP (http_*), signing (crypto_sign), and opening a
+ *       browser (open_url).
+ */
+
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
@@ -30,27 +52,53 @@
 #define SCOPE "service::user.auth.xboxlive.com::MBI_SSL"
 
 typedef struct authentication_ctx {
-    /* Input parameters */
-    const device_t              *device;
-    pthread_t                    thread;
+    /** Input device identity (owned by caller; must outlive the flow). */
+    const device_t *device;
+
+    /** Background worker thread running the flow. */
+    pthread_t thread;
+
+    /** Completion callback invoked when the flow finishes (success or error). */
     on_xbox_live_authenticated_t on_completed;
-    void                        *on_completed_data;
 
-    /* Parameters of the user token polling */
+    /** Opaque pointer forwarded to on_completed. */
+    void *on_completed_data;
+
+    /** Device-code flow: device_code (allocated). */
     char *device_code;
-    long  interval_in_seconds;
-    long  sleep_time;
-    long  expires_in_seconds;
 
+    /** Device-code flow: server-provided polling interval in seconds. */
+    long interval_in_seconds;
+
+    /** Sleep time (currently unused / reserved). */
+    long sleep_time;
+
+    /** Device-code flow: device-code expiry in seconds. */
+    long expires_in_seconds;
+
+    /** Result struct holding any error message / status for the caller. */
     xbox_live_authenticate_result_t result;
 
-    /* Returned values */
+    /** Access token obtained for the current user (allocated/persisted elsewhere). */
     token_t *user_token;
+
+    /** Refresh token for the current user (allocated/persisted elsewhere). */
     token_t *refresh_token;
+
+    /** Device (PoP) token used for SISU/device authentication (allocated/persisted elsewhere). */
     token_t *device_token;
 
 } authentication_ctx_t;
 
+//  --------------------------------------------------------------------------------------------------------------------
+//  Private
+//  --------------------------------------------------------------------------------------------------------------------
+
+/**
+ * @brief Notify the caller that the authentication flow has completed.
+ *
+ * This simply invokes the caller-provided callback (if any).
+ */
 static void complete(authentication_ctx_t *ctx) {
 
     if (!ctx->on_completed) {
@@ -61,9 +109,17 @@ static void complete(authentication_ctx_t *ctx) {
 }
 
 /**
- * Retrieves the sisu token
+ * @brief Retrieve the SISU token and persist Xbox identity data.
  *
- * @param ctx
+ * This creates and signs a SISU_AUTHENTICATE request using the device PoP key,
+ * then extracts:
+ *  - AuthorizationToken.Token (the Xbox token)
+ *  - xid, uhs, gtg (identity)
+ *  - NotAfter (expiry)
+ *
+ * The resulting identity is persisted using state_set_xbox_identity().
+ *
+ * On success or failure, this function calls complete(ctx).
  */
 static void retrieve_sisu_token(authentication_ctx_t *ctx) {
 
@@ -247,9 +303,13 @@ cleanup:
 }
 
 /**
- * Retrieves the device token
+ * @brief Retrieve the device PoP token required for SISU.
  *
- * @param ctx
+ * If a cached device token exists, it is reused. Otherwise this signs and sends
+ * a request to DEVICE_AUTHENTICATE and parses Token/NotAfter from the response.
+ *
+ * On success, the device token is persisted and the flow proceeds to
+ * retrieve_sisu_token(). On failure it calls complete(ctx).
  */
 static void retrieve_device_token(struct authentication_ctx *ctx) {
 
@@ -401,10 +461,11 @@ cleanup:
 }
 
 /**
+ * @brief Refresh the user access token using a cached refresh token.
  *
- *
- * @param ctx
- * @return
+ * Sends a request to TOKEN_ENDPOINT and extracts access_token, refresh_token and
+ * expires_in. On success it persists the tokens and proceeds to
+ * retrieve_device_token(). On failure it calls complete(ctx).
  */
 static void refresh_user_token(authentication_ctx_t *ctx) {
 
@@ -497,10 +558,14 @@ cleanup:
 }
 
 /**
- *  Waits for the user token to be available
+ * @brief Poll TOKEN_ENDPOINT until the user completes device-code verification.
  *
- * @param ctx
- * @return
+ * This repeatedly sleeps for the server-provided interval and performs a GET to
+ * TOKEN_ENDPOINT with device_code and grant_type. When a 200 response includes
+ * access_token/refresh_token/expires_in, the tokens are persisted and the flow
+ * proceeds to retrieve_device_token().
+ *
+ * On timeout/expiry or parse failure, the flow completes with an error.
  */
 static void poll_for_user_token(authentication_ctx_t *ctx) {
 
@@ -590,10 +655,14 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
 }
 
 /**
- * Starts the authentication process by trying to get a user token
+ * @brief Worker thread entry point running the full authentication flow.
  *
- * @param param
- * @return
+ * Order of preference:
+ *  1) If a non-expired cached user token exists, reuse it.
+ *  2) Else if a refresh token exists, refresh the user token.
+ *  3) Else perform device-code flow: request codes, open browser, poll.
+ *
+ * Final step after user token is available: retrieve device token + SISU token.
  */
 static void *start_authentication_flow(void *param) {
 
@@ -737,6 +806,23 @@ cleanup:
     return (void *)false;
 }
 
+//  --------------------------------------------------------------------------------------------------------------------
+//  Public
+//  --------------------------------------------------------------------------------------------------------------------
+
+/**
+ * @brief Start Xbox Live authentication on a background thread.
+ *
+ * Allocates an internal authentication context and launches a pthread.
+ * Completion is signaled via @p callback.
+ *
+ * @param device   Device identity (UUID/serial/keypair) used for PoP signing.
+ *                 Must remain valid for the duration of the authentication.
+ * @param data     Opaque pointer passed back to @p callback.
+ * @param callback Completion callback (must be non-NULL).
+ *
+ * @return true if the worker thread was successfully created; false otherwise.
+ */
 bool xbox_live_authenticate(const device_t *device, void *data, on_xbox_live_authenticated_t callback) {
 
     /* Defines the structure that will filled up by the different authentication steps */

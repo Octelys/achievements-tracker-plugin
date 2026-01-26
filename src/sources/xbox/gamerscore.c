@@ -1,5 +1,26 @@
 #include "sources/xbox/gamerscore.h"
 
+/**
+ * @file gamerscore.c
+ * @brief OBS source that renders the currently authenticated Xbox account's gamerscore.
+ *
+ * This source displays a numeric gamerscore by drawing digits from a pre-baked
+ * font sheet (atlas). Digits are extracted as subregions from the atlas texture
+ * and drawn sequentially.
+ *
+ * Data flow:
+ *  - The Xbox monitor notifies this module when connection state changes and/or
+ *    achievement progress updates.
+ *  - The module computes the latest gamerscore and stores it in a global.
+ *  - During rendering, the current gamerscore is formatted to text and each
+ *    digit is drawn from the font sheet texture.
+ *
+ * Threading notes:
+ *  - Event handlers may be invoked from non-graphics threads.
+ *  - Texture creation must happen on the OBS graphics thread; this file lazily
+ *    initializes the texture in the video_render callback.
+ */
+
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
 #include <obs-module.h>
@@ -13,20 +34,47 @@
 #define NO_FLIP 0
 
 typedef struct xbox_account_source {
+    /** OBS source instance. */
     obs_source_t *source;
-    uint32_t      width;
-    uint32_t      height;
+
+    /** Output width in pixels. */
+    uint32_t width;
+
+    /** Output height in pixels. */
+    uint32_t height;
 } xbox_account_source_t;
 
-static int64_t                     g_gamerscore = 0;
+/**
+ * @brief Latest computed gamerscore for the authenticated account.
+ */
+static int64_t g_gamerscore = 0;
+
+/**
+ * @brief Configuration for rendering digits from the font sheet.
+ *
+ * Stored as a module-global pointer and initialized during
+ * xbox_gamerscore_source_register().
+ */
 static gamerscore_configuration_t *g_default_configuration;
 
+/**
+ * @brief Loaded font sheet image/texture (digit atlas).
+ *
+ * gs_image_file_t holds decoded CPU-side image data and (after
+ * gs_image_file_init_texture()) the GPU texture handle.
+ */
 gs_image_file_t g_font_sheet_image;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
+/**
+ * @brief Load (and decode) the configured font sheet image.
+ *
+ * This initializes g_font_sheet_image using the configured path.
+ * Texture creation is deferred until rendering (see on_source_video_render()).
+ */
 static void load_font_sheet() {
 
     if (!g_default_configuration) {
@@ -49,6 +97,11 @@ static void load_font_sheet() {
     }
 }
 
+/**
+ * @brief Recompute and store the latest gamerscore.
+ *
+ * @param gamerscore Gamerscore snapshot received from the Xbox monitor.
+ */
 static void update_gamerscore(const gamerscore_t *gamerscore) {
 
     g_gamerscore = gamerscore_compute(gamerscore);
@@ -56,6 +109,15 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
     obs_log(LOG_INFO, "Gamerscore is %" PRId64, g_gamerscore);
 }
 
+/**
+ * @brief Xbox monitor callback invoked when connection state changes.
+ *
+ * When connected, this refreshes the gamerscore display.
+ *
+ * @param is_connected Whether the account is currently connected.
+ * @param gamerscore   Current gamerscore snapshot.
+ * @param error_message Optional error message if disconnected (ignored here).
+ */
 static void on_connection_changed(bool is_connected, const gamerscore_t *gamerscore, const char *error_message) {
 
     UNUSED_PARAMETER(error_message);
@@ -67,6 +129,14 @@ static void on_connection_changed(bool is_connected, const gamerscore_t *gamersc
     update_gamerscore(gamerscore);
 }
 
+/**
+ * @brief Xbox monitor callback invoked when achievements progress.
+ *
+ * Recomputes the gamerscore based on the updated snapshot.
+ *
+ * @param gamerscore Updated gamerscore snapshot.
+ * @param progress   Achievement progress details (unused).
+ */
 static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
 
     UNUSED_PARAMETER(progress);
@@ -78,6 +148,13 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
 //	Source callbacks
 //  --------------------------------------------------------------------------------------------------------------------
 
+/**
+ * @brief OBS callback creating a new gamerscore source instance.
+ *
+ * @param settings Source settings (unused).
+ * @param source   OBS source instance.
+ * @return Newly allocated xbox_account_source_t.
+ */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
@@ -90,6 +167,9 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     return s;
 }
 
+/**
+ * @brief OBS callback destroying a gamerscore source instance.
+ */
 static void on_source_destroy(void *data) {
 
     xbox_account_source_t *source = data;
@@ -101,21 +181,37 @@ static void on_source_destroy(void *data) {
     bfree(source);
 }
 
+/** @brief OBS callback returning the configured source width. */
 static uint32_t source_get_width(void *data) {
     const xbox_account_source_t *s = data;
     return s->width;
 }
 
+/** @brief OBS callback returning the configured source height. */
 static uint32_t source_get_height(void *data) {
     const xbox_account_source_t *s = data;
     return s->height;
 }
 
+/**
+ * @brief OBS callback invoked when settings change.
+ *
+ * Currently unused.
+ */
 static void on_source_update(void *data, obs_data_t *settings) {
     UNUSED_PARAMETER(data);
     UNUSED_PARAMETER(settings);
 }
 
+/**
+ * @brief OBS callback to render the gamerscore digits.
+ *
+ * Lazily initializes the font sheet texture (if needed) and draws each digit of
+ * the current gamerscore using gs_draw_sprite_subregion().
+ *
+ * @param data   Source instance data (unused).
+ * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
+ */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
     UNUSED_PARAMETER(data);
     UNUSED_PARAMETER(effect);
@@ -180,6 +276,11 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 }
 
+/**
+ * @brief OBS callback constructing the properties UI.
+ *
+ * Exposes configuration of the font sheet path and digit glyph metrics.
+ */
 static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
@@ -203,12 +304,16 @@ static obs_properties_t *source_get_properties(void *data) {
     return p;
 }
 
+/** @brief OBS callback returning the display name for this source type. */
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
     return "Xbox Gamerscore";
 }
 
+/**
+ * @brief obs_source_info describing the Xbox Gamerscore source.
+ */
 static struct obs_source_info xbox_gamerscore_source = {
     .id             = "xbox_gamerscore_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
@@ -224,6 +329,9 @@ static struct obs_source_info xbox_gamerscore_source = {
     .video_render   = on_source_video_render,
 };
 
+/**
+ * @brief Get the obs_source_info for registration.
+ */
 static const struct obs_source_info *xbox_source_get(void) {
     return &xbox_gamerscore_source;
 }
@@ -233,7 +341,10 @@ static const struct obs_source_info *xbox_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
+ * @brief Register the Xbox Gamerscore source with OBS.
  *
+ * Registers the source type and subscribes to Xbox monitor events so the
+ * displayed gamerscore stays up to date.
  */
 void xbox_gamerscore_source_register(void) {
 

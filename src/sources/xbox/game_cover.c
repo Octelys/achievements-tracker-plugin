@@ -1,5 +1,22 @@
 #include "sources/xbox/game_cover.h"
 
+/**
+ * @file game_cover.c
+ * @brief OBS source that renders the cover art for the currently played Xbox game.
+ *
+ * Responsibilities:
+ *  - Subscribe to Xbox game-played events.
+ *  - Download cover art when the game changes.
+ *  - Load the image into an OBS gs_texture_t on the graphics thread.
+ *  - Render the texture in the source's video_render callback.
+ *
+ * Threading notes:
+ *  - Downloading happens on the calling thread of on_xbox_game_played() (currently
+ *    synchronous).
+ *  - Texture creation/destruction must happen on the OBS graphics thread; this
+ *    file uses obs_enter_graphics()/obs_leave_graphics() to ensure that.
+ */
+
 #include <graphics/graphics.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
@@ -16,18 +33,36 @@
 #include <net/http/http.h>
 
 typedef struct xbox_game_cover_source {
+    /** OBS source instance. */
     obs_source_t *source;
-    uint32_t      width;
-    uint32_t      height;
+
+    /** Source draw width in pixels (used by get_width/video_render). */
+    uint32_t width;
+
+    /** Source draw height in pixels (used by get_height/video_render). */
+    uint32_t height;
 } xbox_game_cover_source_t;
 
-/* Keeps track of the game cover image data */
+/**
+ * @brief Runtime cache for the downloaded cover art image.
+ */
 typedef struct game_cover {
-    char          image_path[512];
+    /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
+    char image_path[512];
+
+    /** GPU texture created from the downloaded image (owned by this module). */
     gs_texture_t *image_texture;
-    bool          must_reload;
+
+    /** If true, the next render tick should reload the texture from image_path. */
+    bool must_reload;
 } game_cover_t;
 
+/**
+ * @brief Global singleton cover cache.
+ *
+ * This source is implemented as a singleton that stores the current cover art in
+ * a global cache.
+ */
 static game_cover_t g_game_cover;
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -35,9 +70,12 @@ static game_cover_t g_game_cover;
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * Downloads the game box art from the specified URL and saves it in a temporary file.
+ * @brief Download cover art from an URL into a temporary file.
  *
- * @param image_url
+ * The file path is stored in g_game_cover.image_path and g_game_cover.must_reload
+ * is set to true so the graphics thread can create a texture on the next render.
+ *
+ * @param image_url Cover art URL. If NULL or empty, this function is a no-op.
  */
 static void download_box_art_from_url(const char *image_url) {
 
@@ -78,11 +116,12 @@ static void download_box_art_from_url(const char *image_url) {
 }
 
 /**
- *  Loads the game box art into the texture, if needed.
+ * @brief Load the downloaded cover image into a gs_texture_t.
  *
- *  Use OBS's gs_texture_create_from_file with a temp file, or decode manually.
- *  OBS doesn't have a direct "from memory" for arbitrary formats, so we use
- *  `gs_create_texture_file_data` which can decode PNG/JPEG from memory.
+ * If g_game_cover.must_reload is false, this function does nothing.
+ *
+ * This must be called from a context where entering/leaving graphics is allowed
+ * (typically from video_render).
  */
 static void load_texture_from_file() {
 
@@ -119,8 +158,11 @@ static void load_texture_from_file() {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * Called when a new game is being played.
- * @param game
+ * @brief Event handler called when a new game starts being played.
+ *
+ * Fetches the cover-art URL for the given game and triggers a download.
+ *
+ * @param game Currently played game information.
  */
 static void on_xbox_game_played(const game_t *game) {
 
@@ -136,16 +178,19 @@ static void on_xbox_game_played(const game_t *game) {
 //	Source callbacks
 //  --------------------------------------------------------------------------------------------------------------------
 
+/** @brief OBS callback returning the source width. */
 static uint32_t source_get_width(void *data) {
     const xbox_game_cover_source_t *s = data;
     return s->width;
 }
 
+/** @brief OBS callback returning the source height. */
 static uint32_t source_get_height(void *data) {
     const xbox_game_cover_source_t *s = data;
     return s->height;
 }
 
+/** @brief OBS callback returning the display name for the source type. */
 static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
@@ -153,6 +198,13 @@ static const char *source_get_name(void *unused) {
     return "Xbox Game Cover";
 }
 
+/**
+ * @brief OBS callback creating a new source instance.
+ *
+ * @param settings OBS settings object (currently unused).
+ * @param source   OBS source instance.
+ * @return Newly allocated xbox_game_cover_source_t.
+ */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
@@ -165,6 +217,11 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     return s;
 }
 
+/**
+ * @brief OBS callback destroying a source instance.
+ *
+ * Frees the instance data and any global image resources.
+ */
 static void on_source_destroy(void *data) {
 
     xbox_game_cover_source_t *source = data;
@@ -184,9 +241,9 @@ static void on_source_destroy(void *data) {
 }
 
 /**
+ * @brief OBS callback invoked when source settings change.
  *
- * @param data
- * @param settings
+ * Currently unused (no editable settings).
  */
 static void on_source_update(void *data, obs_data_t *settings) {
 
@@ -204,6 +261,11 @@ static void on_source_update(void *data, obs_data_t *settings) {
     */
 }
 
+/**
+ * @brief OBS callback to render the source.
+ *
+ * Loads a new texture if required and draws it using draw_texture().
+ */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
     xbox_game_cover_source_t *source = data;
@@ -219,15 +281,13 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     if (g_game_cover.image_texture) {
         draw_texture(g_game_cover.image_texture, source->width, source->height, effect);
     }
-
-    /* Let the child (Text FT2) render into our source */
-    /*
-    if (source->child_text) {
-        obs_source_video_render(source->child_text);
-    }
-    */
 }
 
+/**
+ * @brief OBS callback to construct the properties UI.
+ *
+ * Shows connection status, gamerscore, and the currently played game.
+ */
 static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
@@ -269,7 +329,7 @@ static obs_properties_t *source_get_properties(void *data) {
 }
 
 /**
- * Configuration of the Xbox game cover source.
+ * @brief obs_source_info for the Xbox Game Cover source.
  */
 static struct obs_source_info xbox_game_cover_source_info = {
     .id             = "xbox_game_cover_source",
@@ -286,6 +346,9 @@ static struct obs_source_info xbox_game_cover_source_info = {
     .video_tick     = NULL,
 };
 
+/**
+ * @brief Get a pointer to this source type's obs_source_info.
+ */
 static const struct obs_source_info *xbox_game_cover_source_get(void) {
     return &xbox_game_cover_source_info;
 }
@@ -295,8 +358,10 @@ static const struct obs_source_info *xbox_game_cover_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * Registers the Xbox game cover source with the OBS source system.
- * This allows the Xbox game cover source to be available for use within OBS.
+ * @brief Register the Xbox Game Cover source with OBS.
+ *
+ * Registers the source type, then subscribes to Xbox game-played events so the
+ * cover art gets refreshed when the current game changes.
  */
 void xbox_game_cover_source_register(void) {
 
