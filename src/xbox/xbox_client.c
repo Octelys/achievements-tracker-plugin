@@ -1,5 +1,26 @@
 #include "xbox_client.h"
 
+/**
+ * @file xbox_client.c
+ * @brief Xbox HTTP client helpers (presence, profile, title art, achievements).
+ *
+ * This module provides a small set of convenience functions that call Xbox Live
+ * REST endpoints using the currently authenticated Xbox identity from the
+ * persistent state.
+ *
+ * Common requirements:
+ *  - Most functions require an authenticated identity to be present (see
+ *    state_get_xbox_identity()).
+ *  - Requests use the "Authorization: XBL3.0 x=<uhs>;<token>" header and a
+ *    contract version header.
+ *
+ * Allocation/ownership:
+ *  - Functions returning strings or linked lists allocate them with OBS
+ *    allocators (bstrdup/bzalloc) and/or libc strdup.
+ *  - Callers must free returned objects appropriately (e.g., bfree/free_game/
+ *    free_achievement depending on the type).
+ */
+
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
@@ -25,7 +46,7 @@
 #define XBOX_GAME_COVER_BOX_ART_TYPE        "boxart"
 
 /**
- * @brief Fetches the cover image URL for a given game.
+ * @brief Fetch the cover image URL for a given game.
  *
  * Calls the Xbox TitleHub decoration/image endpoint and attempts to extract a
  * poster or box art image URL from the response. If no such image is available,
@@ -34,10 +55,8 @@
  * Requires an authenticated Xbox identity to be present in the persistent state.
  *
  * @param game Game to fetch the cover for (may be NULL).
- *
- * @return Newly allocated URL string, or NULL on error / if not available.
- *         The caller owns the returned string and must free it with @c bfree()
- *         (or @ref free_memory).
+ * @return Newly allocated URL string on success, or NULL on error / if not
+ *         available. The caller owns the returned string and must free it.
  */
 char *xbox_get_game_cover(const game_t *game) {
 
@@ -150,15 +169,13 @@ cleanup:
 }
 
 /**
- * @brief Fetches the current user's gamerscore.
+ * @brief Fetch the current user's gamerscore.
  *
  * Performs a profile batch settings call and extracts the "Gamerscore" setting.
  * Requires an authenticated Xbox identity to be present in the persistent state.
  *
  * @param[out] out_gamerscore Output location for the gamerscore value.
- *
- * @return True if the gamerscore was successfully retrieved and parsed; false
- *         otherwise.
+ * @return true if the gamerscore was successfully retrieved and parsed; false otherwise.
  */
 bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
 
@@ -246,17 +263,16 @@ cleanup:
 }
 
 /**
- * @brief Retrieves the game currently being played by the authenticated user.
+ * @brief Retrieve the game currently being played by the authenticated user.
  *
  * Calls the Xbox Presence endpoint and searches for the first non-"Home" title
  * with state "Active".
  *
  * Notes:
- * - Requires an authenticated Xbox identity to be present in the persistent state.
- * - The returned @c game_t owns its @c id and @c title strings.
- * - The caller must free the returned game with @ref free_game.
+ *  - Requires an authenticated Xbox identity to be present in the persistent state.
+ *  - The returned game_t owns its id/title strings.
  *
- * @return Newly allocated @c game_t on success, or NULL if the user is offline,
+ * @return Newly allocated game_t on success, or NULL if the user is offline,
  *         no active game is found, or on error.
  */
 game_t *xbox_get_current_game(void) {
@@ -294,6 +310,7 @@ game_t *xbox_get_current_game(void) {
     response_json  = http_get(presence_url, headers, NULL, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
+        /* Retry? */
         obs_log(LOG_ERROR, "Failed to fetch the current game: received status code %d", http_code);
         goto cleanup;
     }
@@ -380,18 +397,16 @@ cleanup:
 }
 
 /**
- * @brief Retrieves the list of achievements for a game.
+ * @brief Retrieve the list of achievements for a given game.
  *
  * Calls the achievements endpoint for the authenticated user and parses the
- * response JSON into an @c achievement_t linked list.
+ * response JSON into an achievement_t linked list.
  *
  * Requires an authenticated Xbox identity to be present in the persistent state.
  *
  * @param game Game for which achievements should be fetched (may be NULL).
- *
- * @return Head of a newly allocated linked list of achievements, or NULL on
- *         error. The caller owns the returned list and must free it with
- *         @ref free_achievement.
+ * @return Head of a newly allocated linked list of achievements, or NULL on error.
+ *         The caller owns the returned list and must free it.
  */
 achievement_t *xbox_get_game_achievements(const game_t *game) {
 

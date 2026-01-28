@@ -348,7 +348,9 @@ static const struct obs_source_info *xbox_source_get(void) {
  */
 void xbox_gamerscore_source_register(void) {
 
-    g_default_configuration                  = bzalloc(sizeof(gamerscore_configuration_t));
+    g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
+
+    /* TODO A default font sheet path should be embedded with the plugin */
     g_default_configuration->font_sheet_path = "/Users/christophe/Downloads/font_sheet.png";
     g_default_configuration->offset_x        = 0;
     g_default_configuration->offset_y        = 0;

@@ -47,6 +47,23 @@ typedef void (*on_xbox_live_authenticated_t)(void *data);
  */
 bool xbox_live_authenticate(const device_t *device, void *data, on_xbox_live_authenticated_t callback);
 
+/**
+ * @brief Get the currently persisted Xbox identity (if any).
+ *
+ * This is a convenience accessor that returns the Xbox identity data previously
+ * obtained during authentication.
+ *
+ * Ownership/lifetime:
+ *  - The returned pointer is owned by the caller.
+ *  - The exact allocation/free contract depends on the implementation. In the
+ *    current codebase, identity objects are typically allocated and returned by
+ *    the state subsystem (see state_get_xbox_identity()), and should be freed by
+ *    the caller when no longer needed.
+ *
+ * @return An xbox_identity_t on success, or NULL if no identity is available.
+ */
+xbox_identity_t *xbox_live_get_identity(void);
+
 #ifdef __cplusplus
 }
 #endif
