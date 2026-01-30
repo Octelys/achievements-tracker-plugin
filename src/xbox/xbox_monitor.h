@@ -53,13 +53,28 @@ typedef void (*on_xbox_achievements_progressed_t)(const gamerscore_t           *
  * @brief Callback invoked when the connection status changes.
  *
  * @param connected     true if connected; false if disconnected.
- * @param gamerscore    Current gamerscore snapshot (may be NULL if not available).
  * @param error_message Error message if disconnected due to an error; otherwise NULL.
  */
-typedef void (*on_xbox_connection_changed_t)(bool connected, const gamerscore_t *gamerscore, const char *error_message);
+typedef void (*on_xbox_connection_changed_t)(bool connected, const char *error_message);
+
+/**
+ * @brief Get the most recently cached gamerscore snapshot.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitor and may be
+ * replaced on the next incoming update. Copy it if you need to keep it.
+ *
+ * Threading: safe to call from any thread but the returned object may change
+ * asynchronously while monitoring is running.
+ *
+ * @return Pointer to the current gamerscore snapshot, or NULL if unknown.
+ */
+const gamerscore_t *get_current_gamerscore(void);
 
 /**
  * @brief Get the most recently detected currently played game.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitor and remains
+ * valid until the next update or until monitoring stops.
  *
  * @return Pointer to the current game, or NULL if none is known.
  */
@@ -67,6 +82,9 @@ const game_t *get_current_game(void);
 
 /**
  * @brief Get the most recently cached achievements list for the current game.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitor and remains
+ * valid until the next update or until monitoring stops.
  *
  * @return Pointer to the cached achievements list, or NULL if not available.
  */
@@ -96,6 +114,8 @@ bool xbox_monitoring_is_active(void);
 /**
  * @brief Subscribe to game-played events.
  *
+ * Passing NULL clears/unsubscribes the callback.
+ *
  * @param callback Callback invoked when the current game changes.
  */
 void xbox_subscribe_game_played(on_xbox_game_played_t callback);
@@ -103,12 +123,16 @@ void xbox_subscribe_game_played(on_xbox_game_played_t callback);
 /**
  * @brief Subscribe to achievement progress events.
  *
+ * Passing NULL clears/unsubscribes the callback.
+ *
  * @param callback Callback invoked when achievement progress is received.
  */
 void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t callback);
 
 /**
  * @brief Subscribe to connection state change events.
+ *
+ * Passing NULL clears/unsubscribes the callback.
  *
  * @param callback Callback invoked when connectivity changes.
  */

@@ -115,16 +115,14 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
  * When connected, this refreshes the gamerscore display.
  *
  * @param is_connected Whether the account is currently connected.
- * @param gamerscore   Current gamerscore snapshot.
  * @param error_message Optional error message if disconnected (ignored here).
  */
-static void on_connection_changed(bool is_connected, const gamerscore_t *gamerscore, const char *error_message) {
+static void on_connection_changed(bool is_connected, const char *error_message) {
 
+    UNUSED_PARAMETER(is_connected);
     UNUSED_PARAMETER(error_message);
 
-    if (!is_connected) {
-        return;
-    }
+    const gamerscore_t *gamerscore = get_current_gamerscore();
 
     update_gamerscore(gamerscore);
 }

@@ -9,6 +9,19 @@ extern "C" {
 #endif
 
 /**
+ * @file xbox_session.h
+ * @brief In-memory session state for Xbox monitoring.
+ *
+ * A session tracks the “currently played game” and any derived/cached state
+ * associated with that game (achievements list, unlocked achievements, cached
+ * gamerscore snapshot, etc.).
+ *
+ * Threading:
+ *  - Not inherently thread-safe. Callers should ensure session mutation happens
+ *    from a single thread or is externally synchronized.
+ */
+
+/**
  * @brief Checks whether the session is currently associated with the given game.
  *
  * Typically used to detect when the user has started playing a different title.
@@ -27,6 +40,11 @@ bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game);
  * cached session state derived from that game (e.g., achievements list and
  * gamerscore).
  *
+ * Ownership:
+ *  - The session makes its own copy of @p game. The caller retains ownership of
+ *    the passed-in @p game and remains responsible for freeing it.
+ *  - If @p game is NULL, the session is cleared.
+ *
  * @param session Session to update.
  * @param game New game to set for this session.
  */
@@ -35,13 +53,30 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game);
 /**
  * @brief Applies an unlock/progress update to the session.
  *
- * Updates the session state (achievement list, unlocked achievements, gamerscore
- * deltas, etc.) based on the provided progress event.
+ * Updates session-derived state (achievement list, unlocked achievements,
+ * gamerscore deltas, etc.) based on the provided progress event.
  *
  * @param session Session to update.
  * @param progress Progress information for the achievement being unlocked.
  */
-void xbox_session_unlock_achievement(const xbox_session_t *session, const achievement_progress_t *progress);
+void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_progress_t *progress);
+
+/**
+ * @brief Clears all session state.
+ *
+ * Resets the current game and any cached/derived state (achievements list,
+ * unlocked achievements list, cached gamerscore, etc.) to an empty state.
+ *
+ * This is typically used when disconnecting, when the identity changes, or when
+ * starting a fresh monitoring run.
+ *
+ * Ownership:
+ *  - Frees any heap allocations owned by the session.
+ *  - Does not free the session object itself.
+ *
+ * @param session Session to clear (must be non-NULL).
+ */
+void xbox_session_clear(xbox_session_t *session);
 
 #ifdef __cplusplus
 }

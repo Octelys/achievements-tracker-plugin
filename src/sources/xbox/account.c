@@ -75,6 +75,8 @@ static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *propert
 
     schedule_refresh_properties(data);
 
+    xbox_monitoring_stop();
+
     return true;
 }
 

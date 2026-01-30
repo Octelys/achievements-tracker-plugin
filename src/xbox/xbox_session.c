@@ -116,7 +116,7 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game) {
  * @param progress Progress update indicating which achievement was unlocked
  *        (may be NULL).
  */
-void xbox_session_unlock_achievement(const xbox_session_t *session, const achievement_progress_t *progress) {
+void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_progress_t *progress) {
 
     if (!session || !progress) {
         return;
@@ -183,4 +183,27 @@ void xbox_session_unlock_achievement(const xbox_session_t *session, const achiev
             achievement->name,
             unlocked_achievement->value,
             xbox_session_compute_gamerscore(session));
+}
+
+/**
+ * @brief Clears all cached state in the session.
+ *
+ * Frees heap allocations owned by the session and leaves it in an empty state:
+ * - clears the cached achievements list
+ * - clears the current game
+ * - clears the cached gamerscore (including unlocked achievements list)
+ *
+ * This does not free the @p session object itself.
+ *
+ * @param session Session to clear (may be NULL).
+ */
+void xbox_session_clear(xbox_session_t *session) {
+
+    if (!session) {
+        return;
+    }
+
+    free_achievement(&session->achievements);
+    free_game(&session->game);
+    free_gamerscore(&session->gamerscore);
 }
