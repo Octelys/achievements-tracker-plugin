@@ -935,8 +935,7 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
 
 /* Stub implementations when libwebsockets is not available */
 
-bool xbox_monitoring_start(on_xbox_game_played_t on_game_played) {
-    (void)on_game_played;
+bool xbox_monitoring_start() {
 
     obs_log(LOG_WARNING, "Monitoring | WebSockets support not available, monitoring not started");
 

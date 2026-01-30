@@ -241,7 +241,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     /*
      * Extracts the token expiration
      */
-    not_after_date = json_read_string(sisu_token_json, "NotAfter");
+    not_after_date = json_read_string_from_path(sisu_token_json, "AuthorizationToken.NotAfter");
 
     if (!not_after_date) {
         ctx->result.error_message = "Unable to retrieve the NotAfter: no value found";
@@ -271,10 +271,11 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     obs_log(LOG_INFO, "Sisu authentication succeeded!");
 
-    obs_log(LOG_INFO, "gtg: %s\n", gtg);
-    obs_log(LOG_INFO, "XID: %s\n", xid);
-    obs_log(LOG_INFO, "Hash: %s\n", uhs);
-    obs_log(LOG_INFO, "Expires: %d\n", unix_timestamp);
+    obs_log(LOG_INFO, "gtg: %s", gtg);
+    obs_log(LOG_INFO, "XID: %s", xid);
+    obs_log(LOG_INFO, "Hash: %s", uhs);
+    obs_log(LOG_INFO, "Now: %d", now());
+    obs_log(LOG_INFO, "Expires: %d (%s)", unix_timestamp, not_after_date);
 
     /*
      * Creates the Xbox identity
