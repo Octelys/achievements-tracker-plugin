@@ -576,6 +576,11 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         }
         break;
 
+    case LWS_CALLBACK_CLIENT_RECEIVE_PONG:
+        obs_log(LOG_ERROR, "Monitoring | Received pong");
+        /* Test token! */
+
+        break;
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
         obs_log(LOG_ERROR, "Monitoring | Connection error: %s", in ? (char *)in : "unknown");
         ctx->connected = false;
@@ -697,8 +702,6 @@ bool xbox_monitoring_start() {
         obs_log(LOG_WARNING, "Monitoring | Monitoring already active");
         return false;
     }
-
-    //  TODO The Xbox source account should use xbox live to get the token / identity. Not the other to avoid conflicts.
 
     /* Get the authorization token from state */
     const xbox_identity_t *identity = xbox_live_get_identity();

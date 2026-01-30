@@ -15,6 +15,21 @@ typedef struct xbox_account_source {
 } xbox_account_source_t;
 
 /**
+ * @brief Starts the monitoring if the user is logged in.
+ */
+static void start_monitoring_if_needed(void) {
+
+    xbox_identity_t *identity = xbox_live_get_identity();
+
+    if (!identity) {
+        obs_log(LOG_INFO, "Monitoring will not be started: no identity signed-in");
+        return;
+    }
+
+    xbox_monitoring_start();
+}
+
+/**
  * @brief Refreshes the OBS properties UI for a source (runs on the UI thread).
  *
  * @param data The @c obs_source_t* whose properties should be refreshed.
@@ -69,6 +84,9 @@ static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *propert
  * Refreshes the properties UI so the signed-in state is reflected.
  */
 static void on_xbox_signed_in(void *data) {
+
+    start_monitoring_if_needed();
+
     schedule_refresh_properties(data);
 }
 
@@ -266,11 +284,5 @@ void xbox_account_source_register(void) {
 
     xbox_subscribe_game_played(&on_xbox_game_played);
 
-    /* Starts the monitoring if the user is already logged in */
-    xbox_identity_t *identity = xbox_live_get_identity();
-
-    if (identity) {
-        xbox_monitoring_start();
-        obs_log(LOG_INFO, "Monitoring started");
-    }
+    start_monitoring_if_needed();
 }

@@ -271,10 +271,10 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     obs_log(LOG_INFO, "Sisu authentication succeeded!");
 
-    obs_log(LOG_DEBUG, "gtg: %s\n", gtg);
-    obs_log(LOG_DEBUG, "XID: %s\n", xid);
-    obs_log(LOG_DEBUG, "Hash: %s\n", uhs);
-    obs_log(LOG_DEBUG, "Expires: %d\n", unix_timestamp);
+    obs_log(LOG_INFO, "gtg: %s\n", gtg);
+    obs_log(LOG_INFO, "XID: %s\n", xid);
+    obs_log(LOG_INFO, "Hash: %s\n", uhs);
+    obs_log(LOG_INFO, "Expires: %d\n", unix_timestamp);
 
     /*
      * Creates the Xbox identity
@@ -884,7 +884,13 @@ xbox_identity_t *xbox_live_get_identity(void) {
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
-    if (!token_is_expired(identity->token)) {
+    if (identity && !token_is_expired(identity->token)) {
+        obs_log(LOG_INFO, "Token is NOT expired, reusing existing identity");
+        return identity;
+    }
+
+    if (!identity) {
+        obs_log(LOG_INFO, "No identity found");
         return identity;
     }
 

@@ -1,6 +1,7 @@
 #include "token.h"
 
 #include "memory.h"
+#include "diagnostics/log.h"
 #include "time/time.h"
 
 #include <obs-module.h>
@@ -72,6 +73,13 @@ bool token_is_expired(const token_t *token) {
     }
 
     time_t current_time = now();
+    bool   is_expired   = current_time >= token->expires;
 
-    return difftime(current_time, token->expires) >= 0;
+    obs_log(LOG_INFO,
+            "Now: %lld. Token expires=%lld. Status? %s",
+            (long long)current_time,
+            (long long)token->expires,
+            is_expired ? "expired" : "valid");
+
+    return is_expired;
 }
