@@ -948,6 +948,10 @@ bool xbox_monitoring_is_active(void) {
     return false;
 }
 
+const gamerscore_t *get_current_gamerscore(void) {
+    return NULL;
+}
+
 const game_t *get_current_game() {
     return NULL;
 }
