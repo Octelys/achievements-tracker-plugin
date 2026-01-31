@@ -135,9 +135,12 @@ static void load_texture_from_file() {
     /* Free existing texture */
     if (g_game_cover.image_texture) {
         gs_texture_destroy(g_game_cover.image_texture);
+        g_game_cover.image_texture = NULL;
     }
 
-    g_game_cover.image_texture = gs_texture_create_from_file(g_game_cover.image_path);
+    if (strlen(g_game_cover.image_path) > 0) {
+        g_game_cover.image_texture = gs_texture_create_from_file(g_game_cover.image_path);
+    }
 
     obs_leave_graphics();
 
@@ -172,6 +175,26 @@ static void on_xbox_game_played(const game_t *game) {
 
     const char *game_cover_url = xbox_get_game_cover(game);
     download_box_art_from_url(game_cover_url);
+}
+
+/**
+ * @brief Xbox monitor callback invoked when connection state changes.
+ *
+ * When connected, this refreshes the gamerscore display.
+ *
+ * @param is_connected Whether the account is currently connected.
+ * @param error_message Optional error message if disconnected (ignored here).
+ */
+static void on_connection_changed(bool is_connected, const char *error_message) {
+
+    UNUSED_PARAMETER(error_message);
+
+    if (is_connected) {
+        obs_log(LOG_INFO, "Connected to Xbox Live - waiting for game played events");
+    } else {
+        g_game_cover.image_path[0] = '\0';
+        g_game_cover.must_reload   = true;
+    }
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -292,8 +315,8 @@ static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
 
-    /* Finds out if there is a token available already */
-    const xbox_identity_t *xbox_identity = state_get_xbox_identity();
+    /* Gets or refreshes the token */
+    const xbox_identity_t *xbox_identity = xbox_live_get_identity();
 
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
@@ -368,4 +391,5 @@ void xbox_game_cover_source_register(void) {
     obs_register_source(xbox_game_cover_source_get());
 
     xbox_subscribe_game_played(&on_xbox_game_played);
+    xbox_subscribe_connected_changed(&on_connection_changed);
 }

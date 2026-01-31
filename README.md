@@ -73,7 +73,6 @@ achievements-tracker-plugin/
 │   │   └── log.h                       # Logging API
 │   ├── drawing/
 │   │   ├── image.c/h                   # Image rendering helpers
-│   │   └── text.c/h                    # Text rendering helpers
 │   ├── encoding/
 │   │   └── base64.c/h                  # Base64 URL-safe encoding
 │   ├── io/

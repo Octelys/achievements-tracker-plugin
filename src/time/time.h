@@ -9,16 +9,35 @@ extern "C" {
 #endif
 
 /**
- * @brief Parses an ISO-8601 UTC timestamp into Unix seconds.
+ * @brief Parses an ISO-8601 UTC timestamp into Unix time.
  *
- * Converts an ISO-8601 timestamp (UTC) into a Unix timestamp (seconds since the
- * Unix epoch, 1970-01-01T00:00:00Z). If the input contains fractional seconds,
- * the fractional part is returned separately.
+ * This function parses a strict subset of ISO-8601 timestamps that are commonly
+ * returned by Xbox/Microsoft APIs.
  *
- * @param iso8601 Input timestamp string (e.g. `2024-01-01T12:34:56Z` or
- *        `2024-01-01T12:34:56.123Z`).
+ * Supported formats (UTC only):
+ * - `YYYY-MM-DDTHH:MM:SSZ`
+ * - `YYYY-MM-DDTHH:MM:SS.<fraction>Z`
+ *
+ * Where `<fraction>` contains 1..9 decimal digits and will be scaled to
+ * nanoseconds.
+ *
+ * Strictness / validation rules:
+ * - The timestamp must use the `T` separator and a trailing `Z` (UTC designator).
+ * - No timezone offsets (`+01:00`, `-0800`, etc.) are supported.
+ * - No extra characters (including whitespace) are permitted after the trailing
+ *   `Z`.
+ * - Calendar fields are validated (month/day ranges, leap years).
+ * - Seconds are accepted in the range 0..60 to accommodate leap seconds.
+ *
+ * Outputs:
+ * - @p out_unix_seconds receives whole seconds since the Unix epoch
+ *   (`1970-01-01T00:00:00Z`).
+ * - @p out_fraction_ns receives the fractional part in nanoseconds
+ *   (0..999,999,999). If no fractional part is present, 0 is returned.
+ *
+ * @param iso8601 Input timestamp string (UTC).
  * @param[out] out_unix_seconds Output Unix timestamp in seconds.
- * @param[out] out_fraction_ns Output fractional part in nanoseconds (0..999,999,999).
+ * @param[out] out_fraction_ns Output fractional part in nanoseconds.
  *
  * @return True on successful parse, false otherwise.
  */

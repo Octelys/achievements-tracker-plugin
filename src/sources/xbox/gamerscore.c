@@ -115,16 +115,14 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
  * When connected, this refreshes the gamerscore display.
  *
  * @param is_connected Whether the account is currently connected.
- * @param gamerscore   Current gamerscore snapshot.
  * @param error_message Optional error message if disconnected (ignored here).
  */
-static void on_connection_changed(bool is_connected, const gamerscore_t *gamerscore, const char *error_message) {
+static void on_connection_changed(bool is_connected, const char *error_message) {
 
+    UNUSED_PARAMETER(is_connected);
     UNUSED_PARAMETER(error_message);
 
-    if (!is_connected) {
-        return;
-    }
+    const gamerscore_t *gamerscore = get_current_gamerscore();
 
     update_gamerscore(gamerscore);
 }
@@ -348,7 +346,9 @@ static const struct obs_source_info *xbox_source_get(void) {
  */
 void xbox_gamerscore_source_register(void) {
 
-    g_default_configuration                  = bzalloc(sizeof(gamerscore_configuration_t));
+    g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
+
+    /* TODO A default font sheet path should be embedded with the plugin */
     g_default_configuration->font_sheet_path = "/Users/christophe/Downloads/font_sheet.png";
     g_default_configuration->offset_x        = 0;
     g_default_configuration->offset_y        = 0;

@@ -228,7 +228,7 @@ static void token_is_expired__token_just_expired__true_returned(void) {
 static void token_is_expired__token_is_not_expired__false_returned(void) {
     //  Arrange.
     token_t *token = bzalloc(sizeof(token_t));
-    token->expires = 250;
+    token->expires = 250 + 15 * 60;
 
     time_t current_time = 200;
     mock_now(current_time);

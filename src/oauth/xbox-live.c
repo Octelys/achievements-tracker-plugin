@@ -53,7 +53,8 @@
 
 typedef struct authentication_ctx {
     /** Input device identity (owned by caller; must outlive the flow). */
-    const device_t *device;
+    device_t *device;
+    bool      allow_cache;
 
     /** Background worker thread running the flow. */
     pthread_t thread;
@@ -121,8 +122,9 @@ static void complete(authentication_ctx_t *ctx) {
  *
  * On success or failure, this function calls complete(ctx).
  */
-static void retrieve_sisu_token(authentication_ctx_t *ctx) {
+static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
+    bool     succeeded       = false;
     uint8_t *signature       = NULL;
     char    *signature_b64   = NULL;
     char    *sisu_token_json = NULL;
@@ -239,7 +241,7 @@ static void retrieve_sisu_token(authentication_ctx_t *ctx) {
     /*
      * Extracts the token expiration
      */
-    not_after_date = json_read_string(sisu_token_json, "NotAfter");
+    not_after_date = json_read_string_from_path(sisu_token_json, "AuthorizationToken.NotAfter");
 
     if (!not_after_date) {
         ctx->result.error_message = "Unable to retrieve the NotAfter: no value found";
@@ -269,10 +271,11 @@ static void retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     obs_log(LOG_INFO, "Sisu authentication succeeded!");
 
-    obs_log(LOG_DEBUG, "gtg: %s\n", gtg);
-    obs_log(LOG_DEBUG, "XID: %s\n", xid);
-    obs_log(LOG_DEBUG, "Hash: %s\n", uhs);
-    obs_log(LOG_DEBUG, "Expires: %d\n", unix_timestamp);
+    obs_log(LOG_INFO, "gtg: %s", gtg);
+    obs_log(LOG_INFO, "XID: %s", xid);
+    obs_log(LOG_INFO, "Hash: %s", uhs);
+    obs_log(LOG_INFO, "Now: %d", now());
+    obs_log(LOG_INFO, "Expires: %d (%s)", unix_timestamp, not_after_date);
 
     /*
      * Creates the Xbox identity
@@ -292,6 +295,8 @@ static void retrieve_sisu_token(authentication_ctx_t *ctx) {
      */
     state_set_xbox_identity(identity);
 
+    succeeded = true;
+
 cleanup:
     FREE(sisu_token_json);
     FREE(sisu_token);
@@ -300,6 +305,8 @@ cleanup:
     FREE(not_after_date);
 
     complete(ctx);
+
+    return succeeded;
 }
 
 /**
@@ -311,20 +318,20 @@ cleanup:
  * On success, the device token is persisted and the flow proceeds to
  * retrieve_sisu_token(). On failure it calls complete(ctx).
  */
-static void retrieve_device_token(struct authentication_ctx *ctx) {
+static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
     /*
      * Finds out if a device token already exists
      */
     token_t *existing_device_token = state_get_device_token();
 
-    if (existing_device_token) {
+    if (ctx->allow_cache && existing_device_token) {
         obs_log(LOG_INFO, "Using cached device token");
         ctx->device_token = existing_device_token;
-        retrieve_sisu_token(ctx);
-        return;
+        return retrieve_sisu_token(ctx);
     }
 
+    bool     succeeded         = false;
     char    *encoded_signature = NULL;
     char    *not_after_date    = NULL;
     char    *token             = NULL;
@@ -392,7 +399,8 @@ static void retrieve_device_token(struct authentication_ctx *ctx) {
     if (!device_token_json) {
         ctx->result.error_message = "Unable retrieve a device token: server returned no response";
         obs_log(LOG_ERROR, ctx->result.error_message);
-        return;
+        return false;
+        ;
     }
 
     obs_log(LOG_DEBUG, "Received response with status code %d: %s", http_code, device_token_json);
@@ -401,7 +409,7 @@ static void retrieve_device_token(struct authentication_ctx *ctx) {
         ctx->result.error_message = "Unable retrieve a device token: server returned an error";
         obs_log(LOG_ERROR, "Unable retrieve a device token: server returned status code %d", http_code);
         FREE(device_token_json);
-        return;
+        return false;
     }
 
     /*
@@ -438,26 +446,31 @@ static void retrieve_device_token(struct authentication_ctx *ctx) {
      */
     obs_log(LOG_INFO, "Device authentication succeeded!");
 
-    token_t *device = (token_t *)bzalloc(sizeof(token_t));
+    token_t *device = bzalloc(sizeof(token_t));
     device->value   = bstrdup_n(token, strlen(token));
     device->expires = unix_timestamp;
 
     state_set_device_token(device);
 
     ctx->device_token = device;
+    succeeded         = true;
 
 cleanup:
-    FREE(signature);
-    FREE(encoded_signature);
-    FREE(device_token_json);
-    FREE(token);
-    FREE(not_after_date);
+    free_memory((void **)&signature);
+    free_memory((void **)&encoded_signature);
+    free_memory((void **)&device_token_json);
+    free_memory((void **)&token);
+    free_memory((void **)&not_after_date);
 
     if (ctx->result.error_message) {
         complete(ctx);
-    } else {
-        retrieve_sisu_token(ctx);
     }
+
+    if (!succeeded) {
+        return false;
+    }
+
+    return retrieve_sisu_token(ctx);
 }
 
 /**
@@ -467,8 +480,9 @@ cleanup:
  * expires_in. On success it persists the tokens and proceeds to
  * retrieve_device_token(). On failure it calls complete(ctx).
  */
-static void refresh_user_token(authentication_ctx_t *ctx) {
+static bool refresh_user_token(authentication_ctx_t *ctx) {
 
+    bool  succeeded           = false;
     char *response_json       = NULL;
     char *access_token_value  = NULL;
     char *refresh_token_value = NULL;
@@ -527,11 +541,11 @@ static void refresh_user_token(authentication_ctx_t *ctx) {
     /*
      *  The token has been found and is saved in the context
      */
-    token_t *user_token = (token_t *)bzalloc(sizeof(token_t));
+    token_t *user_token = bzalloc(sizeof(token_t));
     user_token->value   = bstrdup_n(access_token_value, strlen(access_token_value));
     user_token->expires = time(NULL) + *token_expires_in / 1000;
 
-    token_t *refresh_token = (token_t *)bzalloc(sizeof(token_t));
+    token_t *refresh_token = bzalloc(sizeof(token_t));
     refresh_token->value   = bstrdup_n(refresh_token_value, strlen(refresh_token_value));
 
     ctx->user_token = user_token;
@@ -539,22 +553,29 @@ static void refresh_user_token(authentication_ctx_t *ctx) {
     /* And in the persistence */
     state_set_user_token(user_token, refresh_token);
 
+    succeeded = true;
+
     obs_log(LOG_INFO, "User & refresh token received");
 
 cleanup:
-    FREE(access_token_value);
-    FREE(refresh_token_value);
-    FREE(token_expires_in);
-    FREE(response_json);
+    free_memory((void **)&access_token_value);
+    free_memory((void **)&refresh_token_value);
+    free_memory((void **)&token_expires_in);
+    free_memory((void **)&response_json);
 
     /*
      * Either complete the process if an error has been encountered or go to the next step
      */
     if (!ctx->user_token) {
         complete(ctx);
-    } else {
-        retrieve_device_token(ctx);
+        return false;
     }
+
+    if (!succeeded) {
+        return false;
+    }
+
+    return retrieve_device_token(ctx);
 }
 
 /**
@@ -673,7 +694,7 @@ static void *start_authentication_flow(void *param) {
     char *device_code = NULL;
     char *user_code   = NULL;
 
-    authentication_ctx_t *ctx = (authentication_ctx_t *)param;
+    authentication_ctx_t *ctx = param;
 
     token_t *user_token = state_get_user_token();
 
@@ -790,18 +811,20 @@ static void *start_authentication_flow(void *param) {
     poll_for_user_token(ctx);
 
 cleanup:
-    FREE(scope_enc);
-    FREE(token_json);
-    FREE(device_code);
-    FREE(expires_in);
-    FREE(interval);
-    FREE(user_code);
+    free_memory((void **)&scope_enc);
+    free_memory((void **)&token_json);
+    free_memory((void **)&device_code);
+    free_memory((void **)&expires_in);
+    free_memory((void **)&interval);
+    free_memory((void **)&user_code);
 
     if (!ctx->result.error_message) {
         retrieve_device_token(ctx);
     } else {
         complete(ctx);
     }
+
+    /* TODO ctx! */
 
     return (void *)false;
 }
@@ -816,20 +839,140 @@ cleanup:
  * Allocates an internal authentication context and launches a pthread.
  * Completion is signaled via @p callback.
  *
- * @param device   Device identity (UUID/serial/keypair) used for PoP signing.
- *                 Must remain valid for the duration of the authentication.
  * @param data     Opaque pointer passed back to @p callback.
  * @param callback Completion callback (must be non-NULL).
  *
  * @return true if the worker thread was successfully created; false otherwise.
  */
-bool xbox_live_authenticate(const device_t *device, void *data, on_xbox_live_authenticated_t callback) {
+bool xbox_live_authenticate(void *data, on_xbox_live_authenticated_t callback) {
+
+    device_t *device = state_get_device();
+
+    if (!device) {
+        obs_log(LOG_ERROR, "Unable to authenticate: no device identity found");
+        return false;
+    }
 
     /* Defines the structure that will filled up by the different authentication steps */
     authentication_ctx_t *ctx = bzalloc(sizeof(authentication_ctx_t));
     ctx->device               = device;
     ctx->on_completed         = callback;
     ctx->on_completed_data    = data;
+    ctx->allow_cache          = true;
 
     return pthread_create(&ctx->thread, NULL, start_authentication_flow, ctx) == 0;
+}
+
+/**
+ * @brief Get the currently stored Xbox identity, refreshing tokens if needed.
+ *
+ * This is a convenience helper around the state subsystem:
+ *  - If an identity is already present and its token is not expired, it is
+ *    returned immediately.
+ *  - If the token is expired, this function attempts to refresh authentication
+ *    using the persisted device identity and refresh token.
+ *
+ * Side-effects:
+ *  - May perform network requests to refresh tokens.
+ *  - May persist updated tokens/identity via the state subsystem.
+ *
+ * Threading:
+ *  - This function is synchronous and may block while performing network I/O.
+ *  - Call from a worker thread (not the OBS render thread).
+ *
+ * Ownership:
+ *  - Returns an xbox_identity_t allocated/returned by state_get_xbox_identity().
+ *    The caller owns the returned object and must free it consistently with the
+ *    state subsystem contract.
+ *
+ * @return Xbox identity on success; NULL if no identity is available or refresh
+ *         fails.
+ */
+xbox_identity_t *xbox_live_get_identity(void) {
+
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (!identity) {
+        obs_log(LOG_INFO, "No identity found");
+        return identity;
+    }
+
+    /* Checks if the Sisu token is expired */
+    if (!token_is_expired(identity->token)) {
+        obs_log(LOG_INFO, "Token is NOT expired, reusing existing identity");
+        return identity;
+    }
+
+    obs_log(LOG_INFO, "Sisu token is expired, refreshing...");
+
+    device_t *device = state_get_device();
+
+    if (!device) {
+        obs_log(LOG_ERROR, "No device found for Xbox token refresh");
+        return false;
+    }
+
+    authentication_ctx_t *ctx = bzalloc(sizeof(authentication_ctx_t));
+    ctx->device               = device;
+    ctx->on_completed         = NULL;
+    ctx->on_completed_data    = NULL;
+    ctx->allow_cache          = false;
+
+    /* Retrieves the user token */
+    token_t *user_token = state_get_user_token();
+
+    if (!user_token) {
+        obs_log(LOG_ERROR, "No user token found for Xbox token refresh");
+        identity = NULL;
+        goto cleanup;
+    }
+
+    if (token_is_expired(user_token)) {
+        /* All the tokens (User, Device and Sisu) will be retrieved */
+        if (!refresh_user_token(ctx)) {
+            identity = NULL;
+            goto cleanup;
+        }
+        identity = state_get_xbox_identity();
+        goto cleanup;
+    }
+
+    ctx->user_token = user_token;
+
+    /* Retrieves the device token */
+    token_t *device_token = state_get_device_token();
+
+    if (!device_token) {
+        obs_log(LOG_ERROR, "No device token found for Xbox token refresh");
+        identity = NULL;
+        goto cleanup;
+    }
+
+    if (token_is_expired(device_token)) {
+        /* All the tokens (Device and Sisu) will be retrieved */
+        if (!retrieve_device_token(ctx)) {
+            identity = NULL;
+            goto cleanup;
+        }
+        identity = state_get_xbox_identity();
+        goto cleanup;
+    }
+
+    ctx->device_token = device_token;
+
+    /* Defines the structure that will filled up by the different authentication steps */
+    if (!retrieve_sisu_token(ctx)) {
+        identity = NULL;
+        goto cleanup;
+    }
+
+    identity = state_get_xbox_identity();
+
+cleanup:
+    free_memory((void **)&ctx->device);
+    free_memory((void **)&ctx->user_token);
+    free_memory((void **)&ctx->device_token);
+    free_memory((void **)&ctx);
+
+    return identity;
 }

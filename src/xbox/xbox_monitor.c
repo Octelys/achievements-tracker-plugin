@@ -1,5 +1,30 @@
 #include "xbox_monitor.h"
 
+/**
+ * @file xbox_monitor.c
+ * @brief Xbox Live RTA (Real-Time Activity) monitor implementation.
+ *
+ * When built with libwebsockets (HAVE_LIBWEBSOCKETS), this module:
+ *  - Connects to the Xbox Live RTA WebSocket endpoint.
+ *  - Adds the XBL3.0 Authorization header during the handshake.
+ *  - Subscribes to presence and achievement progression channels.
+ *  - Parses incoming RTA messages and emits higher-level events.
+ *
+ * Threading:
+ *  - The monitor runs a background pthread that calls lws_service().
+ *  - Incoming messages are parsed and subscriber callbacks are invoked from that
+ *    thread.
+ *
+ * Ownership/lifetime:
+ *  - Callback parameters (game/progress/gamerscore) generally point to objects
+ *    owned by the monitor/session and are valid until the next update.
+ *  - If a subscriber needs to keep data, it must make a deep copy.
+ *
+ * Build variants:
+ *  - If HAVE_LIBWEBSOCKETS is not defined, stub implementations are provided
+ *    that report monitoring is unavailable.
+ */
+
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
@@ -16,6 +41,7 @@
 #include "external/cjson/cJSON.h"
 
 #include "io/state.h"
+#include "oauth/xbox-live.h"
 
 #include <text/parsers.h>
 
@@ -28,7 +54,9 @@
 #define SUBSCRIBE 1
 #define UNSUBSCRIBE 1
 
-/* Manages all the subscriptions to the `game_played` event */
+/**
+ * @brief Subscription node for game-played events.
+ */
 typedef struct game_played_subscription {
     on_xbox_game_played_t            callback;
     struct game_played_subscription *next;
@@ -36,7 +64,9 @@ typedef struct game_played_subscription {
 
 static game_played_subscription_t *g_game_played_subscriptions = NULL;
 
-/* Manages all the subscriptions to the `achievements_updated` event */
+/**
+ * @brief Subscription node for achievement progress events.
+ */
 typedef struct achievements_updated_subscription {
     on_xbox_achievements_progressed_t         callback;
     struct achievements_updated_subscription *next;
@@ -44,7 +74,9 @@ typedef struct achievements_updated_subscription {
 
 static achievements_updated_subscription_t *g_achievements_updated_subscriptions = NULL;
 
-/* Manages all the subscriptions to the `connection_changed` event */
+/**
+ * @brief Subscription node for connection status change events.
+ */
 typedef struct connection_changed_subscription {
     on_xbox_connection_changed_t            callback;
     struct connection_changed_subscription *next;
@@ -52,18 +84,49 @@ typedef struct connection_changed_subscription {
 
 static connection_changed_subscription_t *g_connection_changed_subscriptions = NULL;
 
-/* Keep track of the monitoring */
+/**
+ * @brief Monitor thread state.
+ *
+ * This struct is allocated when monitoring starts and owned by the module-level
+ * @c g_monitoring_context pointer.
+ *
+ * Ownership/lifetime:
+ * - @c identity is an xbox_identity_t instance returned by state/xbox_live helpers.
+ *   It is owned by the state subsystem; do not free it here.
+ * - @c auth_token is a heap-allocated "XBL3.0 x=<uhs>;<token>" header value.
+ *   It is owned by this context and must be freed when replaced or on stop.
+ */
 typedef struct monitoring_context {
+    /** libwebsockets context (event loop) */
     struct lws_context *context;
-    struct lws         *wsi;
-    pthread_t           thread;
-    bool                running;
-    bool                connected;
 
-    /* Authentication */
+    /** Websocket instance */
+    struct lws *wsi;
+
+    /** Background thread running lws_service() */
+    pthread_t thread;
+
+    /** True while monitoring is active */
+    bool running;
+
+    /** True once websocket has reached the "established" state */
+    bool connected;
+
+    /**
+     * Current identity used.
+     *
+     * Used to determine whether the token is expired and to refresh it when needed.
+     */
+    xbox_identity_t *identity;
+
+    /**
+     * Authorization token used during the handshake ("XBL3.0 x=uhs;token").
+     *
+     * Note: this is the full header value (without the "Authorization:" prefix).
+     */
     char *auth_token;
 
-    /* Receive buffer */
+    /** Receive buffer used to accumulate websocket fragments */
     char  *rx_buffer;
     size_t rx_buffer_size;
     size_t rx_buffer_used;
@@ -74,6 +137,33 @@ static monitoring_context_t *g_monitoring_context = NULL;
 /* Keeps track of the game, achievements and gamerscore */
 static xbox_session_t g_current_session;
 
+/**
+ * @brief Build the WebSocket "Authorization" header value for a given Xbox identity.
+ *
+ * The returned string is of the form:
+ * `XBL3.0 x=<uhs>;<token>`
+ *
+ * Ownership:
+ * - The returned string is heap-allocated and must be freed by the caller (bfree).
+ *
+ * @param identity Identity containing @c uhs and a valid token.
+ * @return Newly allocated header value, or NULL on error.
+ */
+static char *build_authorization_header(const xbox_identity_t *identity) {
+
+    if (!identity) {
+        return NULL;
+    }
+
+    char auth_header[4096];
+    snprintf(auth_header, sizeof(auth_header), "XBL3.0 x=%s;%s", identity->uhs, identity->token->value);
+
+    return bstrdup(auth_header);
+}
+
+/**
+ * @brief Invoke all registered game-played subscribers.
+ */
 static void notify_game_played(const game_t *game) {
 
     if (!game) {
@@ -91,6 +181,9 @@ static void notify_game_played(const game_t *game) {
     }
 }
 
+/**
+ * @brief Invoke all registered achievement progressed subscribers.
+ */
 static void notify_achievements_progressed(const achievement_progress_t *achievements_progress) {
 
     obs_log(LOG_INFO, "Notifying achievements progress: %s", achievements_progress->service_config_id);
@@ -103,29 +196,34 @@ static void notify_achievements_progressed(const achievement_progress_t *achieve
     }
 }
 
-static void notify_connection_changed(bool connected, const char *error_message) {
+/**
+ * @brief Invoke all registered connection state subscribers.
+ */
+static void notify_connection_changed(bool is_connected, const char *error_message) {
 
     UNUSED_PARAMETER(error_message);
 
     obs_log(LOG_INFO,
             "Notifying of a connection changed: %s (%s)",
-            connected ? "Connected" : "Not connected",
+            is_connected ? "Connected" : "Not connected",
             error_message);
 
     connection_changed_subscription_t *node = g_connection_changed_subscriptions;
 
     while (node) {
-        node->callback(connected, g_current_session.gamerscore, error_message);
+        node->callback(is_connected, error_message);
         node = node->next;
     }
 }
 
 /**
- * Send a message over the WebSocket connection
- * @param message The message to send
- * @return true if message was queued for sending, false otherwise
+ * @brief Send a JSON-ish RTA control message over the websocket.
+ *
+ * @param message Message to send.
+ * @return true if successfully written; false otherwise.
  */
 static bool send_websocket_message(const char *message) {
+
     if (!g_monitoring_context || !g_monitoring_context->wsi || !g_monitoring_context->connected) {
         obs_log(LOG_ERROR, "Monitoring | Cannot send message - not connected");
         return false;
@@ -154,6 +252,9 @@ static bool send_websocket_message(const char *message) {
     return true;
 }
 
+/**
+ * @brief Subscribe to rich presence changes for the current user.
+ */
 static bool xbox_presence_subscribe() {
 
     xbox_identity_t *identity = state_get_xbox_identity();
@@ -179,6 +280,11 @@ static bool xbox_presence_subscribe() {
     return send_websocket_message(message);
 }
 
+/**
+ * @brief Unsubscribe from a previously subscribed RTA channel.
+ *
+ * @param subscription_id Subscription ID/path to unsubscribe from.
+ */
 static bool xbox_presence_unsubscribe(const char *subscription_id) {
     if (!subscription_id || !*subscription_id) {
         obs_log(LOG_ERROR, "Monitoring | Invalid subscription ID for unsubscribe");
@@ -197,6 +303,9 @@ static bool xbox_presence_unsubscribe(const char *subscription_id) {
     return send_websocket_message(message);
 }
 
+/**
+ * @brief Subscribe to achievement progression updates for the current session's game.
+ */
 static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) {
 
     if (!session) {
@@ -241,6 +350,9 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
     return send_websocket_message(message);
 }
 
+/**
+ * @brief Unsubscribe from achievement progression updates for the current session's game.
+ */
 static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session) {
 
     if (!session) {
@@ -283,6 +395,15 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
     return send_websocket_message(message);
 }
 
+/**
+ * @brief Update the current game (including sessions and subscriptions) and notify listeners.
+ *
+ * This:
+ *  - unsubscribes from previous achievements
+ *  - refreshes the session (fetch achievements for new game)
+ *  - subscribes to achievement updates for the new game (if any)
+ *  - notifies listeners
+ */
 static void xbox_change_game(game_t *game) {
 
     if (game && xbox_session_is_game_played(&g_current_session, game)) {
@@ -305,11 +426,17 @@ static void xbox_change_game(game_t *game) {
     notify_game_played(game);
 }
 
+/**
+ * @brief Handle a parsed game update message.
+ */
 static void on_game_update_received(game_t *game) {
 
     xbox_change_game(game);
 }
 
+/**
+ * @brief Handle a parsed achievement progress message.
+ */
 static void on_achievement_progress_received(const achievement_progress_t *progress) {
 
     if (!progress) {
@@ -324,6 +451,11 @@ static void on_achievement_progress_received(const achievement_progress_t *progr
     notify_achievements_progressed(progress);
 }
 
+/**
+ * @brief Called when the websocket transitions to connected state.
+ *
+ * Fetches the initial gamerscore, sets up subscriptions, and notifies listeners.
+ */
 static void on_websocket_connected() {
 
     int64_t gamerscore_value;
@@ -341,11 +473,22 @@ static void on_websocket_connected() {
     notify_connection_changed(true, NULL);
 }
 
+/**
+ * @brief Called when the websocket disconnects.
+ */
 static void on_websocket_disconnected() {
+
+    xbox_session_clear(&g_current_session);
 
     notify_connection_changed(false, NULL);
 }
 
+/**
+ * @brief Process a single, complete websocket message buffer.
+ *
+ * Xbox RTA messages are arrays; this function extracts index 2 and interprets it as
+ * a JSON message. Known message types are dispatched to the relevant parsers.
+ */
 static void on_buffer_received(const char *buffer) {
 
     cJSON  *presence_item = NULL;
@@ -401,6 +544,9 @@ cleanup:
     FREE_JSON(root);
 }
 
+/**
+ * @brief libwebsockets callback for websocket events.
+ */
 static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) {
 
     UNUSED_PARAMETER(user);
@@ -422,7 +568,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
             if (lws_add_http_header_by_name(wsi,
                                             (unsigned char *)"Authorization:",
                                             (unsigned char *)ctx->auth_token,
-                                            strlen(ctx->auth_token),
+                                            (int)strlen(ctx->auth_token),
                                             p,
                                             end)) {
                 obs_log(LOG_ERROR, "Monitoring | Failed to add Authorization header");
@@ -472,6 +618,40 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         }
         break;
 
+    case LWS_CALLBACK_CLIENT_RECEIVE_PONG:
+        /*
+         * Periodic pong received.
+         *
+         * We use this as a lightweight place to refresh credentials if needed.
+         * Note: libwebsockets does not automatically update handshake headers
+         * for an already-established connection. Refreshing @c ctx->auth_token
+         * here prepares the next connection attempt (reconnect) to use fresh
+         * credentials.
+         */
+        obs_log(LOG_DEBUG, "Monitoring | Checking token");
+
+        if (g_monitoring_context->identity && !token_is_expired(g_monitoring_context->identity->token)) {
+            break;
+        }
+
+        obs_log(LOG_INFO, "Monitoring | Refreshing token");
+
+        free_memory((void **)&g_monitoring_context->auth_token);
+        free_memory((void **)&g_monitoring_context->identity);
+
+        g_monitoring_context->identity = xbox_live_get_identity();
+
+        if (!g_monitoring_context->identity) {
+            obs_log(LOG_ERROR, "Monitoring | Failed to refresh the token");
+            break;
+        }
+
+        /* Replace the cached auth header for future handshakes */
+        g_monitoring_context->auth_token = build_authorization_header(g_monitoring_context->identity);
+
+        obs_log(LOG_INFO, "Monitoring | Token refreshed");
+
+        break;
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
         obs_log(LOG_ERROR, "Monitoring | Connection error: %s", in ? (char *)in : "unknown");
         ctx->connected = false;
@@ -496,9 +676,24 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
     return 0;
 }
 
-static const struct lws_protocols protocols[] = {{"xbox-rta", websocket_callback, 0, 4096, 0, NULL, 0},
-                                                 {NULL, NULL, 0, 0, 0, NULL, 0}};
+/**
+ * @brief libwebsockets protocol table.
+ *
+ * libwebsockets requires a NULL-terminated array of protocols. We register a
+ * single protocol that forwards events to websocket_callback().
+ */
+static const struct lws_protocols protocols[] = {
+    {"xbox-rta", websocket_callback, 0, 4096, 0, NULL, 0},
+    {NULL, NULL, 0, 0, 0, NULL, 0},
+};
 
+/**
+ * @brief Background thread entry point.
+ *
+ * Creates the libwebsockets context, connects to the RTA endpoint, performs an
+ * initial fetch of the current game, then runs the websocket event loop until
+ * stopped.
+ */
 static void *monitoring_thread(void *arg) {
 
     monitoring_context_t *ctx = arg;
@@ -563,9 +758,15 @@ static void *monitoring_thread(void *arg) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//	Public functions
+//  Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
+/**
+ * @brief Start the Xbox RTA monitor.
+ *
+ * Allocates a global monitoring context, builds the auth header from the
+ * persisted Xbox identity, and starts the background networking thread.
+ */
 bool xbox_monitoring_start() {
 
     if (g_monitoring_context) {
@@ -574,7 +775,7 @@ bool xbox_monitoring_start() {
     }
 
     /* Get the authorization token from state */
-    xbox_identity_t *identity = state_get_xbox_identity();
+    xbox_identity_t *identity = xbox_live_get_identity();
 
     if (!identity) {
         obs_log(LOG_ERROR, "Monitoring | No identity available");
@@ -588,12 +789,12 @@ bool xbox_monitoring_start() {
         return false;
     }
 
-    char auth_header[4096];
-    snprintf(auth_header, sizeof(auth_header), "XBL3.0 x=%s;%s", identity->uhs, identity->token->value);
+    char *authorization_header = build_authorization_header(identity);
 
+    g_monitoring_context->identity   = identity;
     g_monitoring_context->running    = true;
     g_monitoring_context->connected  = false;
-    g_monitoring_context->auth_token = bstrdup(auth_header);
+    g_monitoring_context->auth_token = authorization_header;
 
     /* Allocate initial receive buffer */
     g_monitoring_context->rx_buffer_size = 4096;
@@ -622,6 +823,9 @@ bool xbox_monitoring_start() {
     return true;
 }
 
+/**
+ * @brief Stop the Xbox RTA monitor and free resources.
+ */
 void xbox_monitoring_stop(void) {
 
     if (!g_monitoring_context) {
@@ -652,6 +856,9 @@ void xbox_monitoring_stop(void) {
     obs_log(LOG_INFO, "Monitoring | Monitoring stopped");
 }
 
+/**
+ * @brief Return whether monitoring is currently active.
+ */
 bool xbox_monitoring_is_active(void) {
     if (!g_monitoring_context) {
         return false;
@@ -660,14 +867,57 @@ bool xbox_monitoring_is_active(void) {
     return g_monitoring_context->running;
 }
 
+/**
+ * @brief Get the currently cached game from the active session.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitor/session and
+ * may be replaced when the current game changes or when monitoring stops.
+ *
+ * @return Cached game, or NULL if no game is currently known.
+ */
 const game_t *get_current_game() {
     return g_current_session.game;
 }
 
+/**
+ * @brief Get the most recently cached gamerscore associated with the current session.
+ *
+ * This snapshot is initialized when the websocket connects (via an initial
+ * gamerscore fetch) and then updated as achievement progression messages are
+ * processed.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitor/session and
+ * remains valid until the next update or until monitoring stops.
+ *
+ * @return Cached gamerscore snapshot, or NULL if not available yet.
+ */
+const gamerscore_t *get_current_gamerscore(void) {
+    return g_current_session.gamerscore;
+}
+
+/**
+ * @brief Get the currently cached achievements list from the active session.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitor/session and
+ * may be replaced when the current game changes or when monitoring stops.
+ *
+ * @return Cached achievements list, or NULL if not available.
+ */
 const achievement_t *get_current_game_achievements() {
     return g_current_session.achievements;
 }
 
+/**
+ * @brief Subscribe to game-played events.
+ *
+ * Current behavior:
+ * - Each call registers an additional callback (fan-out).
+ * - There is currently no unsubscribe API; callbacks live until process exit.
+ * - If a game is already known at subscription time, the callback is invoked
+ *   immediately with the cached game.
+ *
+ * Threading: callbacks may be invoked from the monitor thread.
+ */
 void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
 
     if (!callback) {
@@ -691,6 +941,15 @@ void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
     }
 }
 
+/**
+ * @brief Subscribe to achievement progression events.
+ *
+ * Current behavior:
+ * - Each call registers an additional callback (fan-out).
+ * - There is currently no unsubscribe API; callbacks live until process exit.
+ *
+ * Threading: callbacks may be invoked from the monitor thread.
+ */
 void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t callback) {
 
     if (!callback) {
@@ -709,6 +968,17 @@ void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t ca
     g_achievements_updated_subscriptions = new_subscription;
 }
 
+/**
+ * @brief Subscribe to connection state change events.
+ *
+ * Current behavior:
+ * - Each call registers an additional callback (fan-out).
+ * - There is currently no unsubscribe API; callbacks live until process exit.
+ * - If the monitor context already exists, the callback is invoked immediately
+ *   with the current connection state.
+ *
+ * Threading: callbacks may be invoked from the monitor thread.
+ */
 void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callback) {
     if (!callback) {
         return;
@@ -726,7 +996,7 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
     g_connection_changed_subscriptions = new_node;
 
     if (g_monitoring_context) {
-        callback(g_monitoring_context->connected, g_current_session.gamerscore, "");
+        callback(g_monitoring_context->connected, "");
     }
 }
 
@@ -734,8 +1004,7 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
 
 /* Stub implementations when libwebsockets is not available */
 
-bool xbox_monitoring_start(on_xbox_game_played_t on_game_played) {
-    (void)on_game_played;
+bool xbox_monitoring_start() {
 
     obs_log(LOG_WARNING, "Monitoring | WebSockets support not available, monitoring not started");
 
@@ -746,6 +1015,10 @@ void xbox_monitoring_stop(void) {}
 
 bool xbox_monitoring_is_active(void) {
     return false;
+}
+
+const gamerscore_t *get_current_gamerscore(void) {
+    return NULL;
 }
 
 const game_t *get_current_game() {

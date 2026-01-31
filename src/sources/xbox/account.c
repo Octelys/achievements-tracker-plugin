@@ -15,6 +15,21 @@ typedef struct xbox_account_source {
 } xbox_account_source_t;
 
 /**
+ * @brief Starts the monitoring if the user is logged in.
+ */
+static void start_monitoring_if_needed(void) {
+
+    xbox_identity_t *identity = xbox_live_get_identity();
+
+    if (!identity) {
+        obs_log(LOG_INFO, "Monitoring will not be started: no identity signed-in");
+        return;
+    }
+
+    xbox_monitoring_start();
+}
+
+/**
  * @brief Refreshes the OBS properties UI for a source (runs on the UI thread).
  *
  * @param data The @c obs_source_t* whose properties should be refreshed.
@@ -60,6 +75,8 @@ static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *propert
 
     schedule_refresh_properties(data);
 
+    xbox_monitoring_stop();
+
     return true;
 }
 
@@ -69,6 +86,9 @@ static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *propert
  * Refreshes the properties UI so the signed-in state is reflected.
  */
 static void on_xbox_signed_in(void *data) {
+
+    start_monitoring_if_needed();
+
     schedule_refresh_properties(data);
 }
 
@@ -84,9 +104,7 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
     UNUSED_PARAMETER(property);
     UNUSED_PARAMETER(data);
 
-    device_t *device = state_get_device();
-
-    if (!xbox_live_authenticate(device, data, &on_xbox_signed_in)) {
+    if (!xbox_live_authenticate(data, &on_xbox_signed_in)) {
         obs_log(LOG_WARNING, "Xbox sign-in failed");
         return false;
     }
@@ -185,8 +203,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
-    /* Finds out if there is a token available already */
-    const xbox_identity_t *xbox_identity = state_get_xbox_identity();
+    /* Gets or refreshes the token */
+    const xbox_identity_t *xbox_identity = xbox_live_get_identity();
 
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
@@ -266,11 +284,5 @@ void xbox_account_source_register(void) {
 
     xbox_subscribe_game_played(&on_xbox_game_played);
 
-    /* Starts the monitoring if the user is already logged in */
-    xbox_identity_t *identity = state_get_xbox_identity();
-
-    if (identity) {
-        xbox_monitoring_start();
-        obs_log(LOG_INFO, "Monitoring started");
-    }
+    start_monitoring_if_needed();
 }

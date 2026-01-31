@@ -308,11 +308,6 @@ token_t *state_get_device_token(void) {
     token_t *token = bzalloc(sizeof(token_t));
     token->value   = device_token;
 
-    if (token_is_expired(token)) {
-        obs_log(LOG_INFO, "Device token is expired");
-        return NULL;
-    }
-
     return token;
 }
 
@@ -342,11 +337,6 @@ token_t *state_get_sisu_token(void) {
 
     token_t *token = bzalloc(sizeof(token_t));
     token->value   = sisu_token;
-
-    if (token_is_expired(token)) {
-        obs_log(LOG_INFO, "Sisu token is expired");
-        return NULL;
-    }
 
     return token;
 }
@@ -380,11 +370,6 @@ token_t *state_get_user_token(void) {
 
     token_t *token = bzalloc(sizeof(token_t));
     token->value   = user_token;
-
-    if (token_is_expired(token)) {
-        obs_log(LOG_INFO, "User token is expired");
-        return NULL;
-    }
 
     return token;
 }
