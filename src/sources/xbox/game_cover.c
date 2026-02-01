@@ -77,7 +77,7 @@ static game_cover_t g_game_cover;
  *
  * @param image_url Cover art URL. If NULL or empty, this function is a no-op.
  */
-static void download_avatar_from_url(const char *image_url) {
+static void download_game_cover_from_url(const char *image_url) {
 
     if (!image_url || image_url[0] == '\0') {
         return;
@@ -174,7 +174,7 @@ static void on_xbox_game_played(const game_t *game) {
     obs_log(LOG_INFO, text);
 
     const char *game_cover_url = xbox_get_game_cover(game);
-    download_avatar_from_url(game_cover_url);
+    download_game_cover_from_url(game_cover_url);
 }
 
 /**
