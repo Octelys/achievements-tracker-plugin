@@ -1,21 +1,4 @@
-#include "sources/xbox/game_cover.h"
-
-/**
- * @file game_cover.c
- * @brief OBS source that renders the cover art for the currently played Xbox game.
- *
- * Responsibilities:
- *  - Subscribe to Xbox game-played events.
- *  - Download cover art when the game changes.
- *  - Load the image into an OBS gs_texture_t on the graphics thread.
- *  - Render the texture in the source's video_render callback.
- *
- * Threading notes:
- *  - Downloading happens on the calling thread of on_xbox_game_played() (currently
- *    synchronous).
- *  - Texture creation/destruction must happen on the OBS graphics thread; this
- *    file uses obs_enter_graphics()/obs_leave_graphics() to ensure that.
- */
+#include "sources/xbox/avatar.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -24,7 +7,6 @@
 #include <inttypes.h>
 
 #include "drawing/image.h"
-#include "io/state.h"
 #include "oauth/xbox-live.h"
 #include "crypto/crypto.h"
 #include "xbox/xbox_client.h"
@@ -32,7 +14,7 @@
 
 #include <net/http/http.h>
 
-typedef struct xbox_game_cover_source {
+typedef struct xbox_avatar_source {
     /** OBS source instance. */
     obs_source_t *source;
 
@@ -41,12 +23,12 @@ typedef struct xbox_game_cover_source {
 
     /** Source draw height in pixels (used by get_height/video_render). */
     uint32_t height;
-} xbox_game_cover_source_t;
+} xbox_avatar_source_t;
 
 /**
- * @brief Runtime cache for the downloaded cover art image.
+ * @brief Runtime cache for the downloaded avatar image.
  */
-typedef struct game_cover {
+typedef struct avatar {
     /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
     char image_path[512];
 
@@ -55,27 +37,27 @@ typedef struct game_cover {
 
     /** If true, the next render tick should reload the texture from image_path. */
     bool must_reload;
-} game_cover_t;
+} avatar_t;
 
 /**
- * @brief Global singleton cover cache.
+ * @brief Global singleton avatar cache.
  *
- * This source is implemented as a singleton that stores the current cover art in
- * a global cache.
+ * This source is implemented as a singleton that stores the current user avatar
+ * in a global cache.
  */
-static game_cover_t g_game_cover;
+static avatar_t g_avatar;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Download cover art from an URL into a temporary file.
+ * @brief Download avatar image from a URL into a temporary file.
  *
- * The file path is stored in g_game_cover.image_path and g_game_cover.must_reload
- * is set to true so the graphics thread can create a texture on the next render.
+ * The file path is stored in g_avatar.image_path and g_avatar.must_reload is set
+ * to true so the graphics thread can create a texture on the next render.
  *
- * @param image_url Cover art URL. If NULL or empty, this function is a no-op.
+ * @param image_url Avatar image URL. If NULL or empty, this function is a no-op.
  */
 static void download_avatar_from_url(const char *image_url) {
 
@@ -83,24 +65,24 @@ static void download_avatar_from_url(const char *image_url) {
         return;
     }
 
-    obs_log(LOG_INFO, "Loading Xbox game box art from URL: %s", image_url);
+    obs_log(LOG_INFO, "Loading Xbox avatar image from URL: %s", image_url);
 
     /* Downloads the image in memory */
     uint8_t *data = NULL;
     size_t   size = 0;
 
     if (!http_download(image_url, &data, &size)) {
-        obs_log(LOG_WARNING, "Unable to download box art from URL: %s", image_url);
+        obs_log(LOG_WARNING, "Unable to download avatar image from URL: %s", image_url);
         return;
     }
 
     /* Write the bytes to a temp file and use gs_texture_create_from_file of the render thread */
-    snprintf(g_game_cover.image_path,
-             sizeof(g_game_cover.image_path),
-             "%s/obs_plugin_temp_image.png",
+    snprintf(g_avatar.image_path,
+             sizeof(g_avatar.image_path),
+             "%s/obs_plugin_temp_avatar.png",
              getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
 
-    FILE *temp_file = fopen(g_game_cover.image_path, "wb");
+    FILE *temp_file = fopen(g_avatar.image_path, "wb");
 
     if (!temp_file) {
         obs_log(LOG_ERROR, "Failed to create temp file for image");
@@ -112,20 +94,20 @@ static void download_avatar_from_url(const char *image_url) {
     bfree(data);
 
     /* Force its reload into a texture on the next render */
-    g_game_cover.must_reload = true;
+    g_avatar.must_reload = true;
 }
 
 /**
- * @brief Load the downloaded cover image into a gs_texture_t.
+ * @brief Load the downloaded avatar image into a gs_texture_t.
  *
- * If g_game_cover.must_reload is false, this function does nothing.
+ * If g_avatar.must_reload is false, this function does nothing.
  *
  * This must be called from a context where entering/leaving graphics is allowed
  * (typically from video_render).
  */
 static void load_texture_from_file() {
 
-    if (!g_game_cover.must_reload) {
+    if (!g_avatar.must_reload) {
         return;
     }
 
@@ -133,23 +115,23 @@ static void load_texture_from_file() {
     obs_enter_graphics();
 
     /* Free existing texture */
-    if (g_game_cover.image_texture) {
-        gs_texture_destroy(g_game_cover.image_texture);
-        g_game_cover.image_texture = NULL;
+    if (g_avatar.image_texture) {
+        gs_texture_destroy(g_avatar.image_texture);
+        g_avatar.image_texture = NULL;
     }
 
-    if (strlen(g_game_cover.image_path) > 0) {
-        g_game_cover.image_texture = gs_texture_create_from_file(g_game_cover.image_path);
+    if (strlen(g_avatar.image_path) > 0) {
+        g_avatar.image_texture = gs_texture_create_from_file(g_avatar.image_path);
     }
 
     obs_leave_graphics();
 
-    g_game_cover.must_reload = false;
+    g_avatar.must_reload = false;
 
     /* Clean up temp file */
-    remove(g_game_cover.image_path);
+    remove(g_avatar.image_path);
 
-    if (g_game_cover.image_texture) {
+    if (g_avatar.image_texture) {
         obs_log(LOG_INFO, "New image has been successfully loaded from the file");
     } else {
         obs_log(LOG_WARNING, "Failed to create texture from the file");
@@ -159,23 +141,6 @@ static void load_texture_from_file() {
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
 //  --------------------------------------------------------------------------------------------------------------------
-
-/**
- * @brief Event handler called when a new game starts being played.
- *
- * Fetches the cover-art URL for the given game and triggers a download.
- *
- * @param game Currently played game information.
- */
-static void on_xbox_game_played(const game_t *game) {
-
-    char text[4096];
-    snprintf(text, 4096, "Playing game %s (%s)", game->title, game->id);
-    obs_log(LOG_INFO, text);
-
-    const char *game_cover_url = xbox_get_game_cover(game);
-    download_avatar_from_url(game_cover_url);
-}
 
 /**
  * @brief Xbox monitor callback invoked when connection state changes.
@@ -189,12 +154,37 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
     UNUSED_PARAMETER(error_message);
 
+    char *avatar_url = NULL;
+
     if (is_connected) {
-        obs_log(LOG_INFO, "Connected to Xbox Live - waiting for game played events");
+
+        obs_log(LOG_INFO, "Connected to Xbox Live - fetching avatar URL");
+        avatar_url = (char *)xbox_fetch_avatar();
+
+        if (avatar_url) {
+            if (strcasecmp(avatar_url, g_avatar.image_path) == 0) {
+                /* Avatar URL hasn't changed, no need to reload */
+                goto cleanup;
+            }
+
+            snprintf(g_avatar.image_path, sizeof(g_avatar.image_path), "%s", avatar_url);
+
+            if (avatar_url[0] != '\0') {
+                download_avatar_from_url(avatar_url);
+            }
+        } else {
+            g_avatar.image_path[0] = '\0';
+        }
+
     } else {
-        g_game_cover.image_path[0] = '\0';
-        g_game_cover.must_reload   = true;
+        g_avatar.image_path[0] = '\0';
     }
+
+    g_avatar.must_reload = true;
+
+cleanup:
+    /* xbox_fetch_avatar() returns a newly allocated string */
+    free_memory((void **)&avatar_url);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -203,13 +193,13 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
 /** @brief OBS callback returning the source width. */
 static uint32_t source_get_width(void *data) {
-    const xbox_game_cover_source_t *s = data;
+    const xbox_avatar_source_t *s = data;
     return s->width;
 }
 
 /** @brief OBS callback returning the source height. */
 static uint32_t source_get_height(void *data) {
-    const xbox_game_cover_source_t *s = data;
+    const xbox_avatar_source_t *s = data;
     return s->height;
 }
 
@@ -218,7 +208,7 @@ static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Game Cover";
+    return "Xbox Avatar";
 }
 
 /**
@@ -226,16 +216,16 @@ static const char *source_get_name(void *unused) {
  *
  * @param settings OBS settings object (currently unused).
  * @param source   OBS source instance.
- * @return Newly allocated xbox_game_cover_source_t.
+ * @return Newly allocated xbox_avatar_source_t.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_game_cover_source_t *s = bzalloc(sizeof(*s));
-    s->source                   = source;
-    s->width                    = 800;
-    s->height                   = 200;
+    xbox_avatar_source_t *s = bzalloc(sizeof(*s));
+    s->source               = source;
+    s->width                = 800;
+    s->height               = 200;
 
     return s;
 }
@@ -247,16 +237,16 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_game_cover_source_t *source = data;
+    xbox_avatar_source_t *source = data;
 
     if (!source) {
         return;
     }
 
     /* Free image resources */
-    if (g_game_cover.image_texture) {
+    if (g_avatar.image_texture) {
         obs_enter_graphics();
-        gs_texture_destroy(g_game_cover.image_texture);
+        gs_texture_destroy(g_avatar.image_texture);
         obs_leave_graphics();
     }
 
@@ -281,7 +271,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    xbox_game_cover_source_t *source = data;
+    xbox_avatar_source_t *source = data;
 
     if (!source) {
         return;
@@ -291,8 +281,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     load_texture_from_file();
 
     /* Render the image if we have a texture */
-    if (g_game_cover.image_texture) {
-        draw_texture(g_game_cover.image_texture, source->width, source->height, effect);
+    if (g_avatar.image_texture) {
+        draw_texture(g_avatar.image_texture, source->width, source->height, effect);
     }
 }
 
@@ -314,23 +304,7 @@ static obs_properties_t *source_get_properties(void *data) {
     if (xbox_identity != NULL) {
         char status[4096];
         snprintf(status, 4096, "Connected to your xbox account as %s", xbox_identity->gamertag);
-
-        int64_t gamerscore = 0;
-        xbox_fetch_gamerscore(&gamerscore);
-
-        char gamerscore_text[4096];
-        snprintf(gamerscore_text, 4096, "Gamerscore %" PRId64, gamerscore);
-
         obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
-        obs_properties_add_text(p, "gamerscore_info", gamerscore_text, OBS_TEXT_INFO);
-
-        const game_t *game = get_current_game();
-
-        if (game) {
-            char game_played[4096];
-            snprintf(game_played, sizeof(game_played), "Playing %s (%s)", game->title, game->id);
-            obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
-        }
     } else {
         obs_properties_add_text(p,
                                 "disconnected_status_info",
@@ -342,10 +316,10 @@ static obs_properties_t *source_get_properties(void *data) {
 }
 
 /**
- * @brief obs_source_info for the Xbox Game Cover source.
+ * @brief obs_source_info for the Xbox Avatar source.
  */
-static struct obs_source_info xbox_game_cover_source_info = {
-    .id             = "xbox_game_cover_source",
+static struct obs_source_info xbox_avatar_source_info = {
+    .id             = "xbox_avatar_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = source_get_name,
@@ -362,8 +336,8 @@ static struct obs_source_info xbox_game_cover_source_info = {
 /**
  * @brief Get a pointer to this source type's obs_source_info.
  */
-static const struct obs_source_info *xbox_game_cover_source_get(void) {
-    return &xbox_game_cover_source_info;
+static const struct obs_source_info *xbox_avatar_source_get(void) {
+    return &xbox_avatar_source_info;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -371,15 +345,14 @@ static const struct obs_source_info *xbox_game_cover_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Register the Xbox Game Cover source with OBS.
+ * @brief Register the Xbox Avatar source with OBS.
  *
- * Registers the source type, then subscribes to Xbox game-played events so the
- * cover art gets refreshed when the current game changes.
+ * Registers the source type, then subscribes to Xbox connection events so the
+ * avatar gets refreshed when the user connects/reconnects.
  */
-void xbox_game_cover_source_register(void) {
+void xbox_avatar_source_register(void) {
 
-    obs_register_source(xbox_game_cover_source_get());
+    obs_register_source(xbox_avatar_source_get());
 
-    xbox_subscribe_game_played(&on_xbox_game_played);
     xbox_subscribe_connected_changed(&on_connection_changed);
 }

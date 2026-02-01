@@ -37,6 +37,7 @@
 #define XBOX_PROFILE_SETTINGS_ENDPOINT     "https://profile.xboxlive.com/users/batch/profile/settings"
 #define XBOX_PROFILE_CONTRACT_VERSION      "2"
 #define GAMERSCORE_SETTING                 "Gamerscore"
+#define GAMERAVATAR_SETTING                "GameDisplayPicRaw"
 #define XBOX_TITLE_HUB                     "https://titlehub.xboxlive.com/users/xuid(%s)/titles/titleId(%s)/decoration/image"
 #define XBOX_ACHIEVEMENTS_ENDPOINT         "https://achievements.xboxlive.com/users/xuid(%s)/achievements?titleId=%s"
 
@@ -44,7 +45,7 @@
 #define XBOX_GAME_COVER_TYPE               "/titles/0/images/%d/type"
 #define XBOX_GAME_COVER_URL                "/titles/0/images/%d/url"
 #define XBOX_GAME_COVER_POSTER_TYPE        "poster"
-#define XBOX_GAME_COVER_BOX_ART_TYPE        "boxart"
+#define XBOX_GAME_COVER_BOX_ART_TYPE       "boxart"
 
 /**
  * @brief Fetch the cover image URL for a given game.
@@ -57,7 +58,8 @@
  *
  * @param game Game to fetch the cover for (may be NULL).
  * @return Newly allocated URL string on success, or NULL on error / if not
- *         available. The caller owns the returned string and must free it.
+ *         available. The caller owns the returned string and must free it with
+ *         @ref bfree.
  */
 char *xbox_get_game_cover(const game_t *game) {
 
@@ -264,6 +266,91 @@ cleanup:
 }
 
 /**
+ * @brief Fetch the current authenticated user's avatar URL.
+ *
+ * Performs a profile batch settings call and extracts the "GameDisplayPicRaw"
+ * setting. Requires an authenticated Xbox identity to be present in the
+ * persistent state.
+ *
+ * @return Newly allocated URL string on success, or NULL on error / if not
+ *         available. The caller owns the returned string and must free it with
+ *         @ref bfree.
+ */
+const char *xbox_fetch_avatar() {
+
+    xbox_identity_t *identity = state_get_xbox_identity();
+
+    if (!identity) {
+        return NULL;
+    }
+
+    char *response_json   = NULL;
+    char *gameravatar_url = NULL;
+
+    /* Creates the request */
+    char json_body[4096];
+    snprintf(json_body,
+             sizeof(json_body),
+             "{\"userIds\":[\"%s\"],\"settings\":[\"%s\"]}",
+             identity->xid,
+             GAMERAVATAR_SETTING);
+
+    obs_log(LOG_DEBUG, "Body: %s", json_body);
+
+    char headers[4096];
+    snprintf(headers,
+             sizeof(headers),
+             "Authorization: XBL3.0 x=%s;%s\r\n"
+             "x-xbl-contract-version: %s\r\n",
+             identity->uhs,
+             identity->token->value,
+             XBOX_PROFILE_CONTRACT_VERSION);
+
+    obs_log(LOG_DEBUG, "Headers: %s", headers);
+
+    /* Sends the request */
+    long http_code = 0;
+    response_json  = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
+
+    if (http_code < 200 || http_code >= 300) {
+        obs_log(LOG_ERROR, "Failed to fetch the user's avatar: received status code %d", http_code);
+        goto cleanup;
+    }
+
+    if (!response_json) {
+        obs_log(LOG_ERROR, "Failed to fetch the user's avatar:: received no response");
+        goto cleanup;
+    }
+
+    cJSON *root = cJSON_Parse(response_json);
+
+    if (!root) {
+        obs_log(LOG_ERROR, "Failed to fetch the user's avatar: unable to parse the JSON response");
+        goto cleanup;
+    }
+
+    /* Retrieves the value at the specified key: we assume it is at the first item (for now) */
+    char user_avatar_key[512] = "/profileUsers/0/settings/%s/value";
+    snprintf(user_avatar_key, sizeof(user_avatar_key), user_avatar_key, GAMERAVATAR_SETTING);
+
+    cJSON *user_avatar_url = cJSONUtils_GetPointer(root, user_avatar_key);
+
+    if (!user_avatar_url || strlen(user_avatar_url->valuestring) == 0) {
+        obs_log(LOG_INFO, "Failed to fetch the user's avatar: no value found.");
+        goto cleanup;
+    }
+
+    obs_log(LOG_INFO, "User avatar URL is '%s'", user_avatar_url->valuestring);
+
+    gameravatar_url = bstrdup(user_avatar_url->valuestring);
+
+cleanup:
+    free_memory((void **)&response_json);
+
+    return gameravatar_url;
+}
+
+/**
  * @brief Retrieve the game currently being played by the authenticated user.
  *
  * Calls the Xbox Presence endpoint and searches for the first non-"Home" title
@@ -436,9 +523,7 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     obs_log(LOG_DEBUG, "Headers: %s", headers);
 
-    /*
-     * Sends the request
-     */
+    /* Sends the request */
     char presence_url[512];
     snprintf(presence_url, sizeof(presence_url), XBOX_ACHIEVEMENTS_ENDPOINT, identity->xid, game->id);
 
