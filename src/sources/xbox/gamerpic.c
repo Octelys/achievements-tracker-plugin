@@ -1,4 +1,4 @@
-#include "sources/xbox/avatar.h"
+#include "sources/xbox/gamerpic.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -14,7 +14,7 @@
 
 #include <net/http/http.h>
 
-typedef struct xbox_avatar_source {
+typedef struct xbox_gamerpic_source {
     /** OBS source instance. */
     obs_source_t *source;
 
@@ -23,12 +23,12 @@ typedef struct xbox_avatar_source {
 
     /** Source draw height in pixels (used by get_height/video_render). */
     uint32_t height;
-} xbox_avatar_source_t;
+} xbox_gamerpic_source_t;
 
 /**
- * @brief Runtime cache for the downloaded avatar image.
+ * @brief Runtime cache for the downloaded gamerpic image.
  */
-typedef struct avatar {
+typedef struct gamerpic {
     /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
     char image_path[512];
 
@@ -37,52 +37,52 @@ typedef struct avatar {
 
     /** If true, the next render tick should reload the texture from image_path. */
     bool must_reload;
-} avatar_t;
+} gamerpic_t;
 
 /**
- * @brief Global singleton avatar cache.
+ * @brief Global singleton gamerpic cache.
  *
- * This source is implemented as a singleton that stores the current user avatar
+ * This source is implemented as a singleton that stores the current user gamerpic
  * in a global cache.
  */
-static avatar_t g_avatar;
+static gamerpic_t g_gamerpic;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Download avatar image from a URL into a temporary file.
+ * @brief Download gamerpic image from a URL into a temporary file.
  *
- * The file path is stored in g_avatar.image_path and g_avatar.must_reload is set
+ * The file path is stored in g_gamerpic.image_path and g_gamerpic.must_reload is set
  * to true so the graphics thread can create a texture on the next render.
  *
- * @param image_url Avatar image URL. If NULL or empty, this function is a no-op.
+ * @param image_url Gamerpic image URL. If NULL or empty, this function is a no-op.
  */
-static void download_avatar_from_url(const char *image_url) {
+static void download_gamerpic_from_url(const char *image_url) {
 
     if (!image_url || image_url[0] == '\0') {
         return;
     }
 
-    obs_log(LOG_INFO, "Loading Xbox avatar image from URL: %s", image_url);
+    obs_log(LOG_INFO, "Loading Xbox gamerpic image from URL: %s", image_url);
 
     /* Downloads the image in memory */
     uint8_t *data = NULL;
     size_t   size = 0;
 
     if (!http_download(image_url, &data, &size)) {
-        obs_log(LOG_WARNING, "Unable to download avatar image from URL: %s", image_url);
+        obs_log(LOG_WARNING, "Unable to download gamerpic image from URL: %s", image_url);
         return;
     }
 
     /* Write the bytes to a temp file and use gs_texture_create_from_file of the render thread */
-    snprintf(g_avatar.image_path,
-             sizeof(g_avatar.image_path),
-             "%s/obs_plugin_temp_avatar.png",
+    snprintf(g_gamerpic.image_path,
+             sizeof(g_gamerpic.image_path),
+             "%s/obs_plugin_temp_gamerpic.png",
              getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
 
-    FILE *temp_file = fopen(g_avatar.image_path, "wb");
+    FILE *temp_file = fopen(g_gamerpic.image_path, "wb");
 
     if (!temp_file) {
         obs_log(LOG_ERROR, "Failed to create temp file for image");
@@ -94,20 +94,20 @@ static void download_avatar_from_url(const char *image_url) {
     bfree(data);
 
     /* Force its reload into a texture on the next render */
-    g_avatar.must_reload = true;
+    g_gamerpic.must_reload = true;
 }
 
 /**
- * @brief Load the downloaded avatar image into a gs_texture_t.
+ * @brief Load the downloaded gamerpic image into a gs_texture_t.
  *
- * If g_avatar.must_reload is false, this function does nothing.
+ * If g_gamerpic.must_reload is false, this function does nothing.
  *
  * This must be called from a context where entering/leaving graphics is allowed
  * (typically from video_render).
  */
 static void load_texture_from_file() {
 
-    if (!g_avatar.must_reload) {
+    if (!g_gamerpic.must_reload) {
         return;
     }
 
@@ -115,23 +115,23 @@ static void load_texture_from_file() {
     obs_enter_graphics();
 
     /* Free existing texture */
-    if (g_avatar.image_texture) {
-        gs_texture_destroy(g_avatar.image_texture);
-        g_avatar.image_texture = NULL;
+    if (g_gamerpic.image_texture) {
+        gs_texture_destroy(g_gamerpic.image_texture);
+        g_gamerpic.image_texture = NULL;
     }
 
-    if (strlen(g_avatar.image_path) > 0) {
-        g_avatar.image_texture = gs_texture_create_from_file(g_avatar.image_path);
+    if (strlen(g_gamerpic.image_path) > 0) {
+        g_gamerpic.image_texture = gs_texture_create_from_file(g_gamerpic.image_path);
     }
 
     obs_leave_graphics();
 
-    g_avatar.must_reload = false;
+    g_gamerpic.must_reload = false;
 
     /* Clean up temp file */
-    remove(g_avatar.image_path);
+    remove(g_gamerpic.image_path);
 
-    if (g_avatar.image_texture) {
+    if (g_gamerpic.image_texture) {
         obs_log(LOG_INFO, "New image has been successfully loaded from the file");
     } else {
         obs_log(LOG_WARNING, "Failed to create texture from the file");
@@ -154,37 +154,37 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
     UNUSED_PARAMETER(error_message);
 
-    char *avatar_url = NULL;
+    char *gamerpic_url = NULL;
 
     if (is_connected) {
 
-        obs_log(LOG_INFO, "Connected to Xbox Live - fetching avatar URL");
-        avatar_url = (char *)xbox_fetch_avatar();
+        obs_log(LOG_INFO, "Connected to Xbox Live - fetching gamerpic URL");
+        gamerpic_url = (char *)xbox_fetch_gamerpic();
 
-        if (avatar_url) {
-            if (strcasecmp(avatar_url, g_avatar.image_path) == 0) {
-                /* Avatar URL hasn't changed, no need to reload */
+        if (gamerpic_url) {
+            if (strcasecmp(gamerpic_url, g_gamerpic.image_path) == 0) {
+                /* gamerpic URL hasn't changed, no need to reload */
                 goto cleanup;
             }
 
-            snprintf(g_avatar.image_path, sizeof(g_avatar.image_path), "%s", avatar_url);
+            snprintf(g_gamerpic.image_path, sizeof(g_gamerpic.image_path), "%s", gamerpic_url);
 
-            if (avatar_url[0] != '\0') {
-                download_avatar_from_url(avatar_url);
+            if (gamerpic_url[0] != '\0') {
+                download_gamerpic_from_url(gamerpic_url);
             }
         } else {
-            g_avatar.image_path[0] = '\0';
+            g_gamerpic.image_path[0] = '\0';
         }
 
     } else {
-        g_avatar.image_path[0] = '\0';
+        g_gamerpic.image_path[0] = '\0';
     }
 
-    g_avatar.must_reload = true;
+    g_gamerpic.must_reload = true;
 
 cleanup:
-    /* xbox_fetch_avatar() returns a newly allocated string */
-    free_memory((void **)&avatar_url);
+    /* xbox_fetch_gamerpic() returns a newly allocated string */
+    free_memory((void **)&gamerpic_url);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -193,13 +193,13 @@ cleanup:
 
 /** @brief OBS callback returning the source width. */
 static uint32_t source_get_width(void *data) {
-    const xbox_avatar_source_t *s = data;
+    const xbox_gamerpic_source_t *s = data;
     return s->width;
 }
 
 /** @brief OBS callback returning the source height. */
 static uint32_t source_get_height(void *data) {
-    const xbox_avatar_source_t *s = data;
+    const xbox_gamerpic_source_t *s = data;
     return s->height;
 }
 
@@ -208,7 +208,7 @@ static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Avatar";
+    return "Xbox Gamerpic";
 }
 
 /**
@@ -216,16 +216,16 @@ static const char *source_get_name(void *unused) {
  *
  * @param settings OBS settings object (currently unused).
  * @param source   OBS source instance.
- * @return Newly allocated xbox_avatar_source_t.
+ * @return Newly allocated xbox_gamerpic_source_t.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_avatar_source_t *s = bzalloc(sizeof(*s));
-    s->source               = source;
-    s->width                = 800;
-    s->height               = 200;
+    xbox_gamerpic_source_t *s = bzalloc(sizeof(*s));
+    s->source                 = source;
+    s->width                  = 800;
+    s->height                 = 200;
 
     return s;
 }
@@ -237,16 +237,16 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_avatar_source_t *source = data;
+    xbox_gamerpic_source_t *source = data;
 
     if (!source) {
         return;
     }
 
     /* Free image resources */
-    if (g_avatar.image_texture) {
+    if (g_gamerpic.image_texture) {
         obs_enter_graphics();
-        gs_texture_destroy(g_avatar.image_texture);
+        gs_texture_destroy(g_gamerpic.image_texture);
         obs_leave_graphics();
     }
 
@@ -271,7 +271,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    xbox_avatar_source_t *source = data;
+    xbox_gamerpic_source_t *source = data;
 
     if (!source) {
         return;
@@ -281,8 +281,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     load_texture_from_file();
 
     /* Render the image if we have a texture */
-    if (g_avatar.image_texture) {
-        draw_texture(g_avatar.image_texture, source->width, source->height, effect);
+    if (g_gamerpic.image_texture) {
+        draw_texture(g_gamerpic.image_texture, source->width, source->height, effect);
     }
 }
 
@@ -316,10 +316,10 @@ static obs_properties_t *source_get_properties(void *data) {
 }
 
 /**
- * @brief obs_source_info for the Xbox Avatar source.
+ * @brief obs_source_info for the Xbox Gamerpic source.
  */
-static struct obs_source_info xbox_avatar_source_info = {
-    .id             = "xbox_avatar_source",
+static struct obs_source_info xbox_gamerpic_source_info = {
+    .id             = "xbox_gamerpic_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = source_get_name,
@@ -336,8 +336,8 @@ static struct obs_source_info xbox_avatar_source_info = {
 /**
  * @brief Get a pointer to this source type's obs_source_info.
  */
-static const struct obs_source_info *xbox_avatar_source_get(void) {
-    return &xbox_avatar_source_info;
+static const struct obs_source_info *xbox_gamerpic_source_get(void) {
+    return &xbox_gamerpic_source_info;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -345,14 +345,14 @@ static const struct obs_source_info *xbox_avatar_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Register the Xbox Avatar source with OBS.
+ * @brief Register the Xbox Gamerpic source with OBS.
  *
  * Registers the source type, then subscribes to Xbox connection events so the
- * avatar gets refreshed when the user connects/reconnects.
+ * gamerpic gets refreshed when the user connects/reconnects.
  */
-void xbox_avatar_source_register(void) {
+void xbox_gamerpic_source_register(void) {
 
-    obs_register_source(xbox_avatar_source_get());
+    obs_register_source(xbox_gamerpic_source_get());
 
     xbox_subscribe_connected_changed(&on_connection_changed);
 }

@@ -55,7 +55,7 @@ achievement_t *xbox_get_game_achievements(const game_t *game);
 char *xbox_get_game_cover(const game_t *game);
 
 /**
- * @brief Fetches the current authenticated user's avatar URL.
+ * @brief Fetches the current authenticated user's Gamerpic URL.
  *
  * This performs an authenticated request to the Xbox profile settings endpoint
  * and extracts the "GameDisplayPicRaw" (avatar) URL.
@@ -64,7 +64,7 @@ char *xbox_get_game_cover(const game_t *game);
  *         error. The caller owns the returned string and must free it with
  *         @ref bfree.
  */
-const char *xbox_fetch_avatar();
+const char *xbox_fetch_gamerpic();
 
 #ifdef __cplusplus
 }

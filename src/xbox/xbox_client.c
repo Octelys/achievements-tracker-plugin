@@ -37,7 +37,7 @@
 #define XBOX_PROFILE_SETTINGS_ENDPOINT     "https://profile.xboxlive.com/users/batch/profile/settings"
 #define XBOX_PROFILE_CONTRACT_VERSION      "2"
 #define GAMERSCORE_SETTING                 "Gamerscore"
-#define GAMERAVATAR_SETTING                "GameDisplayPicRaw"
+#define GAMERPIC_SETTING                   "GameDisplayPicRaw"
 #define XBOX_TITLE_HUB                     "https://titlehub.xboxlive.com/users/xuid(%s)/titles/titleId(%s)/decoration/image"
 #define XBOX_ACHIEVEMENTS_ENDPOINT         "https://achievements.xboxlive.com/users/xuid(%s)/achievements?titleId=%s"
 
@@ -46,6 +46,36 @@
 #define XBOX_GAME_COVER_URL                "/titles/0/images/%d/url"
 #define XBOX_GAME_COVER_POSTER_TYPE        "poster"
 #define XBOX_GAME_COVER_BOX_ART_TYPE       "boxart"
+
+static bool str_replace(char *s, const char *needle, const char *replacement) {
+    if (!s || !needle || !replacement) {
+        return false;
+    }
+
+    const size_t needle_length      = strlen(needle);
+    const size_t replacement_length = strlen(replacement);
+
+    if (needle_length == 0 || replacement_length > needle_length) {
+        return false;
+    }
+
+    bool changed = false;
+
+    for (char *p = s; (p = strstr(p, needle)) != NULL;) {
+        if (replacement_length) {
+            memcpy(p, replacement, replacement_length);
+        }
+
+        if (replacement_length < needle_length) {
+            memmove(p + replacement_length, p + needle_length, strlen(p + needle_length) + 1);
+        }
+
+        p += replacement_length;
+        changed = true;
+    }
+
+    return changed;
+}
 
 /**
  * @brief Fetch the cover image URL for a given game.
@@ -276,7 +306,7 @@ cleanup:
  *         available. The caller owns the returned string and must free it with
  *         @ref bfree.
  */
-const char *xbox_fetch_avatar() {
+const char *xbox_fetch_gamerpic() {
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
@@ -284,8 +314,8 @@ const char *xbox_fetch_avatar() {
         return NULL;
     }
 
-    char *response_json   = NULL;
-    char *gameravatar_url = NULL;
+    char *response_json = NULL;
+    char *gamerpic_url  = NULL;
 
     /* Creates the request */
     char json_body[4096];
@@ -293,9 +323,9 @@ const char *xbox_fetch_avatar() {
              sizeof(json_body),
              "{\"userIds\":[\"%s\"],\"settings\":[\"%s\"]}",
              identity->xid,
-             GAMERAVATAR_SETTING);
+             GAMERPIC_SETTING);
 
-    obs_log(LOG_DEBUG, "Body: %s", json_body);
+    obs_log(LOG_INFO, "Body: %s", json_body);
 
     char headers[4096];
     snprintf(headers,
@@ -318,36 +348,36 @@ const char *xbox_fetch_avatar() {
     }
 
     if (!response_json) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's avatar:: received no response");
+        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic:: received no response");
         goto cleanup;
     }
+
+    obs_log(LOG_INFO, "Response: %s", response_json);
 
     cJSON *root = cJSON_Parse(response_json);
 
     if (!root) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's avatar: unable to parse the JSON response");
+        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic: unable to parse the JSON response");
         goto cleanup;
     }
 
     /* Retrieves the value at the specified key: we assume it is at the first item (for now) */
-    char user_avatar_key[512] = "/profileUsers/0/settings/%s/value";
-    snprintf(user_avatar_key, sizeof(user_avatar_key), user_avatar_key, GAMERAVATAR_SETTING);
+    cJSON *user_gamerpic_url = cJSONUtils_GetPointer(root, "/profileUsers/0/settings/0/value");
 
-    cJSON *user_avatar_url = cJSONUtils_GetPointer(root, user_avatar_key);
-
-    if (!user_avatar_url || strlen(user_avatar_url->valuestring) == 0) {
-        obs_log(LOG_INFO, "Failed to fetch the user's avatar: no value found.");
+    if (!user_gamerpic_url || strlen(user_gamerpic_url->valuestring) == 0) {
+        obs_log(LOG_INFO, "Failed to fetch the user's gamerpic: no value found.");
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "User avatar URL is '%s'", user_avatar_url->valuestring);
+    gamerpic_url = bstrdup(user_gamerpic_url->valuestring);
+    str_replace(gamerpic_url, "u0026", "&");
 
-    gameravatar_url = bstrdup(user_avatar_url->valuestring);
+    obs_log(LOG_INFO, "User gamerpic URL is '%s'", gamerpic_url);
 
 cleanup:
     free_memory((void **)&response_json);
 
-    return gameravatar_url;
+    return gamerpic_url;
 }
 
 /**

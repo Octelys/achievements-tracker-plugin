@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-void xbox_avatar_source_register(void);
+void xbox_gamerpic_source_register(void);
 
 #ifdef __cplusplus
 }

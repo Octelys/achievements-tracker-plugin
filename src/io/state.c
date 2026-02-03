@@ -18,6 +18,7 @@
 #define DEVICE_SERIAL_NUMBER "device_serial_number"
 #define DEVICE_KEYS "device_keys"
 #define DEVICE_TOKEN "device_token"
+#define DEVICE_CODE "device_code"
 
 #define SISU_TOKEN "sisu_token"
 
@@ -151,12 +152,14 @@ void state_clear(void) {
     /*obs_data_set_string(g_state, DEVICE_SERIAL_NUMBER, "");*/
     /*obs_data_set_string(g_state, DEVICE_KEYS, "");*/
 
+    obs_data_set_string(g_state, DEVICE_CODE, "");
     obs_data_set_string(g_state, USER_ACCESS_TOKEN, "");
     obs_data_set_int(g_state, USER_ACCESS_TOKEN_EXPIRY, 0);
     obs_data_set_string(g_state, USER_REFRESH_TOKEN, "");
     obs_data_set_string(g_state, XBOX_TOKEN_EXPIRY, "");
     obs_data_set_string(g_state, DEVICE_TOKEN, "");
     obs_data_set_string(g_state, XBOX_IDENTITY_GTG, "");
+    obs_data_set_string(g_state, XBOX_IDENTITY_UHS, "");
     obs_data_set_string(g_state, XBOX_IDENTITY_ID, "");
     obs_data_set_string(g_state, XBOX_TOKEN, "");
     obs_data_set_string(g_state, XBOX_TOKEN_EXPIRY, "");
@@ -269,7 +272,7 @@ device_t *state_get_device(void) {
         return NULL;
     }
 
-    device_t *device      = (device_t *)bzalloc(sizeof(device_t));
+    device_t *device      = bzalloc(sizeof(device_t));
     device->uuid          = device_uuid;
     device->serial_number = device_serial_number;
     device->keys          = device_evp_pkeys;
@@ -344,14 +347,28 @@ token_t *state_get_sisu_token(void) {
 /**
  * @brief Store the user access token and refresh token.
  *
+ * @param device_code   Device code required for the refresh.
  * @param user_token    Access token (value + expiry).
  * @param refresh_token Refresh token.
  */
-void state_set_user_token(const token_t *user_token, const token_t *refresh_token) {
+void state_set_user_token(const char *device_code, const token_t *user_token, const token_t *refresh_token) {
+    obs_data_set_string(g_state, DEVICE_CODE, device_code);
     obs_data_set_string(g_state, USER_ACCESS_TOKEN, user_token->value);
     obs_data_set_int(g_state, USER_ACCESS_TOKEN_EXPIRY, user_token->expires);
     obs_data_set_string(g_state, USER_REFRESH_TOKEN, refresh_token->value);
     save_state(g_state);
+}
+
+char *state_get_device_code(void) {
+
+    const char *device_code = obs_data_get_string(g_state, DEVICE_CODE);
+
+    if (!device_code || strlen(device_code) == 0) {
+        obs_log(LOG_INFO, "No device code found in the cache");
+        return NULL;
+    }
+
+    return bstrdup(device_code);
 }
 
 /**
@@ -369,7 +386,7 @@ token_t *state_get_user_token(void) {
     }
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = user_token;
+    token->value   = bstrdup(user_token);
 
     return token;
 }
@@ -388,7 +405,7 @@ token_t *state_get_user_refresh_token(void) {
     }
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = refresh_token;
+    token->value   = bstrdup(refresh_token);
 
     return token;
 }
@@ -460,13 +477,13 @@ xbox_identity_t *state_get_xbox_identity(void) {
     obs_log(LOG_DEBUG, "Xbox identity found in the cache: %s (%s)", gtg, xid);
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = xbox_token;
+    token->value   = bstrdup(xbox_token);
     token->expires = xbox_token_expiry;
 
     xbox_identity_t *identity = bzalloc(sizeof(xbox_identity_t));
-    identity->gamertag        = gtg;
-    identity->xid             = xid;
-    identity->uhs             = uhs;
+    identity->gamertag        = bstrdup(gtg);
+    identity->xid             = bstrdup(xid);
+    identity->uhs             = bstrdup(uhs);
     identity->token           = token;
 
     return identity;
