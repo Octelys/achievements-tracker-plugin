@@ -29,6 +29,9 @@ typedef struct xbox_gamerpic_source {
  * @brief Runtime cache for the downloaded gamerpic image.
  */
 typedef struct gamerpic {
+    /** Last fetched gamerpic/avatar URL (used to detect changes). */
+    char image_url[1024];
+
     /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
     char image_path[512];
 
@@ -65,7 +68,7 @@ static void download_gamerpic_from_url(const char *image_url) {
         return;
     }
 
-    obs_log(LOG_INFO, "Loading Xbox gamerpic image from URL: %s", image_url);
+    obs_log(LOG_INFO, "Downloading Xbox gamerpic image from URL: %s", image_url);
 
     /* Downloads the image in memory */
     uint8_t *data = NULL;
@@ -76,7 +79,7 @@ static void download_gamerpic_from_url(const char *image_url) {
         return;
     }
 
-    /* Write the bytes to a temp file and use gs_texture_create_from_file of the render thread */
+    /* Write the bytes to a temp file and use gs_texture_create_from_file() on the render thread */
     snprintf(g_gamerpic.image_path,
              sizeof(g_gamerpic.image_path),
              "%s/obs_plugin_temp_gamerpic.png",
@@ -85,7 +88,7 @@ static void download_gamerpic_from_url(const char *image_url) {
     FILE *temp_file = fopen(g_gamerpic.image_path, "wb");
 
     if (!temp_file) {
-        obs_log(LOG_ERROR, "Failed to create temp file for image");
+        obs_log(LOG_ERROR, "Failed to create temp file for gamerpic image");
         bfree(data);
         return;
     }
@@ -120,7 +123,7 @@ static void load_texture_from_file() {
         g_gamerpic.image_texture = NULL;
     }
 
-    if (strlen(g_gamerpic.image_path) > 0) {
+    if (g_gamerpic.image_path[0] != '\0') {
         g_gamerpic.image_texture = gs_texture_create_from_file(g_gamerpic.image_path);
     }
 
@@ -128,13 +131,16 @@ static void load_texture_from_file() {
 
     g_gamerpic.must_reload = false;
 
-    /* Clean up temp file */
-    remove(g_gamerpic.image_path);
+    /* Clean up temp file (best-effort) */
+    if (g_gamerpic.image_path[0] != '\0') {
+        remove(g_gamerpic.image_path);
+        g_gamerpic.image_path[0] = '\0';
+    }
 
     if (g_gamerpic.image_texture) {
-        obs_log(LOG_INFO, "New image has been successfully loaded from the file");
+        obs_log(LOG_INFO, "New gamerpic texture has been successfully loaded");
     } else {
-        obs_log(LOG_WARNING, "Failed to create texture from the file");
+        obs_log(LOG_WARNING, "Failed to create gamerpic texture from the downloaded file");
     }
 }
 
@@ -161,26 +167,27 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
         obs_log(LOG_INFO, "Connected to Xbox Live - fetching gamerpic URL");
         gamerpic_url = (char *)xbox_fetch_gamerpic();
 
-        if (gamerpic_url) {
-            if (strcasecmp(gamerpic_url, g_gamerpic.image_path) == 0) {
-                /* gamerpic URL hasn't changed, no need to reload */
+        if (gamerpic_url && gamerpic_url[0] != '\0') {
+            if (strcasecmp(gamerpic_url, g_gamerpic.image_url) == 0) {
+                /* gamerpic URL hasn't changed, no need to download/reload */
                 goto cleanup;
             }
 
-            snprintf(g_gamerpic.image_path, sizeof(g_gamerpic.image_path), "%s", gamerpic_url);
+            snprintf(g_gamerpic.image_url, sizeof(g_gamerpic.image_url), "%s", gamerpic_url);
+            download_gamerpic_from_url(gamerpic_url);
 
-            if (gamerpic_url[0] != '\0') {
-                download_gamerpic_from_url(gamerpic_url);
-            }
         } else {
+            /* Disconnected/empty URL: clear cached URL and force texture to be freed on the next render */
+            g_gamerpic.image_url[0]  = '\0';
             g_gamerpic.image_path[0] = '\0';
+            g_gamerpic.must_reload   = true;
         }
 
     } else {
+        g_gamerpic.image_url[0]  = '\0';
         g_gamerpic.image_path[0] = '\0';
+        g_gamerpic.must_reload   = true;
     }
-
-    g_gamerpic.must_reload = true;
 
 cleanup:
     /* xbox_fetch_gamerpic() returns a newly allocated string */

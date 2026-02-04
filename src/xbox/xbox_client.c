@@ -47,6 +47,22 @@
 #define XBOX_GAME_COVER_POSTER_TYPE        "poster"
 #define XBOX_GAME_COVER_BOX_ART_TYPE       "boxart"
 
+/**
+ * @brief In-place substring replacement helper.
+ *
+ * Replaces all occurrences of @p needle in @p s with @p replacement.
+ *
+ * This helper is intentionally simple and works in-place, so it only supports
+ * equal or shorter replacements (i.e. replacement_length <= needle_length).
+ * It's used to post-process certain JSON-escaped pieces we get back from Xbox
+ * services (for example: "\\u0026" sequences inside URLs).
+ *
+ * @param[in,out] s String buffer to mutate.
+ * @param needle Substring to search for (must be non-empty).
+ * @param replacement Substring to write in place of @p needle.
+ *
+ * @return true if at least one replacement happened, false otherwise.
+ */
 static bool str_replace(char *s, const char *needle, const char *replacement) {
     if (!s || !needle || !replacement) {
         return false;
@@ -325,7 +341,7 @@ const char *xbox_fetch_gamerpic() {
              identity->xid,
              GAMERPIC_SETTING);
 
-    obs_log(LOG_INFO, "Body: %s", json_body);
+    obs_log(LOG_DEBUG, "Profile settings request body: %s", json_body);
 
     char headers[4096];
     snprintf(headers,
@@ -336,43 +352,46 @@ const char *xbox_fetch_gamerpic() {
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
 
-    obs_log(LOG_DEBUG, "Headers: %s", headers);
+    obs_log(LOG_DEBUG, "Profile settings request headers: %s", headers);
 
     /* Sends the request */
     long http_code = 0;
     response_json  = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's avatar: received status code %d", http_code);
+        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic/avatar: received status code %ld", http_code);
         goto cleanup;
     }
 
     if (!response_json) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic:: received no response");
+        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic/avatar: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Response: %s", response_json);
+    obs_log(LOG_DEBUG, "Profile settings response: %s", response_json);
 
     cJSON *root = cJSON_Parse(response_json);
 
     if (!root) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic: unable to parse the JSON response");
+        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic/avatar: unable to parse the JSON response");
         goto cleanup;
     }
 
     /* Retrieves the value at the specified key: we assume it is at the first item (for now) */
     cJSON *user_gamerpic_url = cJSONUtils_GetPointer(root, "/profileUsers/0/settings/0/value");
 
-    if (!user_gamerpic_url || strlen(user_gamerpic_url->valuestring) == 0) {
-        obs_log(LOG_INFO, "Failed to fetch the user's gamerpic: no value found.");
+    if (!user_gamerpic_url || !user_gamerpic_url->valuestring || user_gamerpic_url->valuestring[0] == '\0') {
+        obs_log(LOG_INFO, "Failed to fetch the user's gamerpic/avatar: no value found.");
         goto cleanup;
     }
 
     gamerpic_url = bstrdup(user_gamerpic_url->valuestring);
-    str_replace(gamerpic_url, "u0026", "&");
 
-    obs_log(LOG_INFO, "User gamerpic URL is '%s'", gamerpic_url);
+    /* cJSON doesn't automatically unescape literal unicode sequences (\\uXXXX) inside strings.
+     * Xbox sometimes returns URLs containing "\\u0026" for '&'. Fix it up for curl/http. */
+    str_replace(gamerpic_url, "\\u0026", "&");
+
+    obs_log(LOG_INFO, "User gamerpic/avatar URL is '%s'", gamerpic_url);
 
 cleanup:
     free_memory((void **)&response_json);
