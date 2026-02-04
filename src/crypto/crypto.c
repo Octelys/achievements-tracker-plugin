@@ -376,7 +376,7 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
     if (!key_json)
         return NULL;
 
-    obs_log(LOG_WARNING, "JSON key: %s", key_json);
+    obs_log(LOG_DEBUG, "JSON key: %s", key_json);
 
     cJSON    *json_root      = NULL;
     cJSON    *d64_local_node = NULL;

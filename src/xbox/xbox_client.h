@@ -43,12 +43,28 @@ achievement_t *xbox_get_game_achievements(const game_t *game);
 /**
  * @brief Fetches a cover image URL for a given game.
  *
+ * This calls the Xbox TitleHub decoration/image endpoint for the specified
+ * title and tries to pick the best artwork available ("poster" or "boxart").
+ * If neither is present, it falls back to the title's display image.
+ *
  * @param game Game to fetch the cover for (may be NULL).
  *
  * @return Newly allocated URL string, or NULL if not available or on error.
- *         The caller owns the returned string and must free it.
+ *         The caller owns the returned string and must free it with @ref bfree.
  */
 char *xbox_get_game_cover(const game_t *game);
+
+/**
+ * @brief Fetches the current authenticated user's Gamerpic URL.
+ *
+ * This performs an authenticated request to the Xbox profile settings endpoint
+ * and extracts the "GameDisplayPicRaw" (avatar) URL.
+ *
+ * @return Newly allocated URL string on success, or NULL if not available or on
+ *         error. The caller owns the returned string and must free it with
+ *         @ref bfree.
+ */
+const char *xbox_fetch_gamerpic();
 
 #ifdef __cplusplus
 }

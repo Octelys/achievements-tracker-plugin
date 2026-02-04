@@ -31,10 +31,11 @@ device_t *state_get_device(void);
  * Implementations usually copy the tokens into internal storage and may persist
  * them.
  *
+ * @param device_code   Device code required for the refresh.
  * @param user_token    The access token to store (may be NULL to clear).
  * @param refresh_token The refresh token to store (may be NULL to clear).
  */
-void state_set_user_token(const token_t *user_token, const token_t *refresh_token);
+void state_set_user_token(const char *device_code, const token_t *user_token, const token_t *refresh_token);
 
 /**
  * @brief Get the current user's access token.
@@ -49,6 +50,13 @@ token_t *state_get_user_token(void);
  * @return Pointer to the stored refresh token, or NULL if none is set.
  */
 token_t *state_get_user_refresh_token(void);
+
+/**
+ * @brief Get the device code used to refresh the token.
+ *
+ * @return Pointer to the stored refresh token, or NULL if none is set.
+ */
+char *state_get_device_code(void);
 
 /**
  * @brief Set the device token used for device authentication.
