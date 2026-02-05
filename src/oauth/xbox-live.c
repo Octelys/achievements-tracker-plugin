@@ -871,8 +871,11 @@ xbox_identity_t *xbox_live_get_identity(void) {
         return false;
     }
 
+    char *device_code = state_get_device_code();
+
     authentication_ctx_t *ctx = bzalloc(sizeof(authentication_ctx_t));
     ctx->device               = device;
+    ctx->device_code          = device_code;
     ctx->on_completed         = NULL;
     ctx->on_completed_data    = NULL;
     ctx->allow_cache          = false;

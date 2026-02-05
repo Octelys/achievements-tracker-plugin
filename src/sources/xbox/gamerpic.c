@@ -68,16 +68,18 @@ static void download_gamerpic_from_url(const char *image_url) {
         return;
     }
 
-    obs_log(LOG_INFO, "Downloading Xbox gamerpic image from URL: %s", image_url);
+    obs_log(LOG_INFO, "Downloading Xbox Gamerpic image from URL: %s", image_url);
 
     /* Downloads the image in memory */
     uint8_t *data = NULL;
     size_t   size = 0;
 
     if (!http_download(image_url, &data, &size)) {
-        obs_log(LOG_WARNING, "Unable to download gamerpic image from URL: %s", image_url);
+        obs_log(LOG_WARNING, "Unable to download Gamerpic image from URL: %s", image_url);
         return;
     }
+
+    obs_log(LOG_INFO, "Downloaded %d bytes for Gamerpic image", size);
 
     /* Write the bytes to a temp file and use gs_texture_create_from_file() on the render thread */
     snprintf(g_gamerpic.image_path,
@@ -88,7 +90,7 @@ static void download_gamerpic_from_url(const char *image_url) {
     FILE *temp_file = fopen(g_gamerpic.image_path, "wb");
 
     if (!temp_file) {
-        obs_log(LOG_ERROR, "Failed to create temp file for gamerpic image");
+        obs_log(LOG_ERROR, "Failed to create temp file for Gamerpic image");
         bfree(data);
         return;
     }
@@ -131,16 +133,13 @@ static void load_texture_from_file() {
 
     g_gamerpic.must_reload = false;
 
-    /* Clean up temp file (best-effort) */
-    if (g_gamerpic.image_path[0] != '\0') {
-        remove(g_gamerpic.image_path);
-        g_gamerpic.image_path[0] = '\0';
-    }
+    /* Clean up temp file */
+    remove(g_gamerpic.image_path);
 
     if (g_gamerpic.image_texture) {
-        obs_log(LOG_INFO, "New gamerpic texture has been successfully loaded");
+        obs_log(LOG_INFO, "New Gamerpic texture has been successfully loaded");
     } else {
-        obs_log(LOG_WARNING, "Failed to create gamerpic texture from the downloaded file");
+        obs_log(LOG_WARNING, "Failed to create Gamerpic texture from the downloaded file");
     }
 }
 
