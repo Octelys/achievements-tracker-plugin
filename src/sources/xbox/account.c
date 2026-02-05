@@ -230,10 +230,10 @@ static obs_properties_t *source_get_properties(void *data) {
             obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
         }
     }
-        obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
+    obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
     //}// else {
-        obs_properties_add_text(p, "disconnected_status_info", "You are not connected.", OBS_TEXT_INFO);
-        obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
+    obs_properties_add_text(p, "disconnected_status_info", "You are not connected.", OBS_TEXT_INFO);
+    obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
     //}
 
     return p;

@@ -1,5 +1,7 @@
 #include "parsers.h"
 
+#include "text/convert.h"
+
 #include <obs-module.h>
 #include <cJSON.h>
 #include <cJSON_Utils.h>
@@ -74,6 +76,43 @@ static bool get_node_bool(cJSON *json_root, int achievement_index, const char *p
     }
 
     return strcmp(property_value, "true") == 0;
+}
+
+/**
+ * @brief Read a boolean value stored as a string from an achievement object.
+ *
+ * Some responses encode booleans as strings. This helper reads the string value
+ * and returns true if it equals "true".
+ *
+ * @param json_root          Parsed JSON root object.
+ * @param achievement_index Index in the "achievements" array.
+ * @param property_name     Property name to read.
+ * @return true if the underlying value equals "true"; false otherwise.
+ */
+static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, const char *property_name) {
+
+    const char *property_value = get_node_string(json_root, achievement_index, property_name);
+
+    obs_log(LOG_INFO, "%s=%s", property_name, property_value);
+
+    if (!property_value || strlen(property_value) == 0) {
+        return 0;
+    }
+
+    int32_t fraction       = 0;
+    int64_t unix_timestamp = 0;
+
+    if (!convert_iso8601_utc_to_unix(property_value, &unix_timestamp, &fraction)) {
+        obs_log(LOG_ERROR,
+                "Unable to convert property '%s' as a unix timestamp. Value: %s",
+                property_name,
+                property_value);
+        return 0;
+    }
+
+    obs_log(LOG_INFO, "%s=%" PRId64, property_name, unix_timestamp);
+
+    return unix_timestamp;
 }
 
 /**
@@ -350,6 +389,8 @@ achievement_t *parse_achievements(const char *json_string) {
         achievement->description        = get_node_string(json_root, achievement_index, "description");
         achievement->locked_description = get_node_string(json_root, achievement_index, "lockedDescription");
         achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
+        achievement->unlocked_timestamp = get_node_unix_timestamp(json_root, achievement_index, "progression/timeUnlocked");
+        achievement->icon_url = get_node_string(json_root, achievement_index, "mediaAssets/0/url");
 
         /* Reads the media assets */
         media_asset_t *media_assets = NULL;

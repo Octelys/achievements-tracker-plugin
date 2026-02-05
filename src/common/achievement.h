@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +69,10 @@ typedef struct achievement {
     const char          *locked_description;
     /** Linked list of rewards associated with this achievement. */
     const reward_t      *rewards;
+    /** Unix timestamp (seconds since epoch) when the achievement was unlocked, or 0 if locked. */
+    int64_t              unlocked_timestamp;
+    /**  */
+    const char          *icon_url;
     /** Next achievement in the list, or NULL. */
     struct achievement  *next;
 } achievement_t;

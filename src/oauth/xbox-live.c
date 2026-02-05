@@ -33,6 +33,7 @@
 #include "crypto/crypto.h"
 #include "encoding/base64.h"
 #include "io/state.h"
+#include "text/convert.h"
 #include "time/time.h"
 
 #include <pthread.h>
@@ -240,7 +241,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     int32_t fraction       = 0;
     int64_t unix_timestamp = 0;
 
-    if (!time_iso8601_utc_to_unix(not_after_date_node->valuestring, &unix_timestamp, &fraction)) {
+    if (!convert_iso8601_utc_to_unix(not_after_date_node->valuestring, &unix_timestamp, &fraction)) {
         ctx->result.error_message = "Unable retrieve a device token: unable to read the NotAfter date";
         obs_log(LOG_ERROR, ctx->result.error_message);
         goto cleanup;
@@ -403,7 +404,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     int32_t fraction       = 0;
     int64_t unix_timestamp = 0;
 
-    if (!time_iso8601_utc_to_unix(not_after_date_node->valuestring, &unix_timestamp, &fraction)) {
+    if (!convert_iso8601_utc_to_unix(not_after_date_node->valuestring, &unix_timestamp, &fraction)) {
         ctx->result.error_message = "Unable retrieve a device token: unable to read the NotAfter date";
         obs_log(LOG_ERROR, ctx->result.error_message);
         goto cleanup;

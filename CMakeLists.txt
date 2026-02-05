@@ -248,6 +248,7 @@ target_sources(
     src/io/state.c
     src/encoding/base64.c
     src/util/uuid.c
+    src/text/convert.c
     src/text/parsers.c
     src/time/time.c
     src/common/achievement.c
@@ -401,7 +402,12 @@ if(BUILD_TESTING)
   # ------------------------------
   # test_time
   # ------------------------------
-  add_executable(test_time test/test_time.c ${unity_SOURCE_DIR}/src/unity.c src/time/time.c test/stubs/bmem_stub.c)
+  add_executable(
+          test_time
+          test/test_convert.c
+          ${unity_SOURCE_DIR}/src/unity.c
+          src/text/convert.c
+          test/stubs/bmem_stub.c)
 
   add_test(NAME test_time COMMAND test_time)
 
@@ -429,6 +435,7 @@ if(BUILD_TESTING)
     test_parsers
     test/test_parsers.c
     ${unity_SOURCE_DIR}/src/unity.c
+    src/text/convert.c
     src/text/parsers.c
     test/stubs/bmem_stub.c
   )
