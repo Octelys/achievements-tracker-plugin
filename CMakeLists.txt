@@ -569,6 +569,6 @@ if(BUILD_TESTING)
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
   if(ENABLE_COVERAGE)
-    add_coverage_target(test_encoder test_crypto test_time test_parsers test_xbox_session test_types)
+    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_xbox_session test_types)
   endif()
 endif()
