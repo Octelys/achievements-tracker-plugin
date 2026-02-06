@@ -23,7 +23,7 @@ typedef struct achievement_progress {
     const char                  *id;
     /** Progress state. */
     const char                  *progress_state;
-    int64_t unlocked_timestamp;
+    int64_t                      unlocked_timestamp;
     /** Next progress entry in the list, or NULL. */
     struct achievement_progress *next;
 } achievement_progress_t;

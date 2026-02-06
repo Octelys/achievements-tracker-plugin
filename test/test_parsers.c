@@ -273,7 +273,9 @@ static void parse_achievements__message_is_one_achievement_achievement_returned(
     TEST_ASSERT_EQUAL_STRING(actual->service_config_id, "00000000-0000-0000-0000-00007972ac43");
     TEST_ASSERT_EQUAL_STRING(actual->name, "Daddy's Glasses");
     TEST_ASSERT_EQUAL_STRING(actual->description, "You found Daddy Pig's Glasses.");
-    TEST_ASSERT_EQUAL_STRING(actual->icon_url, "https://images-eds-ssl.xboxlive.com/image?url=27S1DHqE.cHkmFg4nspsdzttpqR9mABLoi_h264Ah_brT_74D18wvss1Tpl1Hv0V.ZRAXkfWjJILaiyZZyI_J2paDrXdC_1Gly_3Cnd9yC7IDl0y2ssMo_dvyQ_OhHyuW60ck5614OfHrmzXJvVaS2vM4efPU6iwu2_vBB1TeAE-");
+    TEST_ASSERT_EQUAL_STRING(
+        actual->icon_url,
+        "https://images-eds-ssl.xboxlive.com/image?url=27S1DHqE.cHkmFg4nspsdzttpqR9mABLoi_h264Ah_brT_74D18wvss1Tpl1Hv0V.ZRAXkfWjJILaiyZZyI_J2paDrXdC_1Gly_3Cnd9yC7IDl0y2ssMo_dvyQ_OhHyuW60ck5614OfHrmzXJvVaS2vM4efPU6iwu2_vBB1TeAE-");
     TEST_ASSERT_EQUAL_STRING(actual->progress_state, "Achieved");
     TEST_ASSERT_EQUAL_STRING(actual->rewards->value, "80");
     TEST_ASSERT_EQUAL_INT64(actual->unlocked_timestamp, 1768704501);

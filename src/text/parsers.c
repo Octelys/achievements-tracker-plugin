@@ -328,7 +328,7 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
             continue;
         }
 
-        int32_t fraction = 0;
+        int32_t fraction           = 0;
         int64_t unlocked_timestamp = 0;
 
         if (!convert_iso8601_utc_to_unix(time_unlocked_node->valuestring, &unlocked_timestamp, &fraction)) {
@@ -408,7 +408,8 @@ achievement_t *parse_achievements(const char *json_string) {
         achievement->description        = get_node_string(json_root, achievement_index, "description");
         achievement->locked_description = get_node_string(json_root, achievement_index, "lockedDescription");
         achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
-        achievement->unlocked_timestamp = get_node_unix_timestamp(json_root, achievement_index, "progression/timeUnlocked");
+        achievement->unlocked_timestamp =
+            get_node_unix_timestamp(json_root, achievement_index, "progression/timeUnlocked");
         achievement->icon_url = get_node_string(json_root, achievement_index, "mediaAssets/0/url");
 
         /* Reads the media assets */

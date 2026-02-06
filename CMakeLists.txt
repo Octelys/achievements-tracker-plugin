@@ -403,11 +403,12 @@ if(BUILD_TESTING)
   # test_time
   # ------------------------------
   add_executable(
-          test_time
-          test/test_convert.c
-          ${unity_SOURCE_DIR}/src/unity.c
-          src/text/convert.c
-          test/stubs/bmem_stub.c)
+    test_time
+    test/test_convert.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/text/convert.c
+    test/stubs/bmem_stub.c
+  )
 
   add_test(NAME test_time COMMAND test_time)
 
