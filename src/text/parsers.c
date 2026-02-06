@@ -318,10 +318,29 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
             continue;
         }
 
+        char time_unlocked_key[512] = "";
+        snprintf(time_unlocked_key, sizeof(time_unlocked_key), "/progression/%d/timeUnlocked", detail_index);
+
+        cJSON *time_unlocked_node = cJSONUtils_GetPointer(json_root, time_unlocked_key);
+
+        if (!time_unlocked_node) {
+            obs_log(LOG_ERROR, "No time unlocked at %d", detail_index);
+            continue;
+        }
+
+        int32_t fraction = 0;
+        int64_t unlocked_timestamp = 0;
+
+        if (!convert_iso8601_utc_to_unix(time_unlocked_node->valuestring, &unlocked_timestamp, &fraction)) {
+            obs_log(LOG_ERROR, "No time unlocked at %d", detail_index);
+            continue;
+        }
+
         achievement_progress_t *progress = bzalloc(sizeof(achievement_progress_t));
         progress->service_config_id      = strdup(current_service_config_id);
         progress->id                     = strdup(id_node->valuestring);
         progress->progress_state         = strdup(progress_state_node->valuestring);
+        progress->unlocked_timestamp     = unlocked_timestamp;
         progress->next                   = NULL;
 
         if (!achievement_progress) {
