@@ -232,7 +232,6 @@ if(PkgConfig_FOUND)
   target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_CFLAGS_OTHER})
 endif()
 
-
 # Logging helpers (obs_log wrapper + plugin name/version)
 if(TARGET diagnostics-log)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE diagnostics-log)
@@ -422,7 +421,7 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
   )
 
-  add_test(NAME test_convert COMMAND test_convert
+  add_test(NAME test_convert COMMAND test_convert)
 
   if(ENABLE_COVERAGE)
     enable_coverage(test_convert)

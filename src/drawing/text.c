@@ -12,12 +12,12 @@
 
 struct text_tex {
     gs_texture_t *tex;
-    uint32_t w;
-    uint32_t h;
+    uint32_t      w;
+    uint32_t      h;
 };
 
-static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const FT_Bitmap *bmp, uint32_t x, uint32_t y)
-{
+static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const FT_Bitmap *bmp, uint32_t x,
+                            uint32_t y) {
     for (uint32_t row = 0; row < (uint32_t)bmp->rows; row++) {
 
         uint32_t dy = y + row;
@@ -34,7 +34,7 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
                 break;
             }
 
-            uint8_t a = bmp->buffer[row * bmp->pitch + col];
+            uint8_t  a   = bmp->buffer[row * bmp->pitch + col];
             uint32_t idx = (dy * dst_w + dx) * 4;
 
             // White text with alpha from glyph coverage.
@@ -46,13 +46,13 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
     }
 }
 
-static bool make_text_texture(struct text_tex *out, const char *ttf_path, const char *text, uint32_t px_size)
-{
-    if (!out || !ttf_path || !text) return false;
+static bool make_text_texture(struct text_tex *out, const char *ttf_path, const char *text, uint32_t px_size) {
+    if (!out || !ttf_path || !text)
+        return false;
     memset(out, 0, sizeof(*out));
 
-    FT_Library ft = NULL;
-    FT_Face face = NULL;
+    FT_Library ft   = NULL;
+    FT_Face    face = NULL;
 
     if (FT_Init_FreeType(&ft) != 0) {
         return false;
@@ -117,8 +117,8 @@ static bool make_text_texture(struct text_tex *out, const char *ttf_path, const 
 
     // Upload to OBS texture.
     out->tex = gs_texture_create(w, h, GS_RGBA, 1, (const uint8_t **)&rgba, GS_DYNAMIC);
-    out->w = w;
-    out->h = h;
+    out->w   = w;
+    out->h   = h;
 
     free(rgba);
     FT_Done_Face(face);
@@ -127,9 +127,9 @@ static bool make_text_texture(struct text_tex *out, const char *ttf_path, const 
     return out->tex != NULL;
 }
 
-static void draw_text_texture(const struct text_tex *t, float x, float y)
-{
-    if (!t || !t->tex) return;
+static void draw_text_texture(const struct text_tex *t, float x, float y) {
+    if (!t || !t->tex)
+        return;
 
     gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 
