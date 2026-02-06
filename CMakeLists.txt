@@ -222,6 +222,17 @@ if(ENABLE_QT)
   )
 endif()
 
+# Support of FreeType
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
+
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE PkgConfig::FREETYPE)
+  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
+  target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_CFLAGS_OTHER})
+endif()
+
+
 # Logging helpers (obs_log wrapper + plugin name/version)
 if(TARGET diagnostics-log)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE diagnostics-log)
@@ -237,6 +248,7 @@ target_sources(
     src/sources/xbox/gamerscore.c
     src/crypto/crypto.c
     src/drawing/image.c
+    src/drawing/text.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
@@ -400,24 +412,24 @@ if(BUILD_TESTING)
   target_link_test_deps(test_crypto)
 
   # ------------------------------
-  # test_time
+  # test_convert
   # ------------------------------
   add_executable(
-    test_time
+    test_convert
     test/test_convert.c
     ${unity_SOURCE_DIR}/src/unity.c
     src/text/convert.c
     test/stubs/bmem_stub.c
   )
 
-  add_test(NAME test_time COMMAND test_time)
+  add_test(NAME test_convert COMMAND test_convert
 
   if(ENABLE_COVERAGE)
-    enable_coverage(test_time)
+    enable_coverage(test_convert)
   endif()
 
   target_include_directories(
-    test_time
+    test_convert
     PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
       ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -425,9 +437,9 @@ if(BUILD_TESTING)
       ${CMAKE_CURRENT_SOURCE_DIR}/test
   )
 
-  target_compile_definitions(test_time PRIVATE UNITY_INCLUDE_CONFIG_H)
+  target_compile_definitions(test_convert PRIVATE UNITY_INCLUDE_CONFIG_H)
 
-  target_link_test_deps(test_time)
+  target_link_test_deps(test_convert)
 
   # ------------------------------
   # test_parsers

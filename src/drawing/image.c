@@ -1,6 +1,6 @@
 #include "image.h"
 
-#include <obs.h>
+#include <obs-module.h>
 #include <graphics/graphics.h>
 
 /**
