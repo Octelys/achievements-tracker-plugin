@@ -222,14 +222,30 @@ if(ENABLE_QT)
   )
 endif()
 
-# Support of FreeType
-find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
-  pkg_check_modules(FREETYPE REQUIRED IMPORTED_TARGET freetype2)
+# Prefer CMake's built-in FindFreetype (works well on Windows and macOS/Linux).
+find_package(Freetype QUIET)
 
-  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE PkgConfig::FREETYPE)
-  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
-  target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_CFLAGS_OTHER})
+if(Freetype_FOUND)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Freetype::Freetype)
+else()
+  # Fallback to pkg-config (typically macOS/Linux)
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(FREETYPE QUIET IMPORTED_TARGET freetype2)
+    if(FREETYPE_FOUND)
+      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE PkgConfig::FREETYPE)
+      target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
+      target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_CFLAGS_OTHER})
+    endif()
+  endif()
+endif()
+
+# If you \*require\* FreeType whenever `src/drawing/text.c` is compiled, fail hard.
+if(NOT Freetype_FOUND AND NOT FREETYPE_FOUND)
+  message(
+    FATAL_ERROR
+    "FreeType not found (needed for `src/drawing/text.c`). Install freetype and/or set CMAKE_PREFIX_PATH."
+  )
 endif()
 
 # Logging helpers (obs_log wrapper + plugin name/version)
