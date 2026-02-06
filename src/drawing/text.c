@@ -1,5 +1,8 @@
 #include "text.h"
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include <obs-module.h>
 #include <graphics/graphics.h>
 
