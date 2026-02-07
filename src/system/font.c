@@ -7,6 +7,10 @@
 #include <CoreText/CoreText.h>
 #endif
 
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#endif
+
 /**
  * @brief Comparison function for qsort to sort fonts alphabetically by name.
  */

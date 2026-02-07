@@ -111,7 +111,7 @@ typedef struct gamerscore_configuration {
     /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
     const char *font_path;
     /** Font size in pixels (height passed to FreeType). */
-    uint        size;
+    uint32_t    size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t    color;
 } gamerscore_configuration_t;
