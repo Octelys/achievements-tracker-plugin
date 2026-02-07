@@ -104,6 +104,10 @@ void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamers
 
 gamerscore_configuration_t *state_get_gamerscore_configuration();
 
+void state_set_achievement_name_configuration(const achievement_name_configuration_t *configuration);
+
+achievement_name_configuration_t *state_get_achievement_name_configuration();
+
 /**
  * @brief Clear all in-memory state (and typically any persisted state).
  *

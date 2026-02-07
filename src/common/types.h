@@ -117,6 +117,22 @@ typedef struct gamerscore_configuration {
 } gamerscore_configuration_t;
 
 /**
+ * @brief Configuration used by the gamerscore overlay/renderer.
+ *
+ * Ownership:
+ * - Strings are treated as borrowed pointers unless otherwise documented by the
+ *   caller.
+ */
+typedef struct achievement_name_configuration {
+    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
+    const char *font_path;
+    /** Font size in pixels (height passed to FreeType). */
+    uint32_t    size;
+    /** Packed RGBA color in 0xRRGGBBAA format. */
+    uint32_t    color;
+} achievement_name_configuration_t;
+
+/**
  * @brief Dummy type to ensure OpenSSL public types are available to consumers.
  *
  * This header intentionally re-exports OpenSSL's @c EVP_PKEY type.

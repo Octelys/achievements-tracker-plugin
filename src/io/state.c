@@ -32,6 +32,10 @@
 #define GAMERSCORE_CONFIGURATION_SIZE "source_gamerscore_size"
 #define GAMERSCORE_CONFIGURATION_FONT "source_gamerscore_font"
 
+#define ACHIEVEMENT_NAME_CONFIGURATION_COLOR "source_achievement_name_color"
+#define ACHIEVEMENT_NAME_CONFIGURATION_SIZE "source_achievement_name_size"
+#define ACHIEVEMENT_NAME_CONFIGURATION_FONT "source_achievement_name_font"
+
 /**
  * @brief Global in-memory persisted state.
  *
@@ -405,6 +409,33 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
     gamerscore_configuration->font_path                  = bstrdup(font_path);
 
     return gamerscore_configuration;
+}
+
+void state_set_achievement_name_configuration(const achievement_name_configuration_t *configuration) {
+
+    if (!configuration) {
+        return;
+    }
+
+    obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_COLOR, configuration->color);
+    obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE, configuration->size);
+    obs_data_set_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT, configuration->font_path);
+
+    save_state(g_state);
+}
+
+achievement_name_configuration_t *state_get_achievement_name_configuration() {
+
+    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_COLOR);
+    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE);
+    const char *font_path = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT);
+
+    achievement_name_configuration_t *configuration = bzalloc(sizeof(achievement_name_configuration_t));
+    configuration->color                            = color == 0 ? 0xFFFFFF : color;
+    configuration->size                             = size == 0 ? 12 : size;
+    configuration->font_path                        = bstrdup(font_path);
+
+    return configuration;
 }
 
 /**
