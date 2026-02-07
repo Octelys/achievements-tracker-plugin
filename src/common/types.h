@@ -103,14 +103,8 @@ typedef struct xbox_live_authenticate_result {
 typedef struct gamerscore_configuration {
     /** Path to the font sheet asset. */
     const char *font_sheet_path;
-    /** Horizontal pixel offset. */
-    uint32_t    offset_x;
-    /** Vertical pixel offset. */
-    uint32_t    offset_y;
-    /** Single glyph width in pixels. */
-    uint32_t    font_width;
-    /** Single glyph height in pixels. */
-    uint32_t    font_height;
+    /** Color of the Gamerscore */
+    uint32_t    color;
 } gamerscore_configuration_t;
 
 /**
