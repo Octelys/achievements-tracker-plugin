@@ -192,7 +192,21 @@ text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32
         return out;
     }
 
-    int32_t pen_x    = (int32_t)padding + offset_x;
+    int32_t pen_x;
+
+    if (width > 0) {
+        // Measure text width for right alignment.
+        int32_t total_advance = 0;
+        for (size_t i = 0; text[i] != '\0'; i++) {
+            if (FT_Load_Char(face, (unsigned char)text[i], FT_LOAD_NO_BITMAP) == 0) {
+                total_advance += (int32_t)(face->glyph->advance.x >> 6);
+            }
+        }
+        pen_x = (int32_t)w - (int32_t)padding - total_advance;
+    } else {
+        pen_x = (int32_t)padding + offset_x;
+    }
+
     int32_t baseline = (int32_t)padding + offset_y + (int32_t)px_size;
 
     for (size_t i = 0; text[i] != '\0'; i++) {
