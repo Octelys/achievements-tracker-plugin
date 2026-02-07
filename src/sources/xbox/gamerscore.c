@@ -33,6 +33,7 @@
 #include "drawing/color.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
+#include "system/font.h"
 #include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
@@ -184,6 +185,11 @@ static void on_source_update(void *data, obs_data_t *settings) {
         g_must_reload                 = true;
     }
 
+    if (obs_data_has_user_value(settings, "text_font")) {
+        g_default_configuration->font_path = obs_data_get_string(settings, "text_font");
+        g_must_reload                 = true;
+    }
+
     state_set_gamerscore_configuration(g_default_configuration);
 }
 
@@ -211,7 +217,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
             g_text_context = NULL;
         }
 
-        g_text_context = text_context_create("/Library/Fonts/SF-Pro.ttf",
+        g_text_context = text_context_create(g_default_configuration->font_path,
                                              source->width,
                                              source->height,
                                              g_gamerscore,
@@ -240,17 +246,25 @@ static obs_properties_t *source_get_properties(void *data) {
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
 
+    // Font dropdown.
+    obs_property_t *font_list_prop =
+        obs_properties_add_list(p, "text_font", "Font", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+
+    size_t  font_count = 0;
+    font_t *fonts      = font_list_available(&font_count);
+
+    if (fonts) {
+        for (size_t i = 0; i < font_count; i++) {
+            if (fonts[i].name && fonts[i].path) {
+                // Display name shown in UI, path stored as value.
+                obs_property_list_add_string(font_list_prop, fonts[i].name, fonts[i].path);
+            }
+        }
+        font_list_free(fonts, font_count);
+    }
+
     obs_properties_add_color(p, "text_color", "Text color");
     obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
-    /*
-    obs_properties_add_path(p,
-                            "font_sheet_path",  // setting key
-                            "Font sheet image", // display name
-                            OBS_PATH_FILE,      // file chooser
-                            "Image Files (*.png *.jpg *.jpeg);;All Files (*.*)",
-                            NULL // default path (optional)
-    );
-    */
 
     return p;
 }
