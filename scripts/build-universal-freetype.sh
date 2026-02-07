@@ -111,6 +111,13 @@ sed "s|${BUILD_ARM64}/install|${FREETYPE_UNIVERSAL_DIR}|g" \
   "${BUILD_ARM64}/install/lib/pkgconfig/freetype2.pc" \
   > "${FREETYPE_UNIVERSAL_DIR}/lib/pkgconfig/freetype2.pc"
 
+# Remove quarantine attributes from the universal directory
+print "Removing quarantine attributes..."
+xattr -r -d com.apple.quarantine "${FREETYPE_UNIVERSAL_DIR}" 2>/dev/null || true
+
+# Set proper permissions
+chmod -R u+w "${FREETYPE_UNIVERSAL_DIR}"
+
 print "✓ Universal FreeType built successfully"
 print "  Location: ${FREETYPE_UNIVERSAL_DIR}"
 print "  Version: ${FREETYPE_VERSION}"
@@ -118,4 +125,10 @@ print "  Version: ${FREETYPE_VERSION}"
 # Verify universal binary
 print "\nVerifying universal binary..."
 lipo -info "${FREETYPE_UNIVERSAL_DIR}/lib/libfreetype.a"
+
+# Clean up build directories to save space
+print "\nCleaning up build artifacts..."
+rm -rf "${BUILD_ARM64}" "${BUILD_X86_64}" "${FREETYPE_SRC}"
+
+print "✓ Build artifacts cleaned up"
 

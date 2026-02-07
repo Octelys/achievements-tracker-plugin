@@ -22,11 +22,30 @@ function(_check_dependencies_macos)
 
   _check_dependencies()
 
-  execute_process(
-    COMMAND "xattr" -r -d com.apple.quarantine "${dependencies_dir}"
-    RESULT_VARIABLE result
-    COMMAND_ERROR_IS_FATAL ANY
+  # Remove quarantine attributes from downloaded dependencies only
+  # Use glob to only process known dependency directories, not build artifacts
+  file(
+    GLOB dep_dirs
+    "${dependencies_dir}/obs-deps-*"
+    "${dependencies_dir}/obs-studio-*"
+    "${dependencies_dir}/Frameworks"
+    "${dependencies_dir}/openssl-universal"
+    "${dependencies_dir}/freetype-universal"
   )
+
+  foreach(dep_dir ${dep_dirs})
+    if(EXISTS "${dep_dir}")
+      execute_process(
+        COMMAND "xattr" -r -d com.apple.quarantine "${dep_dir}"
+        RESULT_VARIABLE xattr_result
+        ERROR_QUIET
+      )
+      # Don't fail the build if xattr fails - it's not critical
+      if(NOT xattr_result EQUAL 0)
+        message(STATUS "Note: Could not remove quarantine attribute from ${dep_dir} (not critical)")
+      endif()
+    endif()
+  endforeach()
 
   list(APPEND CMAKE_FRAMEWORK_PATH "${dependencies_dir}/Frameworks")
   set(CMAKE_FRAMEWORK_PATH ${CMAKE_FRAMEWORK_PATH} PARENT_SCOPE)
