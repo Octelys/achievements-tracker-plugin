@@ -540,7 +540,9 @@ static void on_buffer_received(const char *buffer) {
     }
 
 cleanup:
-    FREE(message);
+    if (message) {
+        free(message);
+    }
     FREE_JSON(root);
 }
 

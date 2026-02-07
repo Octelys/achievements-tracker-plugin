@@ -102,7 +102,7 @@ typedef struct xbox_live_authenticate_result {
  */
 typedef struct gamerscore_configuration {
     /** Path to the font sheet asset. */
-    const char *font_sheet_path;
+    const char *font_path;
     /** Color of the Gamerscore */
     uint32_t    color;
 } gamerscore_configuration_t;

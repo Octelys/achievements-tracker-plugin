@@ -262,6 +262,7 @@ target_sources(
     src/sources/xbox/game_cover.c
     src/sources/xbox/gamerscore.c
     src/crypto/crypto.c
+    src/drawing/color.c
     src/drawing/image.c
     src/drawing/text.c
     src/net/browser/browser.c

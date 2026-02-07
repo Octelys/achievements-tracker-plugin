@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const FT_Bitmap *bmp, uint32_t x,
-                            uint32_t y, uint32_t color) {
+static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const FT_Bitmap *bmp, uint32_t x, uint32_t y,
+                            uint32_t color) {
 
     if (!bmp || !bmp->buffer || bmp->width == 0 || bmp->rows == 0) {
 
@@ -56,9 +56,9 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
 
             uint32_t idx = (dy * dst_w + dx) * 4;
 
-            uint8_t r = (uint8_t)((color >> 24) & 0xFF);
-            uint8_t g = (uint8_t)((color >> 16) & 0xFF);
-            uint8_t b = (uint8_t)((color >> 8) & 0xFF);
+            uint8_t r = (uint8_t)(color >> 24 & 0xFF);
+            uint8_t g = (uint8_t)(color >> 16 & 0xFF);
+            uint8_t b = (uint8_t)(color >> 8 & 0xFF);
 
             dst[idx + 0] = r; // R
             dst[idx + 1] = g; // G
@@ -68,12 +68,8 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
     }
 }
 
-text_context_t *text_context_create(const char *ttf_path,
-                                    uint32_t width,
-                                    uint32_t height,
-                                    const char *text,
-                                    uint32_t px_size,
-                                    uint32_t color) {
+text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32_t height, const char *text,
+                                    uint32_t px_size, uint32_t color) {
 
     text_context_t *out = NULL;
 
@@ -111,10 +107,10 @@ text_context_t *text_context_create(const char *ttf_path,
 
     const bool use_bounds = (width == 0 || height == 0);
 
-    uint32_t w = 16;
-    uint32_t h = 16;
-    int32_t offset_x = 0;
-    int32_t offset_y = 0;
+    uint32_t w        = 16;
+    uint32_t h        = 16;
+    int32_t  offset_x = 0;
+    int32_t  offset_y = 0;
 
     if (use_bounds) {
         // First pass: measure glyph bounds.
@@ -123,7 +119,7 @@ text_context_t *text_context_create(const char *ttf_path,
         int32_t max_x = INT32_MIN;
         int32_t max_y = INT32_MIN;
 
-        int32_t pen_x   = (int32_t)padding;
+        int32_t pen_x    = (int32_t)padding;
         int32_t baseline = (int32_t)padding + (int32_t)px_size;
 
         for (size_t i = 0; text[i] != '\0'; i++) {
@@ -145,10 +141,14 @@ text_context_t *text_context_create(const char *ttf_path,
             int32_t glyph_h = (int32_t)g->bitmap.rows;
 
             if (glyph_w > 0 && glyph_h > 0) {
-                if (glyph_x < min_x) min_x = glyph_x;
-                if (glyph_y < min_y) min_y = glyph_y;
-                if (glyph_x + glyph_w > max_x) max_x = glyph_x + glyph_w;
-                if (glyph_y + glyph_h > max_y) max_y = glyph_y + glyph_h;
+                if (glyph_x < min_x)
+                    min_x = glyph_x;
+                if (glyph_y < min_y)
+                    min_y = glyph_y;
+                if (glyph_x + glyph_w > max_x)
+                    max_x = glyph_x + glyph_w;
+                if (glyph_y + glyph_h > max_y)
+                    max_y = glyph_y + glyph_h;
             }
 
             pen_x += (int32_t)(g->advance.x >> 6);
@@ -165,8 +165,10 @@ text_context_t *text_context_create(const char *ttf_path,
             w = (uint32_t)(max_x + offset_x + (int32_t)padding);
             h = (uint32_t)(max_y + offset_y + (int32_t)padding);
 
-            if (w < 16) w = 16;
-            if (h < 16) h = 16;
+            if (w < 16)
+                w = 16;
+            if (h < 16)
+                h = 16;
         }
     }
 
@@ -178,17 +180,19 @@ text_context_t *text_context_create(const char *ttf_path,
         h = height < 16 ? 16 : height;
     }
 
-    size_t size = (size_t)w * (size_t)h * 4;
+    size_t   size = (size_t)w * (size_t)h * 4;
     uint8_t *rgba = bzalloc(size);
 
     if (!rgba) {
-        obs_log(LOG_WARNING, "Unable to create the text context: unable to allocate a new rgba array of size %" PRIu64, (uint64_t)size);
+        obs_log(LOG_WARNING,
+                "Unable to create the text context: unable to allocate a new rgba array of size %" PRIu64,
+                (uint64_t)size);
         FT_Done_Face(face);
         FT_Done_FreeType(ft);
         return out;
     }
 
-    int32_t pen_x   = (int32_t)padding + offset_x;
+    int32_t pen_x    = (int32_t)padding + offset_x;
     int32_t baseline = (int32_t)padding + offset_y + (int32_t)px_size;
 
     for (size_t i = 0; text[i] != '\0'; i++) {

@@ -30,6 +30,8 @@
 #include <curl/curl.h>
 #include <util/platform.h>
 
+#include "drawing/color.h"
+#include "io/state.h"
 #include "oauth/xbox-live.h"
 #include "xbox/xbox_client.h"
 #include "xbox/xbox_monitor.h"
@@ -48,8 +50,8 @@ typedef struct xbox_account_source {
 
 } xbox_account_source_t;
 
-static char g_gamerscore[64];
-static bool g_must_reload;
+static char            g_gamerscore[64];
+static bool            g_must_reload;
 static text_context_t *g_text_context;
 
 /**
@@ -60,14 +62,6 @@ static text_context_t *g_text_context;
  */
 static gamerscore_configuration_t *g_default_configuration;
 
-static uint32_t color_argb_to_rgba(uint32_t argb) {
-    const uint8_t a = (uint8_t)((argb >> 24) & 0xFF);
-    const uint8_t r = (uint8_t)((argb >> 16) & 0xFF);
-    const uint8_t g = (uint8_t)((argb >> 8) & 0xFF);
-    const uint8_t b = (uint8_t)(argb & 0xFF);
-    return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | a;
-}
-
 /**
  * @brief Recompute and store the latest gamerscore.
  *
@@ -75,12 +69,13 @@ static uint32_t color_argb_to_rgba(uint32_t argb) {
  */
 static void update_gamerscore(const gamerscore_t *gamerscore) {
 
-    int value = gamerscore_compute(gamerscore);
+    int total_gamerscore = gamerscore_compute(gamerscore);
 
-    snprintf(g_gamerscore, sizeof(g_gamerscore), "%d", value);
+    //  Computes the total gamerscore and activate the switch to reload the texture with the new number.
+    snprintf(g_gamerscore, sizeof(g_gamerscore), "%d", total_gamerscore);
     g_must_reload = true;
 
-    obs_log(LOG_INFO, "Gamerscore is %" PRId64, value);
+    obs_log(LOG_INFO, "Gamerscore is %" PRId64, total_gamerscore);
 }
 
 /**
@@ -133,7 +128,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     xbox_account_source_t *s = bzalloc(sizeof(*s));
     s->source                = source;
-    s->width                 = 800;
+    s->width                 = 600;
     s->height                = 200;
 
     return s;
@@ -180,11 +175,12 @@ static void on_source_update(void *data, obs_data_t *settings) {
     UNUSED_PARAMETER(data);
 
     if (obs_data_has_user_value(settings, "text_color")) {
-        const uint32_t argb = (uint32_t)obs_data_get_int(settings, "text_color");
-        --> Do not work: colors are not the same.
+        const uint32_t argb            = (uint32_t)obs_data_get_int(settings, "text_color");
         g_default_configuration->color = color_argb_to_rgba(argb);
-        g_must_reload = true;
+        g_must_reload                  = true;
     }
+
+    state_set_gamerscore_configuration(g_default_configuration);
 }
 
 /**
@@ -211,20 +207,18 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
             g_text_context = NULL;
         }
 
-        g_text_context = text_context_create(
-            "/Library/Fonts/SF-Pro.ttf",
-            source->width,
-            source->height,
-            g_gamerscore,
-            128,
-            g_default_configuration->color
-        );
+        g_text_context = text_context_create("/Library/Fonts/SF-Pro.ttf",
+                                             source->width,
+                                             source->height,
+                                             g_gamerscore,
+                                             128,
+                                             g_default_configuration->color);
 
         g_must_reload = false;
     }
 
     if (!g_text_context) {
-       return;
+        return;
     }
 
     text_context_draw(g_text_context, effect);
@@ -303,8 +297,12 @@ void xbox_gamerscore_source_register(void) {
 
     g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
 
+    g_default_configuration = state_get_gamerscore_configuration();
+
     /* TODO A default font sheet path should be embedded with the plugin */
-    g_default_configuration->font_sheet_path = "/Users/christophe/Downloads/font_sheet.png";
+    if (!g_default_configuration->font_path) {
+        g_default_configuration->font_path = "/Users/christophe/Downloads/font_sheet.png";
+    }
 
     obs_register_source(xbox_source_get());
 
