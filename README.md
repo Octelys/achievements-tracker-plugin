@@ -178,8 +178,11 @@ The plugin implements the Xbox Live authentication flow with Proof-of-Possession
 - **OpenSSL** 3.x (for cryptographic operations)
 - **libcurl** (for HTTP requests)
 - **FreeType** 2.x (for text rendering)
+- **zlib** (required by FreeType, usually available by default)
 - **libuuid** (Linux/BSD only, for UUID generation)
 - C compiler with C11 support
+
+**Note on zlib:** zlib is required by FreeType for font compression support and is typically pre-installed on all platforms (macOS SDK, Windows via vcpkg/obs-deps, Linux system packages).
 
 ### Platform-Specific Setup
 

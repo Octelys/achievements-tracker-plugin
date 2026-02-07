@@ -63,8 +63,10 @@ LDFLAGS="-arch arm64" \
   --enable-static \
   --disable-shared \
   --without-harfbuzz \
+  --without-brotli \
   --without-bzip2 \
-  --without-png
+  --without-png \
+  --with-zlib=yes
 
 make -j$(sysctl -n hw.ncpu)
 make install
@@ -84,8 +86,10 @@ LDFLAGS="-arch x86_64" \
   --enable-static \
   --disable-shared \
   --without-harfbuzz \
+  --without-brotli \
   --without-bzip2 \
-  --without-png
+  --without-png \
+  --with-zlib=yes
 
 make -j$(sysctl -n hw.ncpu)
 make install

@@ -312,6 +312,10 @@ if(NOT Freetype_FOUND AND NOT FREETYPE_FOUND)
   )
 endif()
 
+# FreeType requires zlib for gzip compression support
+find_package(ZLIB REQUIRED)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ZLIB::ZLIB)
+
 # Logging helpers (obs_log wrapper + plugin name/version)
 if(TARGET diagnostics-log)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE diagnostics-log)
