@@ -100,13 +100,68 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity);
  */
 xbox_identity_t *state_get_xbox_identity(void);
 
+/**
+ * @brief Set the gamerscore source configuration.
+ *
+ * Stores the configuration for the gamerscore display source, including font path,
+ * text size, and color. The configuration is persisted to disk.
+ *
+ * @param gamerscore_configuration Configuration to store (may be NULL to clear).
+ */
 void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamerscore_configuration);
 
+/**
+ * @brief Get the currently stored gamerscore source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFF (white)
+ * - Default size: 12 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with bfree().
+ */
 gamerscore_configuration_t *state_get_gamerscore_configuration();
 
+/**
+ * @brief Set the achievement name source configuration.
+ *
+ * Stores the configuration for the achievement name display source, including
+ * font path, text size, and color. The configuration is persisted to disk.
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
 void state_set_achievement_name_configuration(const achievement_name_configuration_t *configuration);
 
+/**
+ * @brief Get the currently stored achievement name source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFF (white)
+ * - Default size: 12 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with bfree().
+ */
 achievement_name_configuration_t *state_get_achievement_name_configuration();
+
+/**
+ * @brief Set the achievement description source configuration.
+ *
+ * Stores the configuration for the achievement description display source, including
+ * font path, text size, and color. The configuration is persisted to disk.
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_achievement_description_configuration(const achievement_description_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored achievement description source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFF (white)
+ * - Default size: 12 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with bfree().
+ */
+achievement_description_configuration_t *state_get_achievement_description_configuration();
 
 /**
  * @brief Clear all in-memory state (and typically any persisted state).

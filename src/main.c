@@ -8,6 +8,7 @@
 
 #include "io/state.h"
 #include "sources/xbox/achievement_name.h"
+#include "sources/xbox/achievement_description.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -21,6 +22,7 @@ bool obs_module_load(void) {
     xbox_game_cover_source_register();
     xbox_gamerscore_source_register();
     xbox_achievement_name_source_register();
+    xbox_achievement_description_source_register();
 
     obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
 

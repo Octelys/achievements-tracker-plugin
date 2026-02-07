@@ -1,4 +1,4 @@
-#include "sources/xbox/achievement_name.h"
+#include "sources/xbox/achievement_description.h"
 
 #include "drawing/text.h"
 
@@ -17,7 +17,7 @@
 
 #define NO_FLIP 0
 
-typedef struct xbox_account_source {
+typedef struct xbox_achievement_description_source {
     /** OBS source instance. */
     obs_source_t *source;
 
@@ -27,36 +27,35 @@ typedef struct xbox_account_source {
     /** Output height in pixels. */
     uint32_t height;
 
-} xbox_account_source_t;
+} xbox_achievement_description_source_t;
 
-static char            g_achievement_name[512];
+static char            g_achievement_description[512];
 static bool            g_must_reload;
 static text_context_t *g_text_context;
 
 /**
- * @brief Configuration for rendering the achievement name text.
+ * @brief Configuration for rendering the achievement description text.
  *
  * Stored as a module-global pointer and initialized during
- * xbox_achievement_name_source_register(). Contains font path, size, and color settings.
+ * xbox_achievement_description_source_register(). Contains font path, size, and color settings.
  */
-static achievement_name_configuration_t *g_configuration;
+static achievement_description_configuration_t *g_configuration;
 
 /**
- * @brief Update and store the formatted achievement name string.
+ * @brief Update and store the achievement description string.
  *
- * Formats the achievement information as "XG - Achievement Name" where X is the
- * gamerscore value from the first reward. Sets the global reload flag to trigger
- * a text context refresh on the next render.
+ * Extracts and stores the description text from the achievement. Sets the global
+ * reload flag to trigger a text context refresh on the next render.
  *
- * @param achievement Achievement data to format. If NULL, this function returns early.
+ * @param achievement Achievement data to extract description from. If NULL, this function returns early.
  */
-static void update_achievement_name(const achievement_t *achievement) {
+static void update_achievement_description(const achievement_t *achievement) {
 
     if (!achievement) {
         return;
     }
 
-    snprintf(g_achievement_name, sizeof(g_achievement_name), "%sG - %s", achievement->rewards->value, achievement->name);
+    snprintf(g_achievement_description, sizeof(g_achievement_description), "%s", achievement->description);
     g_must_reload = true;
 }
 
@@ -64,7 +63,7 @@ static void update_achievement_name(const achievement_t *achievement) {
  * @brief Xbox monitor callback invoked when Xbox Live connection state changes.
  *
  * Retrieves the current game's most recent achievement and updates the display.
- * This ensures the achievement name source reflects the latest data when the
+ * This ensures the achievement description source reflects the latest data when the
  * connection is established or re-established.
  *
  * @param is_connected Whether the Xbox account is currently connected (unused).
@@ -77,15 +76,15 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
     const achievement_t *achievement = get_current_game_achievements();
 
-    update_achievement_name(achievement);
+    update_achievement_description(achievement);
 }
 
 /**
  * @brief Xbox monitor callback invoked when achievement progress is updated.
  *
  * Retrieves the current game's most recent achievement and updates the display
- * to show the newly unlocked achievement. This callback ensures the source always
- * displays the latest achievement that was unlocked.
+ * to show the newly unlocked achievement's description. This callback ensures the
+ * source always displays the latest achievement that was unlocked.
  *
  * @param gamerscore Updated gamerscore snapshot (unused).
  * @param progress   Achievement progress details (unused).
@@ -97,7 +96,7 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
 
     const achievement_t *achievement = get_current_game_achievements();
 
-    update_achievement_name(achievement);
+    update_achievement_description(achievement);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -105,29 +104,29 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief OBS callback creating a new achievement name source instance.
+ * @brief OBS callback creating a new achievement description source instance.
  *
  * Allocates and initializes the source data structure with default dimensions.
  * The source is configured to display text at 600x200 pixels.
  *
  * @param settings Source settings (unused).
  * @param source   OBS source instance pointer.
- * @return Newly allocated xbox_account_source_t structure, or NULL on failure.
+ * @return Newly allocated xbox_achievement_description_source_t structure, or NULL on failure.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_account_source_t *s = bzalloc(sizeof(*s));
-    s->source                = source;
-    s->width                 = 600;
-    s->height                = 200;
+    xbox_achievement_description_source_t *s = bzalloc(sizeof(*s));
+    s->source                                = source;
+    s->width                                 = 600;
+    s->height                                = 200;
 
     return s;
 }
 
 /**
- * @brief OBS callback destroying an achievement name source instance.
+ * @brief OBS callback destroying an achievement description source instance.
  *
  * Frees the text rendering context and source data structure. Safe to call
  * with NULL data pointer.
@@ -136,7 +135,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_account_source_t *source = data;
+    xbox_achievement_description_source_t *source = data;
 
     if (!source) {
         return;
@@ -157,7 +156,7 @@ static void on_source_destroy(void *data) {
  * @return Width in pixels (600).
  */
 static uint32_t source_get_width(void *data) {
-    const xbox_account_source_t *s = data;
+    const xbox_achievement_description_source_t *s = data;
     return s->width;
 }
 
@@ -168,7 +167,7 @@ static uint32_t source_get_width(void *data) {
  * @return Height in pixels (200).
  */
 static uint32_t source_get_height(void *data) {
-    const xbox_account_source_t *s = data;
+    const xbox_achievement_description_source_t *s = data;
     return s->height;
 }
 
@@ -203,27 +202,27 @@ static void on_source_update(void *data, obs_data_t *settings) {
         g_must_reload              = true;
     }
 
-    state_set_achievement_name_configuration(g_configuration);
+    state_set_achievement_description_configuration(g_configuration);
 }
 
 /**
- * @brief OBS callback to render the achievement name text.
+ * @brief OBS callback to render the achievement description text.
  *
  * Lazily initializes or recreates the text rendering context when needed (on first
- * render or after configuration changes). Draws the formatted achievement name string
+ * render or after configuration changes). Draws the achievement description string
  * using the configured font, size, and color.
  *
  * The text context is recreated when:
  * - It hasn't been created yet (first render)
  * - Settings have changed (g_must_reload flag is set)
- * - Achievement name has been updated
+ * - Achievement description has been updated
  *
  * @param data   Source instance data containing width and height.
  * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    xbox_account_source_t *source = data;
+    xbox_achievement_description_source_t *source = data;
 
     if (!source) {
         return;
@@ -239,7 +238,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         g_text_context = text_context_create(g_configuration->font_path,
                                              source->width,
                                              source->height,
-                                             g_achievement_name,
+                                             g_achievement_description,
                                              g_configuration->size,
                                              g_configuration->color);
 
@@ -254,7 +253,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 /**
- * @brief OBS callback constructing the properties UI for the achievement name source.
+ * @brief OBS callback constructing the properties UI for the achievement description source.
  *
  * Creates a properties panel with the following controls:
  * - Font dropdown: Lists all available system fonts
@@ -298,23 +297,23 @@ static obs_properties_t *source_get_properties(void *data) {
  * @brief OBS callback returning the display name for this source type.
  *
  * @param unused Unused parameter.
- * @return Static string "Xbox Achievement (Name)" displayed in OBS source list.
+ * @return Static string "Xbox Achievement (Description)" displayed in OBS source list.
  */
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Achievement (Name)";
+    return "Xbox Achievement (Description)";
 }
 
 /**
- * @brief obs_source_info describing the Xbox Achievement Name source.
+ * @brief obs_source_info describing the Xbox Achievement Description source.
  *
- * Defines the OBS source type for displaying achievement names. This structure
+ * Defines the OBS source type for displaying achievement descriptions. This structure
  * specifies the source ID, type, capabilities, and callback functions for all
  * OBS lifecycle events (creation, destruction, rendering, property management).
  */
-static struct obs_source_info xbox_achievement_name_source = {
-    .id             = "xbox_achievement_name_source",
+static struct obs_source_info xbox_achievement_description_source = {
+    .id             = "xbox_achievement_description_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = source_get_name,
@@ -333,10 +332,10 @@ static struct obs_source_info xbox_achievement_name_source = {
  *
  * Returns a pointer to the static source info structure for use with obs_register_source().
  *
- * @return Pointer to the xbox_achievement_name_source structure.
+ * @return Pointer to the xbox_achievement_description_source structure.
  */
 static const struct obs_source_info *xbox_source_get(void) {
-    return &xbox_achievement_name_source;
+    return &xbox_achievement_description_source;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -344,9 +343,9 @@ static const struct obs_source_info *xbox_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Register the Xbox Achievement Name source with OBS.
+ * @brief Register the Xbox Achievement Description source with OBS.
  *
- * Initializes the achievement name source by:
+ * Initializes the achievement description source by:
  * - Allocating and loading the configuration from persistent state
  * - Setting a default font path if none is configured
  * - Registering the source type with OBS
@@ -358,11 +357,11 @@ static const struct obs_source_info *xbox_source_get(void) {
  * @note Allocates g_configuration which persists for the lifetime of the plugin.
  * @note TODO: A default font path should be embedded with the plugin rather than hardcoded.
  */
-void xbox_achievement_name_source_register(void) {
+void xbox_achievement_description_source_register(void) {
 
-    g_configuration = bzalloc(sizeof(gamerscore_configuration_t));
+    g_configuration = bzalloc(sizeof(achievement_description_configuration_t));
 
-    g_configuration = state_get_achievement_name_configuration();
+    g_configuration = state_get_achievement_description_configuration();
 
     /* TODO A default font sheet path should be embedded with the plugin */
     if (!g_configuration->font_path) {
