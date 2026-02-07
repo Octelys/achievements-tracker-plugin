@@ -332,6 +332,7 @@ target_sources(
     src/sources/xbox/gamerscore.c
     src/sources/xbox/achievement_name.c
     src/sources/xbox/achievement_description.c
+    src/sources/xbox/achievement_icon.c
     src/crypto/crypto.c
     src/drawing/color.c
     src/drawing/image.c
