@@ -256,7 +256,6 @@ int count_achievements(const achievement_t *achievements) {
     return count;
 }
 
-
 /**
  * @brief Sorts achievements with unlocked ones first (by timestamp descending), then locked ones.
  *
