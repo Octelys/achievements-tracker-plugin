@@ -154,6 +154,8 @@ void free_achievement(achievement_t **achievement);
  */
 int count_achievements(const achievement_t *achievements);
 
+void sort_achievements(achievement_t **achievements);
+
 #ifdef __cplusplus
 }
 #endif
