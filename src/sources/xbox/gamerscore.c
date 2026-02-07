@@ -33,7 +33,6 @@
 #include "drawing/color.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "xbox/xbox_client.h"
 #include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
@@ -180,6 +179,11 @@ static void on_source_update(void *data, obs_data_t *settings) {
         g_must_reload                  = true;
     }
 
+    if (obs_data_has_user_value(settings, "text_size")) {
+        g_default_configuration->size = (uint32_t)obs_data_get_int(settings, "text_size");
+        g_must_reload                 = true;
+    }
+
     state_set_gamerscore_configuration(g_default_configuration);
 }
 
@@ -211,7 +215,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
                                              source->width,
                                              source->height,
                                              g_gamerscore,
-                                             128,
+                                             g_default_configuration->size,
                                              g_default_configuration->color);
 
         g_must_reload = false;
@@ -237,7 +241,7 @@ static obs_properties_t *source_get_properties(void *data) {
     obs_properties_t *p = obs_properties_create();
 
     obs_properties_add_color(p, "text_color", "Text color");
-
+    obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
     /*
     obs_properties_add_path(p,
                             "font_sheet_path",  // setting key

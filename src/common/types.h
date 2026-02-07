@@ -101,8 +101,10 @@ typedef struct xbox_live_authenticate_result {
  * @brief Configuration used by the gamerscore overlay/renderer.
  */
 typedef struct gamerscore_configuration {
-    /** Path to the font sheet asset. */
+    /** Path to the font file */
     const char *font_path;
+    /** Size of the font */
+    uint        size;
     /** Color of the Gamerscore */
     uint32_t    color;
 } gamerscore_configuration_t;
