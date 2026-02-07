@@ -58,7 +58,7 @@ typedef struct achievement {
     /** Display name. */
     const char          *name;
     /** Progress state (service-provided string). */
-    const char          *progress_state;
+    char                *progress_state;
     /** Linked list of media assets associated with this achievement. */
     const media_asset_t *media_assets;
     /** Whether the achievement is secret. */

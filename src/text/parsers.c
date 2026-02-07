@@ -42,7 +42,7 @@
  * @param property_name     Property name to read.
  * @return Newly allocated string (caller must bfree()), or NULL if missing.
  */
-static const char *get_node_string(cJSON *json_root, int achievement_index, const char *property_name) {
+static char *get_node_string(cJSON *json_root, int achievement_index, const char *property_name) {
 
     char property_key[512] = "";
     snprintf(property_key, sizeof(property_key), "/achievements/%d/%s", achievement_index, property_name);
