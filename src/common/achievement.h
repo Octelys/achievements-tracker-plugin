@@ -71,7 +71,11 @@ typedef struct achievement {
     const reward_t      *rewards;
     /** Unix timestamp (seconds since epoch) when the achievement was unlocked, or 0 if locked. */
     int64_t              unlocked_timestamp;
-    /**  */
+    /**
+     * Small icon or tile image URL for the achievement.
+     *
+     * Typically points to a PNG/JPEG hosted by the service.
+     */
     const char          *icon_url;
     /** Next achievement in the list, or NULL. */
     struct achievement  *next;

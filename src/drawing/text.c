@@ -1,7 +1,10 @@
 #include "text.h"
 
+#include <stdbool.h>
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
 #include "common/memory.h"
 #include "diagnostics/log.h"
 
@@ -14,6 +17,26 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @file text.c
+ * @brief FreeType-based text rasterizer that draws glyph bitmaps into an RGBA buffer and uploads it as an OBS texture.
+ */
+
+/**
+ * @brief Blit a FreeType glyph bitmap into an RGBA buffer.
+ *
+ * The glyph bitmap is expected to be an 8-bit grayscale coverage mask. The
+ * coverage value is written into the destination alpha channel; RGB is taken
+ * from @p color.
+ *
+ * @param dst Destination RGBA buffer (row-major).
+ * @param dst_w Destination width in pixels.
+ * @param dst_h Destination height in pixels.
+ * @param bmp FreeType bitmap (typically FT_PIXEL_MODE_GRAY).
+ * @param x Destination x offset.
+ * @param y Destination y offset.
+ * @param color Packed RGBA in 0xRRGGBBAA.
+ */
 static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const FT_Bitmap *bmp, uint32_t x, uint32_t y,
                             uint32_t color) {
 
@@ -68,6 +91,36 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
     }
 }
 
+/**
+ * @brief Create a text rendering context by rasterizing text with FreeType.
+ *
+ * This function loads a TrueType/OpenType font, rasterizes the provided text string
+ * into an RGBA bitmap, and uploads it as an OBS texture. The resulting texture can
+ * be drawn efficiently without re-rendering the glyphs on every frame.
+ *
+ * Layout behavior:
+ * - If @p width and @p height are both zero, the function auto-sizes the texture
+ *   to fit the text with minimal padding.
+ * - If @p width is non-zero, the texture is set to that width and text is
+ *   right-aligned within the canvas.
+ * - If @p height is non-zero, the texture height is set to that value.
+ *
+ * The function performs two passes when auto-sizing:
+ * 1. Measure pass: load glyphs to compute bounding box.
+ * 2. Render pass: rasterize glyphs into the RGBA buffer.
+ *
+ * When a fixed width is provided, text is right-aligned by measuring total advance
+ * and starting pen position from the right edge minus padding.
+ *
+ * @param ttf_path Full path to a TrueType or OpenType font file.
+ * @param width Canvas width in pixels. Set to 0 to auto-size based on text.
+ * @param height Canvas height in pixels. Set to 0 to auto-size based on text.
+ * @param text NUL-terminated UTF-8 string to render (currently treated as single-byte).
+ * @param px_size Font size in pixels (pixel height passed to FreeType).
+ * @param color Packed RGBA color in 0xRRGGBBAA format.
+ * @return Newly allocated text context with an uploaded OBS texture, or NULL on failure.
+ *         The caller must free the returned context with @ref text_context_destroy.
+ */
 text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32_t height, const char *text,
                                     uint32_t px_size, uint32_t color) {
 
@@ -261,6 +314,18 @@ text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32
     return out;
 }
 
+/**
+ * @brief Destroy a text rendering context and free all associated resources.
+ *
+ * This function safely destroys the OBS texture (if it exists) by entering the
+ * graphics context, calling gs_texture_destroy, and leaving the graphics context.
+ * It then frees the text_context_t structure itself.
+ *
+ * Safe to call with NULL. After this call, the @p text_context pointer should not
+ * be used.
+ *
+ * @param text_context Text context to destroy, or NULL.
+ */
 void text_context_destroy(text_context_t *text_context) {
 
     if (!text_context) {
@@ -277,6 +342,25 @@ void text_context_destroy(text_context_t *text_context) {
     bfree(text_context);
 }
 
+/**
+ * @brief Draw a text context's texture to the current OBS render target.
+ *
+ * This function renders the pre-rasterized text texture using OBS's graphics API.
+ * It handles two scenarios:
+ *
+ * 1. If @p effect is non-NULL (already active): assumes we're inside a video_render
+ *    callback where an effect is already looping. In this case, the function sets
+ *    the texture parameter and draws the sprite directly without calling
+ *    gs_effect_loop (which would cause a nested effect error).
+ *
+ * 2. If @p effect is NULL: uses OBS's default effect (OBS_EFFECT_DEFAULT) and
+ *    calls gs_effect_loop to properly render the texture.
+ *
+ * The texture is drawn as a sprite with its original dimensions (no scaling).
+ *
+ * @param text_context Text context to draw. If NULL or has no texture, does nothing.
+ * @param effect Optional active effect. Pass NULL to use the default effect with looping.
+ */
 void text_context_draw(const text_context_t *text_context, gs_effect_t *effect) {
 
     if (!text_context || !text_context->texture)

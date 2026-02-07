@@ -1,5 +1,10 @@
 #include "color.h"
 
+/**
+ * @file color.c
+ * @brief Implementation of packed color conversion helpers.
+ */
+
 uint32_t color_argb_to_rgba(uint32_t argb) {
 
     const uint8_t a = (uint8_t)(argb >> 24 & 0xFF);

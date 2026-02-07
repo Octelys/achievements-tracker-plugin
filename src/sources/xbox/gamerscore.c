@@ -187,7 +187,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     if (obs_data_has_user_value(settings, "text_font")) {
         g_default_configuration->font_path = obs_data_get_string(settings, "text_font");
-        g_must_reload                 = true;
+        g_must_reload                      = true;
     }
 
     state_set_gamerscore_configuration(g_default_configuration);
