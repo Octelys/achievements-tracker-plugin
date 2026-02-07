@@ -28,6 +28,10 @@
 #define XBOX_TOKEN "xbox_token"
 #define XBOX_TOKEN_EXPIRY "xbox_token_expiry"
 
+#define GAMERSCORE_CONFIGURATION_COLOR "source_gamerscore_color"
+#define GAMERSCORE_CONFIGURATION_SIZE "source_gamerscore_size"
+#define GAMERSCORE_CONFIGURATION_FONT "source_gamerscore_font"
+
 /**
  * @brief Global in-memory persisted state.
  *
@@ -352,6 +356,11 @@ token_t *state_get_sisu_token(void) {
  * @param refresh_token Refresh token.
  */
 void state_set_user_token(const char *device_code, const token_t *user_token, const token_t *refresh_token) {
+
+    if (!device_code || !user_token || !refresh_token) {
+        return;
+    }
+
     obs_data_set_string(g_state, DEVICE_CODE, device_code);
     obs_data_set_string(g_state, USER_ACCESS_TOKEN, user_token->value);
     obs_data_set_int(g_state, USER_ACCESS_TOKEN_EXPIRY, user_token->expires);
@@ -369,6 +378,33 @@ char *state_get_device_code(void) {
     }
 
     return bstrdup(device_code);
+}
+
+void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamerscore_configuration) {
+
+    if (!gamerscore_configuration) {
+        return;
+    }
+
+    obs_data_set_int(g_state, GAMERSCORE_CONFIGURATION_COLOR, gamerscore_configuration->color);
+    obs_data_set_int(g_state, GAMERSCORE_CONFIGURATION_SIZE, gamerscore_configuration->size);
+    obs_data_set_string(g_state, GAMERSCORE_CONFIGURATION_FONT, gamerscore_configuration->font_path);
+
+    save_state(g_state);
+}
+
+gamerscore_configuration_t *state_get_gamerscore_configuration() {
+
+    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_COLOR);
+    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_SIZE);
+    const char *font_path = obs_data_get_string(g_state, GAMERSCORE_CONFIGURATION_FONT);
+
+    gamerscore_configuration_t *gamerscore_configuration = bzalloc(sizeof(gamerscore_configuration_t));
+    gamerscore_configuration->color                      = color == 0 ? 0xFFFFFF : color;
+    gamerscore_configuration->size                       = size == 0 ? 12 : size;
+    gamerscore_configuration->font_path                  = bstrdup(font_path);
+
+    return gamerscore_configuration;
 }
 
 /**

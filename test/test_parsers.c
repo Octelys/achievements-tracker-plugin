@@ -234,6 +234,7 @@ static void parse_achievements_progress__message_is_achievement_achievement_retu
     TEST_ASSERT_EQUAL_STRING(actual->service_config_id, "00000000-0000-0000-0000-00007972ac43");
     TEST_ASSERT_EQUAL_STRING(actual->id, "1");
     TEST_ASSERT_EQUAL_STRING(actual->progress_state, "Achieved");
+    TEST_ASSERT_EQUAL_INT64(actual->unlocked_timestamp, 1768704501);
     TEST_ASSERT_NULL(actual->next);
 }
 
@@ -257,6 +258,29 @@ static void parse_achievements_progress__message_is_multiple_achievements_achiev
 }
 
 //  Test parse_achievements
+
+static void parse_achievements__message_is_one_achievement_achievement_returned(void) {
+    //  Arrange.
+    const char *message =
+        "{\"achievements\":[{\"id\":\"1\",\"serviceConfigId\":\"00000000-0000-0000-0000-00007972ac43\",\"name\":\"Daddy's Glasses\",\"titleAssociations\":[{\"name\":\"My Friend Peppa Pig\",\"id\":2037558339}],\"progressState\":\"Achieved\",\"progression\":{\"requirements\":[],\"timeUnlocked\":\"2026-01-18T02:48:21.7070000Z\"},\"mediaAssets\":[{\"name\":\"cf486b2a-3a9e-4c14-b18c-c91e0bb56926\",\"type\":\"Icon\",\"url\":\"https://images-eds-ssl.xboxlive.com/image?url=27S1DHqE.cHkmFg4nspsdzttpqR9mABLoi_h264Ah_brT_74D18wvss1Tpl1Hv0V.ZRAXkfWjJILaiyZZyI_J2paDrXdC_1Gly_3Cnd9yC7IDl0y2ssMo_dvyQ_OhHyuW60ck5614OfHrmzXJvVaS2vM4efPU6iwu2_vBB1TeAE-\"}],\"platforms\":[\"XboxOne\"],\"isSecret\":false,\"description\":\"You found Daddy Pig's Glasses.\",\"lockedDescription\":\"Find Daddy Pig's Glasses.\",\"productId\":\"00000000-0000-0000-0000-00007972ac43\",\"achievementType\":\"Persistent\",\"participationType\":\"Individual\",\"timeWindow\":null,\"rewards\":[{\"name\":null,\"description\":null,\"value\":\"80\",\"type\":\"Gamerscore\",\"mediaAsset\":null,\"valueType\":\"Int\"}],\"estimatedTime\":\"00:00:00\",\"deeplink\":\"\",\"isRevoked\":false}]}";
+
+    //  Act.
+    achievement_t *actual = parse_achievements(message);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(actual);
+    TEST_ASSERT_EQUAL_STRING(actual->id, "1");
+    TEST_ASSERT_EQUAL_STRING(actual->service_config_id, "00000000-0000-0000-0000-00007972ac43");
+    TEST_ASSERT_EQUAL_STRING(actual->name, "Daddy's Glasses");
+    TEST_ASSERT_EQUAL_STRING(actual->description, "You found Daddy Pig's Glasses.");
+    TEST_ASSERT_EQUAL_STRING(
+        actual->icon_url,
+        "https://images-eds-ssl.xboxlive.com/image?url=27S1DHqE.cHkmFg4nspsdzttpqR9mABLoi_h264Ah_brT_74D18wvss1Tpl1Hv0V.ZRAXkfWjJILaiyZZyI_J2paDrXdC_1Gly_3Cnd9yC7IDl0y2ssMo_dvyQ_OhHyuW60ck5614OfHrmzXJvVaS2vM4efPU6iwu2_vBB1TeAE-");
+    TEST_ASSERT_EQUAL_STRING(actual->progress_state, "Achieved");
+    TEST_ASSERT_EQUAL_STRING(actual->rewards->value, "80");
+    TEST_ASSERT_EQUAL_INT64(actual->unlocked_timestamp, 1768704501);
+    TEST_ASSERT_NULL(actual->next);
+}
 
 static void parse_achievements__message_is_multiple_achievements_achievements_returned(void) {
     //  Arrange.
@@ -305,6 +329,7 @@ int main(void) {
     RUN_TEST(parse_achievements_progress__message_is_achievement_achievement_returned);
     RUN_TEST(parse_achievements_progress__message_is_multiple_achievements_achievements_returned);
     //  Test parse_achievements
+    RUN_TEST(parse_achievements__message_is_one_achievement_achievement_returned);
     RUN_TEST(parse_achievements__message_is_multiple_achievements_achievements_returned);
     return UNITY_END();
 }

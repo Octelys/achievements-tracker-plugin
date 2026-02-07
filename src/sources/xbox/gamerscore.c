@@ -21,14 +21,19 @@
  *    initializes the texture in the video_render callback.
  */
 
+#include "drawing/text.h"
+
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
 #include <curl/curl.h>
+#include <util/platform.h>
 
+#include "drawing/color.h"
+#include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "xbox/xbox_client.h"
+#include "system/font.h"
 #include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
@@ -42,12 +47,12 @@ typedef struct xbox_account_source {
 
     /** Output height in pixels. */
     uint32_t height;
+
 } xbox_account_source_t;
 
-/**
- * @brief Latest computed gamerscore for the authenticated account.
- */
-static int64_t g_gamerscore = 0;
+static char            g_gamerscore[64];
+static bool            g_must_reload;
+static text_context_t *g_text_context;
 
 /**
  * @brief Configuration for rendering digits from the font sheet.
@@ -58,55 +63,19 @@ static int64_t g_gamerscore = 0;
 static gamerscore_configuration_t *g_default_configuration;
 
 /**
- * @brief Loaded font sheet image/texture (digit atlas).
- *
- * gs_image_file_t holds decoded CPU-side image data and (after
- * gs_image_file_init_texture()) the GPU texture handle.
- */
-gs_image_file_t g_font_sheet_image;
-
-//  --------------------------------------------------------------------------------------------------------------------
-//	Private functions
-//  --------------------------------------------------------------------------------------------------------------------
-
-/**
- * @brief Load (and decode) the configured font sheet image.
- *
- * This initializes g_font_sheet_image using the configured path.
- * Texture creation is deferred until rendering (see on_source_video_render()).
- */
-static void load_font_sheet() {
-
-    if (!g_default_configuration) {
-        obs_log(LOG_ERROR, "No default configuration available for the font sheet");
-        return;
-    }
-
-    obs_log(LOG_INFO, "Loading the font sheet from the configured path: %s", g_default_configuration->font_sheet_path);
-
-    // Load an RGBA atlas image shipped with the plugin (prebaked glyphs).
-    // OBS provides helpers for module files; loading the image into a texture
-    // is usually done via gs_image_file_t.
-    gs_image_file_init(&g_font_sheet_image, g_default_configuration->font_sheet_path);
-
-    if (g_font_sheet_image.loaded) {
-        obs_log(LOG_INFO, "The font sheet image has successfully been loaded");
-    } else {
-        obs_log(LOG_ERROR, "Unable to load the font sheet image");
-        gs_image_file_free(&g_font_sheet_image);
-    }
-}
-
-/**
  * @brief Recompute and store the latest gamerscore.
  *
  * @param gamerscore Gamerscore snapshot received from the Xbox monitor.
  */
 static void update_gamerscore(const gamerscore_t *gamerscore) {
 
-    g_gamerscore = gamerscore_compute(gamerscore);
+    int total_gamerscore = gamerscore_compute(gamerscore);
 
-    obs_log(LOG_INFO, "Gamerscore is %" PRId64, g_gamerscore);
+    //  Computes the total gamerscore and activate the switch to reload the texture with the new number.
+    snprintf(g_gamerscore, sizeof(g_gamerscore), "%d", total_gamerscore);
+    g_must_reload = true;
+
+    obs_log(LOG_INFO, "Gamerscore is %" PRId64, total_gamerscore);
 }
 
 /**
@@ -159,7 +128,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     xbox_account_source_t *s = bzalloc(sizeof(*s));
     s->source                = source;
-    s->width                 = 800;
+    s->width                 = 600;
     s->height                = 200;
 
     return s;
@@ -174,6 +143,11 @@ static void on_source_destroy(void *data) {
 
     if (!source) {
         return;
+    }
+
+    if (g_text_context) {
+        text_context_destroy(g_text_context);
+        g_text_context = NULL;
     }
 
     bfree(source);
@@ -197,8 +171,26 @@ static uint32_t source_get_height(void *data) {
  * Currently unused.
  */
 static void on_source_update(void *data, obs_data_t *settings) {
+
     UNUSED_PARAMETER(data);
-    UNUSED_PARAMETER(settings);
+
+    if (obs_data_has_user_value(settings, "text_color")) {
+        const uint32_t argb            = (uint32_t)obs_data_get_int(settings, "text_color");
+        g_default_configuration->color = color_argb_to_rgba(argb);
+        g_must_reload                  = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_size")) {
+        g_default_configuration->size = (uint32_t)obs_data_get_int(settings, "text_size");
+        g_must_reload                 = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_font")) {
+        g_default_configuration->font_path = obs_data_get_string(settings, "text_font");
+        g_must_reload                      = true;
+    }
+
+    state_set_gamerscore_configuration(g_default_configuration);
 }
 
 /**
@@ -211,67 +203,35 @@ static void on_source_update(void *data, obs_data_t *settings) {
  * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
-    UNUSED_PARAMETER(data);
-    UNUSED_PARAMETER(effect);
 
-    //  Number 0 is at (x,y) (offset_x,offset_y)
-    //  Number 1 is at (x,y) (offset_x + font_width,offset_y)
-    //  Number 2 is at (x,y) (offset_x + 2 * font_width,offset_y)
+    xbox_account_source_t *source = data;
 
-    if (!g_default_configuration) {
+    if (!source) {
         return;
     }
 
-    if (!g_font_sheet_image.loaded) {
-        return;
-    }
+    if (g_must_reload || !g_text_context) {
 
-    /* Ensures texture is loaded */
-    if (!g_font_sheet_image.texture) {
-        gs_image_file_init_texture(&g_font_sheet_image);
-    }
-
-    /* Prints the gamerscore in a string */
-    char gamerscore_text[128];
-    snprintf(gamerscore_text, sizeof(gamerscore_text), "%" PRId64, g_gamerscore);
-
-    /* Retrieves the configured parameters of the font sheet */
-    const uint32_t font_width  = g_default_configuration->font_width;
-    const uint32_t font_height = g_default_configuration->font_height;
-    const uint32_t offset_x    = g_default_configuration->offset_x;
-    const uint32_t offset_y    = g_default_configuration->offset_y;
-
-    /* Retrieves the texture of the font sheet */
-    gs_texture_t *tex = g_font_sheet_image.texture;
-
-    /* Draw using the stock "Draw" technique. */
-    gs_effect_t *used_effect = effect ? effect : obs_get_base_effect(OBS_EFFECT_DEFAULT);
-    gs_eparam_t *image       = gs_effect_get_param_by_name(used_effect, "image");
-
-    gs_effect_set_texture(image, tex);
-
-    float x = (float)offset_x;
-    float y = (float)offset_y;
-
-    for (const char *p = gamerscore_text; *p; ++p) {
-
-        if (*p < '0' || *p > '9') {
-            continue;
+        if (g_text_context) {
+            text_context_destroy(g_text_context);
+            g_text_context = NULL;
         }
 
-        const uint32_t digit = (uint32_t)(*p - '0');
+        g_text_context = text_context_create(g_default_configuration->font_path,
+                                             source->width,
+                                             source->height,
+                                             g_gamerscore,
+                                             g_default_configuration->size,
+                                             g_default_configuration->color);
 
-        const uint32_t src_x = offset_x + digit * font_width;
-        const uint32_t src_y = offset_y;
-
-        // Draw subregion at current position.
-        gs_matrix_push();
-        gs_matrix_translate3f(x, y, 0.0f);
-        gs_draw_sprite_subregion(tex, NO_FLIP, src_x, src_y, font_width, font_height);
-        gs_matrix_pop();
-
-        x += (float)font_width;
+        g_must_reload = false;
     }
+
+    if (!g_text_context) {
+        return;
+    }
+
+    text_context_draw(g_text_context, effect);
 }
 
 /**
@@ -286,18 +246,25 @@ static obs_properties_t *source_get_properties(void *data) {
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
 
-    obs_properties_add_path(p,
-                            "font_sheet_path",  // setting key
-                            "Font sheet image", // display name
-                            OBS_PATH_FILE,      // file chooser
-                            "Image Files (*.png *.jpg *.jpeg);;All Files (*.*)",
-                            NULL // default path (optional)
-    );
+    // Font dropdown.
+    obs_property_t *font_list_prop =
+        obs_properties_add_list(p, "text_font", "Font", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
-    obs_properties_add_text(p, "offset_x", "Initial X", OBS_TEXT_DEFAULT);
-    obs_properties_add_text(p, "offset_y", "Initial Y", OBS_TEXT_DEFAULT);
-    obs_properties_add_text(p, "font_width", "Font Width", OBS_TEXT_DEFAULT);
-    obs_properties_add_text(p, "font_height", "Font Height", OBS_TEXT_DEFAULT);
+    size_t  font_count = 0;
+    font_t *fonts      = font_list_available(&font_count);
+
+    if (fonts) {
+        for (size_t i = 0; i < font_count; i++) {
+            if (fonts[i].name && fonts[i].path) {
+                // Display name shown in UI, path stored as value.
+                obs_property_list_add_string(font_list_prop, fonts[i].name, fonts[i].path);
+            }
+        }
+        font_list_free(fonts, font_count);
+    }
+
+    obs_properties_add_color(p, "text_color", "Text color");
+    obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
 
     return p;
 }
@@ -348,16 +315,14 @@ void xbox_gamerscore_source_register(void) {
 
     g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
 
+    g_default_configuration = state_get_gamerscore_configuration();
+
     /* TODO A default font sheet path should be embedded with the plugin */
-    g_default_configuration->font_sheet_path = "/Users/christophe/Downloads/font_sheet.png";
-    g_default_configuration->offset_x        = 0;
-    g_default_configuration->offset_y        = 0;
-    g_default_configuration->font_width      = 148;
-    g_default_configuration->font_height     = 226;
+    if (!g_default_configuration->font_path) {
+        g_default_configuration->font_path = "/Users/christophe/Downloads/font_sheet.png";
+    }
 
     obs_register_source(xbox_source_get());
-
-    load_font_sheet();
 
     xbox_subscribe_connected_changed(&on_connection_changed);
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);

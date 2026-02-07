@@ -177,8 +177,12 @@ The plugin implements the Xbox Live authentication flow with Proof-of-Possession
 - **OBS Studio** 30.0+ (headers + libraries)
 - **OpenSSL** 3.x (for cryptographic operations)
 - **libcurl** (for HTTP requests)
+- **FreeType** 2.x (for text rendering)
+- **zlib** (required by FreeType, usually available by default)
 - **libuuid** (Linux/BSD only, for UUID generation)
 - C compiler with C11 support
+
+**Note on zlib:** zlib is required by FreeType for font compression support and is typically pre-installed on all platforms (macOS SDK, Windows via vcpkg/obs-deps, Linux system packages).
 
 ### Platform-Specific Setup
 
@@ -186,7 +190,7 @@ The plugin implements the Xbox Live authentication flow with Proof-of-Possession
 
 1. Install dependencies via Homebrew:
    ```bash
-   brew install cmake openssl@3 curl
+   brew install cmake openssl@3 curl freetype
    ```
 
 2. Clone and configure:
@@ -218,11 +222,25 @@ Or maybe:
       ~/Library/Application\ Support/obs-studio/plugins/
    ```
 
+##### Building Universal Binary for CI
+
+For universal (arm64+x86_64) builds, you'll need a universal FreeType binary:
+
+```bash
+# Build universal FreeType (this will be done automatically in CI)
+./scripts/build-universal-freetype.sh
+
+# Then configure for universal build
+cmake --preset macos-ci
+```
+
+The CI workflow automatically builds universal FreeType before building the plugin.
+
 #### Windows (Untested)
 
 1. Install dependencies via vcpkg:
    ```powershell
-   vcpkg install openssl:x64-windows curl:x64-windows
+   vcpkg install openssl:x64-windows curl:x64-windows freetype:x64-windows
    ```
 
 2. Configure and build:
@@ -235,7 +253,7 @@ Or maybe:
 
 1. Install dependencies:
    ```bash
-   sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev
+   sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6-dev
    ```
 
 2. Configure and build:

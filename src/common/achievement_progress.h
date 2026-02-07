@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,6 +24,8 @@ typedef struct achievement_progress {
     const char                  *id;
     /** Progress state. */
     const char                  *progress_state;
+    /** Unix timestamp (seconds since epoch) when the achievement was unlocked, or 0 if locked. */
+    int64_t                      unlocked_timestamp;
     /** Next progress entry in the list, or NULL. */
     struct achievement_progress *next;
 } achievement_progress_t;

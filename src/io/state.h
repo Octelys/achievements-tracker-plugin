@@ -100,6 +100,10 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity);
  */
 xbox_identity_t *state_get_xbox_identity(void);
 
+void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamerscore_configuration);
+
+gamerscore_configuration_t *state_get_gamerscore_configuration();
+
 /**
  * @brief Clear all in-memory state (and typically any persisted state).
  *

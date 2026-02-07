@@ -1,5 +1,7 @@
 #include "test/stubs/time/time_stub.h"
 
+#include <ctype.h>
+
 static time_t mock_current_time;
 
 void mock_now(time_t current_time) {

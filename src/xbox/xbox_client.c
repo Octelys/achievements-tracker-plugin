@@ -359,12 +359,12 @@ const char *xbox_fetch_gamerpic() {
     response_json  = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic/avatar: received status code %ld", http_code);
+        obs_log(LOG_ERROR, "Failed to fetch the user's Gamerpic: received status code %ld", http_code);
         goto cleanup;
     }
 
     if (!response_json) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic/avatar: received no response");
+        obs_log(LOG_ERROR, "Failed to fetch the user's Gamerpic: received no response");
         goto cleanup;
     }
 
@@ -373,7 +373,7 @@ const char *xbox_fetch_gamerpic() {
     cJSON *root = cJSON_Parse(response_json);
 
     if (!root) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic/avatar: unable to parse the JSON response");
+        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic: unable to parse the JSON response");
         goto cleanup;
     }
 
@@ -381,7 +381,7 @@ const char *xbox_fetch_gamerpic() {
     cJSON *user_gamerpic_url = cJSONUtils_GetPointer(root, "/profileUsers/0/settings/0/value");
 
     if (!user_gamerpic_url || !user_gamerpic_url->valuestring || user_gamerpic_url->valuestring[0] == '\0') {
-        obs_log(LOG_INFO, "Failed to fetch the user's gamerpic/avatar: no value found.");
+        obs_log(LOG_INFO, "Failed to fetch the user's gamerpic: no value found.");
         goto cleanup;
     }
 
@@ -389,9 +389,9 @@ const char *xbox_fetch_gamerpic() {
 
     /* cJSON doesn't automatically unescape literal unicode sequences (\\uXXXX) inside strings.
      * Xbox sometimes returns URLs containing "\\u0026" for '&'. Fix it up for curl/http. */
-    str_replace(gamerpic_url, "\\u0026", "&");
+    str_replace(gamerpic_url, "u0026", "&");
 
-    obs_log(LOG_INFO, "User gamerpic/avatar URL is '%s'", gamerpic_url);
+    obs_log(LOG_INFO, "User gamerpic URL is '%s'", gamerpic_url);
 
 cleanup:
     free_memory((void **)&response_json);
@@ -589,7 +589,7 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Response: %s", response_json);
+    obs_log(LOG_INFO, "Response: %s", response_json);
 
     achievements = parse_achievements(response_json);
 

@@ -32,8 +32,8 @@ extern "C" {
  *
  * @param p Pointer to a cJSON object.
  */
-#define FREE_JSON(p)    \
-if (p)                  \
+#define FREE_JSON(p) \
+    if (p)            \
     cJSON_Delete(p);
 
 /**
@@ -49,10 +49,10 @@ if (p)                  \
  * @param dst Address of the destination pointer, or NULL.
  */
 #define COPY_OR_FREE(src, dst) \
-if (dst)                      \
-    *dst = src;               \
-else                          \
-    FREE(src);
+    if (dst)                  \
+        *dst = src;           \
+    else                      \
+        FREE(src);
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -91,6 +91,9 @@ static void sleep_ms(unsigned int ms) {
 
 /**
  * @brief Result type for Xbox Live authentication.
+ *
+ * This is returned by authentication helpers to provide a stable ABI and a
+ * single place for error details.
  */
 typedef struct xbox_live_authenticate_result {
     /** Human-readable error message when authentication fails, otherwise NULL. */
@@ -99,18 +102,18 @@ typedef struct xbox_live_authenticate_result {
 
 /**
  * @brief Configuration used by the gamerscore overlay/renderer.
+ *
+ * Ownership:
+ * - Strings are treated as borrowed pointers unless otherwise documented by the
+ *   caller.
  */
 typedef struct gamerscore_configuration {
-    /** Path to the font sheet asset. */
-    const char *font_sheet_path;
-    /** Horizontal pixel offset. */
-    uint32_t    offset_x;
-    /** Vertical pixel offset. */
-    uint32_t    offset_y;
-    /** Single glyph width in pixels. */
-    uint32_t    font_width;
-    /** Single glyph height in pixels. */
-    uint32_t    font_height;
+    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
+    const char *font_path;
+    /** Font size in pixels (height passed to FreeType). */
+    uint32_t    size;
+    /** Packed RGBA color in 0xRRGGBBAA format. */
+    uint32_t    color;
 } gamerscore_configuration_t;
 
 /**

@@ -234,7 +234,7 @@ ${_usage_host:-}"
     if (( coverage )) {
       log_group "Building test targets..."
       local build_dir="build_${target##*-}"
-      cmake --build ${build_dir} --target test_encoder test_crypto test_time test_parsers test_xbox_session test_types
+      cmake --build ${build_dir} --target test_encoder test_crypto test_convert test_parsers test_xbox_session test_types
 
       log_group "Running tests..."
       ctest --test-dir ${build_dir} --output-on-failure

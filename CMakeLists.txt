@@ -10,6 +10,9 @@ endif()
 # Prefer universal OpenSSL when present (macOS)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalOpenSSL.cmake")
 
+# Prefer universal FreeType when present (macOS)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalFreeType.cmake")
+
 project(${_name} VERSION ${_version})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
@@ -222,6 +225,97 @@ if(ENABLE_QT)
   )
 endif()
 
+# FreeType for text rendering
+#
+# IMPORTANT (macOS universal): do NOT link against Homebrew's FreeType.
+# On arm64 runners, Homebrew's freetype bottle is arm64-only, which breaks
+# universal (arm64+x86_64) linking.
+#
+# For universal builds, ensure FreeType is available in CMAKE_PREFIX_PATH
+# as a universal binary (e.g., from obs-deps or a custom universal build).
+if(APPLE)
+  # Ignore typical Homebrew prefixes to prevent finding arm64-only FreeType
+  list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+endif()
+
+# Prefer CMake's built-in FindFreetype (works well on Windows and macOS/Linux).
+find_package(Freetype QUIET)
+
+if(Freetype_FOUND)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Freetype::Freetype)
+
+  # If FreeType resolves to Homebrew on macOS, fail early ONLY for universal builds.
+  if(APPLE)
+    get_target_property(FREETYPE_LIB Freetype::Freetype IMPORTED_LOCATION)
+    if(NOT FREETYPE_LIB)
+      # Try alternative properties
+      get_target_property(FREETYPE_LIB Freetype::Freetype LOCATION)
+    endif()
+
+    list(LENGTH CMAKE_OSX_ARCHITECTURES _ft_arch_count)
+    if(_ft_arch_count GREATER 1)
+      # Universal build - require non-Homebrew FreeType
+      if(FREETYPE_LIB MATCHES "(/opt/homebrew|/usr/local)")
+        message(
+          FATAL_ERROR
+          "Found Homebrew's FreeType at ${FREETYPE_LIB} which is often single-arch.\n"
+          "This breaks universal (arm64+x86_64) builds.\n"
+          "Install/use a universal FreeType (add to obs-deps or build manually).\n"
+          "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
+          "For local testing, use the 'macos-dev' preset which builds for native arch only."
+        )
+      endif()
+    else()
+      # Single-arch build - Homebrew FreeType is fine
+      if(FREETYPE_LIB MATCHES "(/opt/homebrew|/usr/local)")
+        message(STATUS "Using Homebrew FreeType for single-arch dev build: ${FREETYPE_LIB}")
+      endif()
+    endif()
+  endif()
+else()
+  # Fallback to pkg-config (typically macOS/Linux)
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(FREETYPE QUIET IMPORTED_TARGET freetype2)
+    if(FREETYPE_FOUND)
+      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE PkgConfig::FREETYPE)
+      target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
+      target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_CFLAGS_OTHER})
+
+      # Check if FreeType is from Homebrew for universal builds
+      if(APPLE)
+        list(LENGTH CMAKE_OSX_ARCHITECTURES _ft_arch_count2)
+        if(_ft_arch_count2 GREATER 1)
+          foreach(lib ${FREETYPE_LIBRARIES})
+            if(lib MATCHES "(/opt/homebrew|/usr/local)")
+              message(
+                FATAL_ERROR
+                "Found Homebrew's FreeType at ${lib} which is arm64-only.\n"
+                "This breaks universal (arm64+x86_64) builds.\n"
+                "Install/use a universal FreeType (add to obs-deps or build manually).\n"
+                "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
+                "For local testing, use the 'macos-dev' preset which builds for native arch only."
+              )
+            endif()
+          endforeach()
+        endif()
+      endif()
+    endif()
+  endif()
+endif()
+
+# If you \*require\* FreeType whenever `src/drawing/text.c` is compiled, fail hard.
+if(NOT Freetype_FOUND AND NOT FREETYPE_FOUND)
+  message(
+    FATAL_ERROR
+    "FreeType not found (needed for `src/drawing/text.c`). Install freetype and/or set CMAKE_PREFIX_PATH."
+  )
+endif()
+
+# FreeType requires zlib for gzip compression support
+find_package(ZLIB REQUIRED)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ZLIB::ZLIB)
+
 # Logging helpers (obs_log wrapper + plugin name/version)
 if(TARGET diagnostics-log)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE diagnostics-log)
@@ -231,12 +325,15 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
+    src/system/font.c
     src/sources/xbox/account.c
     src/sources/xbox/gamerpic.c
     src/sources/xbox/game_cover.c
     src/sources/xbox/gamerscore.c
     src/crypto/crypto.c
+    src/drawing/color.c
     src/drawing/image.c
+    src/drawing/text.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
@@ -248,6 +345,7 @@ target_sources(
     src/io/state.c
     src/encoding/base64.c
     src/util/uuid.c
+    src/text/convert.c
     src/text/parsers.c
     src/time/time.c
     src/common/achievement.c
@@ -399,18 +497,24 @@ if(BUILD_TESTING)
   target_link_test_deps(test_crypto)
 
   # ------------------------------
-  # test_time
+  # test_convert
   # ------------------------------
-  add_executable(test_time test/test_time.c ${unity_SOURCE_DIR}/src/unity.c src/time/time.c test/stubs/bmem_stub.c)
+  add_executable(
+    test_convert
+    test/test_convert.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/text/convert.c
+    test/stubs/bmem_stub.c
+  )
 
-  add_test(NAME test_time COMMAND test_time)
+  add_test(NAME test_convert COMMAND test_convert)
 
   if(ENABLE_COVERAGE)
-    enable_coverage(test_time)
+    enable_coverage(test_convert)
   endif()
 
   target_include_directories(
-    test_time
+    test_convert
     PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
       ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -418,9 +522,9 @@ if(BUILD_TESTING)
       ${CMAKE_CURRENT_SOURCE_DIR}/test
   )
 
-  target_compile_definitions(test_time PRIVATE UNITY_INCLUDE_CONFIG_H)
+  target_compile_definitions(test_convert PRIVATE UNITY_INCLUDE_CONFIG_H)
 
-  target_link_test_deps(test_time)
+  target_link_test_deps(test_convert)
 
   # ------------------------------
   # test_parsers
@@ -429,6 +533,7 @@ if(BUILD_TESTING)
     test_parsers
     test/test_parsers.c
     ${unity_SOURCE_DIR}/src/unity.c
+    src/text/convert.c
     src/text/parsers.c
     test/stubs/bmem_stub.c
   )
@@ -534,6 +639,6 @@ if(BUILD_TESTING)
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
   if(ENABLE_COVERAGE)
-    add_coverage_target(test_encoder test_crypto test_time test_parsers test_xbox_session test_types)
+    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_xbox_session test_types)
   endif()
 endif()
