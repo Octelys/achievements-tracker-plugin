@@ -10,6 +10,9 @@ endif()
 # Prefer universal OpenSSL when present (macOS)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalOpenSSL.cmake")
 
+# Prefer universal FreeType when present (macOS)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalFreeType.cmake")
+
 project(${_name} VERSION ${_version})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
@@ -222,11 +225,53 @@ if(ENABLE_QT)
   )
 endif()
 
+# FreeType for text rendering
+#
+# IMPORTANT (macOS universal): do NOT link against Homebrew's FreeType.
+# On arm64 runners, Homebrew's freetype bottle is arm64-only, which breaks
+# universal (arm64+x86_64) linking.
+#
+# For universal builds, ensure FreeType is available in CMAKE_PREFIX_PATH
+# as a universal binary (e.g., from obs-deps or a custom universal build).
+if(APPLE)
+  # Ignore typical Homebrew prefixes to prevent finding arm64-only FreeType
+  list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+endif()
+
 # Prefer CMake's built-in FindFreetype (works well on Windows and macOS/Linux).
 find_package(Freetype QUIET)
 
 if(Freetype_FOUND)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Freetype::Freetype)
+
+  # If FreeType resolves to Homebrew on macOS, fail early ONLY for universal builds.
+  if(APPLE)
+    get_target_property(FREETYPE_LIB Freetype::Freetype IMPORTED_LOCATION)
+    if(NOT FREETYPE_LIB)
+      # Try alternative properties
+      get_target_property(FREETYPE_LIB Freetype::Freetype LOCATION)
+    endif()
+
+    list(LENGTH CMAKE_OSX_ARCHITECTURES _ft_arch_count)
+    if(_ft_arch_count GREATER 1)
+      # Universal build - require non-Homebrew FreeType
+      if(FREETYPE_LIB MATCHES "(/opt/homebrew|/usr/local)")
+        message(
+          FATAL_ERROR
+          "Found Homebrew's FreeType at ${FREETYPE_LIB} which is often single-arch.\n"
+          "This breaks universal (arm64+x86_64) builds.\n"
+          "Install/use a universal FreeType (add to obs-deps or build manually).\n"
+          "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
+          "For local testing, use the 'macos-dev' preset which builds for native arch only."
+        )
+      endif()
+    else()
+      # Single-arch build - Homebrew FreeType is fine
+      if(FREETYPE_LIB MATCHES "(/opt/homebrew|/usr/local)")
+        message(STATUS "Using Homebrew FreeType for single-arch dev build: ${FREETYPE_LIB}")
+      endif()
+    endif()
+  endif()
 else()
   # Fallback to pkg-config (typically macOS/Linux)
   find_package(PkgConfig QUIET)
@@ -236,6 +281,25 @@ else()
       target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE PkgConfig::FREETYPE)
       target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
       target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE ${FREETYPE_CFLAGS_OTHER})
+
+      # Check if FreeType is from Homebrew for universal builds
+      if(APPLE)
+        list(LENGTH CMAKE_OSX_ARCHITECTURES _ft_arch_count2)
+        if(_ft_arch_count2 GREATER 1)
+          foreach(lib ${FREETYPE_LIBRARIES})
+            if(lib MATCHES "(/opt/homebrew|/usr/local)")
+              message(
+                FATAL_ERROR
+                "Found Homebrew's FreeType at ${lib} which is arm64-only.\n"
+                "This breaks universal (arm64+x86_64) builds.\n"
+                "Install/use a universal FreeType (add to obs-deps or build manually).\n"
+                "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}\n"
+                "For local testing, use the 'macos-dev' preset which builds for native arch only."
+              )
+            endif()
+          endforeach()
+        endif()
+      endif()
     endif()
   endif()
 endif()
