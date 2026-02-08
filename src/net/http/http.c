@@ -76,15 +76,6 @@ static int curl_debug_cb(CURL *handle, curl_infotype type, char *data, size_t si
     return 0;
 }
 
-/**
- * @brief POST application/x-www-form-urlencoded data.
- *
- * @param url           Target URL.
- * @param post_fields   Form-encoded request body.
- * @param out_http_code Optional output for HTTP status code.
- * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
- *         or NULL on libcurl failure.
- */
 char *http_post_form(const char *url, const char *post_fields, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -138,16 +129,6 @@ char *http_post_form(const char *url, const char *post_fields, long *out_http_co
     return chunk.ptr;
 }
 
-/**
- * @brief POST a raw request body with optional extra headers.
- *
- * @param url           Target URL.
- * @param body          Request body (may be NULL).
- * @param extra_headers Optional additional headers, one per line (LF or CRLF).
- * @param out_http_code Optional output for HTTP status code.
- * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
- *         or NULL on libcurl failure.
- */
 char *http_post(const char *url, const char *body, const char *extra_headers, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -227,18 +208,6 @@ char *http_post(const char *url, const char *body, const char *extra_headers, lo
     return chunk.ptr;
 }
 
-/**
- * @brief POST a JSON request body with optional extra headers.
- *
- * Automatically adds "Content-Type: application/json".
- *
- * @param url           Target URL.
- * @param json_body     JSON request body.
- * @param extra_headers Optional additional headers, one per line (LF or CRLF).
- * @param out_http_code Optional output for HTTP status code.
- * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
- *         or NULL on libcurl failure.
- */
 char *http_post_json(const char *url, const char *json_body, const char *extra_headers, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -320,16 +289,6 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
     return chunk.ptr;
 }
 
-/**
- * @brief Perform an HTTP GET request with optional headers.
- *
- * @param url           Target URL.
- * @param extra_headers Optional additional headers, one per line (LF or CRLF).
- * @param post_fields   Optional body passed to libcurl via CURLOPT_POSTFIELDS.
- * @param out_http_code Optional output for HTTP status code.
- * @return Response body allocated with bzalloc/brealloc (caller must bfree()),
- *         or NULL on libcurl failure.
- */
 char *http_get(const char *url, const char *extra_headers, const char *post_fields, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -413,14 +372,6 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
     return chunk.ptr;
 }
 
-/**
- * @brief URL-encode a string (percent-encoding).
- *
- * Uses libcurl's escaping rules and returns a copy allocated with bstrdup.
- *
- * @param in Input string.
- * @return Newly allocated encoded string (caller must bfree()), or NULL on error.
- */
 char *http_urlencode(const char *in) {
     if (!in)
         return NULL;
@@ -441,14 +392,6 @@ char *http_urlencode(const char *in) {
     return out;
 }
 
-/**
- * @brief Download a resource into a raw byte buffer.
- *
- * @param url      Resource URL.
- * @param out_data Receives a newly allocated buffer. Caller must bfree().
- * @param out_size Receives the number of bytes written into @p out_data.
- * @return true on success, false on failure.
- */
 bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
 
     if (!url || !out_data || !out_size)

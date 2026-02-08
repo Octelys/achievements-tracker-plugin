@@ -2,21 +2,6 @@
 
 #ifdef _WIN32
 
-/**
- * @brief Generates a random UUID (version 4) as a string.
- *
- * Produces a NUL-terminated UUID string in the canonical lowercase format:
- * `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
- *
- * Buffer requirements:
- * - @p random_uuid must point to a writable buffer of at least 37 bytes.
- *
- * Failure behavior:
- * - On Windows, if UUID generation or string conversion fails, this function
- *   writes an empty string (first byte set to `\0`).
- *
- * @param[out] random_uuid Output buffer that receives the UUID string.
- */
 void uuid_get_random(char random_uuid[37]) {
     UUID     uuid;
     RPC_CSTR uuid_str = NULL;
@@ -46,17 +31,6 @@ void uuid_get_random(char random_uuid[37]) {
 
 #else
 
-/**
- * @brief Generates a random UUID (version 4) as a string.
- *
- * Produces a NUL-terminated UUID string in the canonical lowercase format:
- * `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
- *
- * Buffer requirements:
- * - @p random_uuid must point to a writable buffer of at least 37 bytes.
- *
- * @param[out] random_uuid Output buffer that receives the UUID string.
- */
 void uuid_get_random(char random_uuid[37]) {
     uuid_t uuid;
     uuid_generate_random(uuid);

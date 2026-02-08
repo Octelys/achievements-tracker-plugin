@@ -23,17 +23,6 @@
  *    freed with bfree().
  */
 
-/**
- * @brief Read a JSON string property by key.
- *
- * This is a lightweight, best-effort string-based extractor. It searches for the
- * first occurrence of the key (as "<key>") and then expects a ':' followed by a
- * double-quoted string value.
- *
- * @param json JSON text.
- * @param key  Property name to search.
- * @return Newly allocated string value (caller must bfree()), or NULL if not found.
- */
 char *json_read_string(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
@@ -79,15 +68,6 @@ char *json_read_string(const char *json, const char *key) {
     return out;
 }
 
-/**
- * @brief Read a JSON integer property by key.
- *
- * Searches for the key and parses an unquoted base-10 integer using strtol().
- *
- * @param json JSON text.
- * @param key  Property name to search.
- * @return Newly allocated long* (caller must bfree()), or NULL if missing or not an integer.
- */
 long *json_read_long(const char *json, const char *key) {
     if (!json || !key)
         return NULL;
@@ -225,16 +205,6 @@ static char *json_read_object_subjson(const char *json, const char *key) {
     return NULL;
 }
 
-/**
- * @brief Read a JSON string property using a dotted path.
- *
- * Traverses object keys by repeatedly extracting the object substring at each
- * segment and then reading the final segment as a string.
- *
- * @param json JSON text.
- * @param path Dot-separated path (e.g. "a.b.c").
- * @return Newly allocated string value (caller must bfree()), or NULL if not found.
- */
 char *json_read_string_from_path(const char *json, const char *path) {
     if (!json || !path || !*path)
         return NULL;

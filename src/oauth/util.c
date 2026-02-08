@@ -81,19 +81,6 @@ static void base64url_encode_bytes(const uint8_t *bytes, size_t bytes_len, char 
     out[k] = '\0';
 }
 
-/**
- * @brief Generate an OAuth `state` value.
- *
- * The state is used to correlate requests and protect against CSRF. The output
- * is an ASCII string containing characters from [a-zA-Z0-9].
- *
- * @note Current implementation uses rand()/srand() seeded with time and pid.
- *       This is adequate for low-stakes correlation but is not
- *       cryptographically-strong randomness.
- *
- * @param out      Output buffer.
- * @param out_size Output buffer size in bytes. Typical size: 33 (32 chars + NUL).
- */
 void oauth_random_state(char *out, size_t out_size) {
     static const char alphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     if (!out || out_size == 0)
@@ -113,18 +100,6 @@ void oauth_random_state(char *out, size_t out_size) {
     out[n] = '\0';
 }
 
-/**
- * @brief Generate a PKCE `code_verifier` value.
- *
- * Produces an ASCII string containing characters allowed by the PKCE spec
- * (letters, digits, and "-._~").
- *
- * @note This reuses the PRNG state from oauth_random_state() and therefore shares
- *       the same randomness caveat.
- *
- * @param out      Output buffer.
- * @param out_size Output buffer size in bytes. Typical size: 65 (64 chars + NUL).
- */
 void oauth_pkce_verifier(char *out, size_t out_size) {
     static const char alphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
     if (!out || out_size == 0)
@@ -139,17 +114,6 @@ void oauth_pkce_verifier(char *out, size_t out_size) {
     out[n] = '\0';
 }
 
-/**
- * @brief Compute the PKCE S256 code challenge for a given verifier.
- *
- * Computes:
- *  - SHA-256(verifier)
- *  - base64url encoding of the digest without '=' padding
- *
- * @param verifier PKCE verifier string.
- * @param out      Output buffer.
- * @param out_size Output buffer size in bytes.
- */
 void oauth_pkce_challenge_s256(const char *verifier, char *out, size_t out_size) {
     if (!verifier || !out || out_size == 0) {
         if (out && out_size)

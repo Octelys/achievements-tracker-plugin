@@ -141,13 +141,6 @@ static void save_state(obs_data_t *data) {
     bfree(path);
 }
 
-/**
- * @brief Initialize the state subsystem.
- *
- * Loads the persisted state from disk into the global in-memory cache.
- *
- * @note Call once during plugin startup before using state_get_* / state_set_*.
- */
 void io_load(void) {
     g_state = load_state();
 
@@ -159,13 +152,6 @@ void io_load(void) {
     (void)last_sync;
 }
 
-/**
- * @brief Clear volatile/authentication state.
- *
- * This clears OAuth/Xbox tokens and identity fields from the persisted state and
- * saves the file. Device-identifying values (UUID/serial/keys) are intentionally
- * kept stable.
- */
 void state_clear(void) {
     /* Considering how sensitive the Xbox live API appears, let's always keep the UUID / Serial / Keys constant */
     /*obs_data_set_string(g_state, DEVICE_UUID, "");*/
@@ -244,23 +230,6 @@ static const char *create_device_keys() {
     return obs_data_get_string(g_state, DEVICE_KEYS);
 }
 
-/**
- * @brief Get the current device identity/key material, creating it if missing.
- *
- * The device UUID/serial and keypair are stored persistently. If any are missing,
- * they are generated and saved.
- *
- * Ownership/lifetime:
- *  - The returned device_t is allocated with bzalloc() and must be freed by the
- *    caller.
- *  - device->uuid and device->serial_number point to strings owned by the
- *    internal obs_data_t state; they must not be freed and remain valid while
- *    g_state remains loaded.
- *  - device->keys is a newly created EVP_PKEY that must be freed by the caller
- *    with EVP_PKEY_free().
- *
- * @return Newly allocated device_t on success, or NULL on failure.
- */
 device_t *state_get_device(void) {
 
     /* Retrieves the device UUID & serial number */
@@ -300,25 +269,11 @@ device_t *state_get_device(void) {
     return device;
 }
 
-/**
- * @brief Store the device token.
- *
- * @param device_token Token to store. The value is persisted.
- */
 void state_set_device_token(const token_t *device_token) {
     obs_data_set_string(g_state, DEVICE_TOKEN, device_token->value);
     save_state(g_state);
 }
 
-/**
- * @brief Retrieve the device token from the state.
- *
- * Ownership/lifetime:
- *  - Returns a token_t allocated with bzalloc() that the caller must free.
- *  - token->value points to a string owned by the internal state object.
- *
- * @return Token wrapper, or NULL if missing/expired.
- */
 token_t *state_get_device_token(void) {
 
     const char *device_token = obs_data_get_string(g_state, DEVICE_TOKEN);
@@ -334,21 +289,11 @@ token_t *state_get_device_token(void) {
     return token;
 }
 
-/**
- * @brief Store the SISU token.
- *
- * @param sisu_token Token to store. The value is persisted.
- */
 void state_set_sisu_token(const token_t *sisu_token) {
     obs_data_set_string(g_state, SISU_TOKEN, sisu_token->value);
     save_state(g_state);
 }
 
-/**
- * @brief Retrieve the SISU token from the state.
- *
- * @return Token wrapper allocated with bzalloc(), or NULL if missing/expired.
- */
 token_t *state_get_sisu_token(void) {
 
     const char *sisu_token = obs_data_get_string(g_state, SISU_TOKEN);
@@ -364,13 +309,6 @@ token_t *state_get_sisu_token(void) {
     return token;
 }
 
-/**
- * @brief Store the user access token and refresh token.
- *
- * @param device_code   Device code required for the refresh.
- * @param user_token    Access token (value + expiry).
- * @param refresh_token Refresh token.
- */
 void state_set_user_token(const char *device_code, const token_t *user_token, const token_t *refresh_token) {
 
     if (!device_code || !user_token || !refresh_token) {
@@ -396,15 +334,6 @@ char *state_get_device_code(void) {
     return bstrdup(device_code);
 }
 
-/**
- * @brief Set the gamerscore source configuration.
- *
- * Stores the gamerscore display configuration (font path, size, color) in the
- * in-memory state and persists it to disk via save_state(). If configuration
- * is NULL, this function returns early without making changes.
- *
- * @param gamerscore_configuration Configuration to store (may be NULL to skip).
- */
 void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamerscore_configuration) {
 
     if (!gamerscore_configuration) {
@@ -419,17 +348,6 @@ void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamers
     save_state(g_state);
 }
 
-/**
- * @brief Get the currently stored gamerscore source configuration.
- *
- * Retrieves the gamerscore configuration from the in-memory state, applying
- * default values where needed:
- * - If color is 0, defaults to 0xFFFFFF (white)
- * - If size is 0, defaults to 12 pixels
- * - Font path is duplicated and must be freed by the caller
- *
- * @return Newly allocated gamerscore_configuration_t. Caller must free with bfree().
- */
 gamerscore_configuration_t *state_get_gamerscore_configuration() {
 
     uint32_t    color     = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_COLOR);
@@ -446,15 +364,6 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
     return gamerscore_configuration;
 }
 
-/**
- * @brief Set the gamertag source configuration.
- *
- * Stores the gamertag display configuration (font path, size, color, align) in
- * the in-memory state and persists it to disk via save_state(). If configuration
- * is NULL, this function returns early without making changes.
- *
- * @param configuration Configuration to store (may be NULL to skip).
- */
 void state_set_gamertag_configuration(const gamertag_configuration_t *configuration) {
 
     if (!configuration) {
@@ -469,17 +378,6 @@ void state_set_gamertag_configuration(const gamertag_configuration_t *configurat
     save_state(g_state);
 }
 
-/**
- * @brief Get the currently stored gamertag source configuration.
- *
- * Retrieves the gamertag configuration from the in-memory state, applying
- * default values where needed:
- * - If color is 0, defaults to 0xFFFFFF (white)
- * - If size is 0, defaults to 12 pixels
- * - Font path is duplicated and must be freed by the caller
- *
- * @return Newly allocated gamertag_configuration_t. Caller must free with bfree().
- */
 gamertag_configuration_t *state_get_gamertag_configuration() {
 
     uint32_t    color     = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_COLOR);
@@ -496,15 +394,6 @@ gamertag_configuration_t *state_get_gamertag_configuration() {
     return configuration;
 }
 
-/**
- * @brief Set the achievement name source configuration.
- *
- * Stores the achievement name display configuration (font path, size, color) in
- * the in-memory state and persists it to disk via save_state(). If configuration
- * is NULL, this function returns early without making changes.
- *
- * @param configuration Configuration to store (may be NULL to skip).
- */
 void state_set_achievement_name_configuration(const achievement_name_configuration_t *configuration) {
 
     if (!configuration) {
@@ -519,17 +408,6 @@ void state_set_achievement_name_configuration(const achievement_name_configurati
     save_state(g_state);
 }
 
-/**
- * @brief Get the currently stored achievement name source configuration.
- *
- * Retrieves the achievement name configuration from the in-memory state, applying
- * default values where needed:
- * - If color is 0, defaults to 0xFFFFFF (white)
- * - If size is 0, defaults to 12 pixels
- * - Font path is duplicated and must be freed by the caller
- *
- * @return Newly allocated achievement_name_configuration_t. Caller must free with bfree().
- */
 achievement_name_configuration_t *state_get_achievement_name_configuration() {
 
     uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_COLOR);
@@ -546,15 +424,6 @@ achievement_name_configuration_t *state_get_achievement_name_configuration() {
     return configuration;
 }
 
-/**
- * @brief Set the achievement description source configuration.
- *
- * Stores the achievement description display configuration (font path, size, color)
- * in the in-memory state and persists it to disk via save_state(). If configuration
- * is NULL, this function returns early without making changes.
- *
- * @param configuration Configuration to store (may be NULL to skip).
- */
 void state_set_achievement_description_configuration(const achievement_description_configuration_t *configuration) {
 
     if (!configuration) {
@@ -569,17 +438,6 @@ void state_set_achievement_description_configuration(const achievement_descripti
     save_state(g_state);
 }
 
-/**
- * @brief Get the currently stored achievement description source configuration.
- *
- * Retrieves the achievement description configuration from the in-memory state,
- * applying default values where needed:
- * - If color is 0, defaults to 0xFFFFFF (white)
- * - If size is 0, defaults to 12 pixels
- * - Font path is duplicated and must be freed by the caller
- *
- * @return Newly allocated achievement_description_configuration_t. Caller must free with bfree().
- */
 achievement_description_configuration_t *state_get_achievement_description_configuration() {
 
     uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_COLOR);
@@ -596,11 +454,6 @@ achievement_description_configuration_t *state_get_achievement_description_confi
     return configuration;
 }
 
-/**
- * @brief Retrieve the user access token from the state.
- *
- * @return Token wrapper allocated with bzalloc(), or NULL if missing/expired.
- */
 token_t *state_get_user_token(void) {
 
     const char *user_token = obs_data_get_string(g_state, USER_ACCESS_TOKEN);
@@ -616,11 +469,6 @@ token_t *state_get_user_token(void) {
     return token;
 }
 
-/**
- * @brief Retrieve the user refresh token from the state.
- *
- * @return Token wrapper allocated with bzalloc(), or NULL if missing.
- */
 token_t *state_get_user_refresh_token(void) {
     const char *refresh_token = obs_data_get_string(g_state, USER_REFRESH_TOKEN);
 
@@ -635,13 +483,6 @@ token_t *state_get_user_refresh_token(void) {
     return token;
 }
 
-/**
- * @brief Store the Xbox identity and associated Xbox token.
- *
- * Persists gamertag, xid, uhs, and the Xbox token+expiry.
- *
- * @param xbox_identity Identity object containing user details and token.
- */
 void state_set_xbox_identity(const xbox_identity_t *xbox_identity) {
     obs_data_set_string(g_state, XBOX_IDENTITY_GTG, xbox_identity->gamertag);
     obs_data_set_string(g_state, XBOX_IDENTITY_ID, xbox_identity->xid);
@@ -651,17 +492,6 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity) {
     save_state(g_state);
 }
 
-/**
- * @brief Retrieve the Xbox identity from the state.
- *
- * Ownership/lifetime:
- *  - Returns an xbox_identity_t allocated with bzalloc() which the caller must
- *    free, plus a nested token_t allocated with bzalloc().
- *  - identity->gamertag/xid/uhs and token->value point to strings owned by the
- *    internal state object.
- *
- * @return Identity object on success, or NULL if missing fields.
- */
 xbox_identity_t *state_get_xbox_identity(void) {
 
     const char *gtg = obs_data_get_string(g_state, XBOX_IDENTITY_GTG);

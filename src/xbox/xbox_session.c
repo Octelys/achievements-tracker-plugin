@@ -45,17 +45,6 @@ static achievement_t *find_achievement_by_id(const achievement_progress_t *progr
 //  Public functions.
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Determines whether the session is currently tracking the given game.
- *
- * Compares the game identifiers case-insensitively.
- *
- * @param session Session to inspect (may be NULL).
- * @param game Game to compare against (may be NULL).
- *
- * @return True if both the session has a current game and its id matches
- *         @p game->id, false otherwise.
- */
 bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game) {
 
     if (!session) {
@@ -71,15 +60,6 @@ bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game) {
     return strcasecmp(current_game->id, game->id) == 0;
 }
 
-/**
- * @brief Switches the session to a new game.
- *
- * Frees any existing achievements and game stored in the session. If @p game is
- * non-NULL, stores a copy of it and fetches the associated achievements list.
- *
- * @param session Session to update (must not be NULL).
- * @param game New game to set. If NULL, the session is cleared.
- */
 void xbox_session_change_game(xbox_session_t *session, game_t *game) {
 
     if (!session) {
@@ -102,22 +82,6 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game) {
     sort_achievements(&session->achievements);
 }
 
-/**
- * @brief Applies an achievement progress update to the current session.
- *
- * Looks up the achievement by id and, if it has a reward, appends a new entry to
- * the session's @c gamerscore->unlocked_achievements list.
- *
- * Current behavior/assumptions:
- * - The function assumes the first reward's @c value is a numeric gamerscore
- *   amount and will parse it via @c atoi().
- * - No de-duplication is performed; callers should avoid sending the same unlock
- *   multiple times.
- *
- * @param session Session to update (may be NULL).
- * @param progress Progress update indicating which achievement was unlocked
- *        (may be NULL).
- */
 void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_progress_t *progress) {
 
     if (!session || !progress) {
@@ -196,18 +160,6 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
             xbox_session_compute_gamerscore(session));
 }
 
-/**
- * @brief Clears all cached state in the session.
- *
- * Frees heap allocations owned by the session and leaves it in an empty state:
- * - clears the cached achievements list
- * - clears the current game
- * - clears the cached gamerscore (including unlocked achievements list)
- *
- * This does not free the @p session object itself.
- *
- * @param session Session to clear (may be NULL).
- */
 void xbox_session_clear(xbox_session_t *session) {
 
     if (!session) {

@@ -347,15 +347,9 @@ static const struct obs_source_info *xbox_gamerpic_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//	Public functions
+//      Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Register the Xbox Gamerpic source with OBS.
- *
- * Registers the source type, then subscribes to Xbox connection events so the
- * gamerpic gets refreshed when the user connects/reconnects.
- */
 void xbox_gamerpic_source_register(void) {
 
     obs_register_source(xbox_gamerpic_source_get());

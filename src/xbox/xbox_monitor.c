@@ -763,12 +763,6 @@ static void *monitoring_thread(void *arg) {
 //  Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Start the Xbox RTA monitor.
- *
- * Allocates a global monitoring context, builds the auth header from the
- * persisted Xbox identity, and starts the background networking thread.
- */
 bool xbox_monitoring_start() {
 
     if (g_monitoring_context) {
@@ -825,9 +819,6 @@ bool xbox_monitoring_start() {
     return true;
 }
 
-/**
- * @brief Stop the Xbox RTA monitor and free resources.
- */
 void xbox_monitoring_stop(void) {
 
     if (!g_monitoring_context) {
@@ -858,9 +849,6 @@ void xbox_monitoring_stop(void) {
     obs_log(LOG_INFO, "Monitoring | Monitoring stopped");
 }
 
-/**
- * @brief Return whether monitoring is currently active.
- */
 bool xbox_monitoring_is_active(void) {
     if (!g_monitoring_context) {
         return false;
@@ -869,57 +857,18 @@ bool xbox_monitoring_is_active(void) {
     return g_monitoring_context->running;
 }
 
-/**
- * @brief Get the currently cached game from the active session.
- *
- * Ownership/lifetime: the returned pointer is owned by the monitor/session and
- * may be replaced when the current game changes or when monitoring stops.
- *
- * @return Cached game, or NULL if no game is currently known.
- */
 const game_t *get_current_game() {
     return g_current_session.game;
 }
 
-/**
- * @brief Get the most recently cached gamerscore associated with the current session.
- *
- * This snapshot is initialized when the websocket connects (via an initial
- * gamerscore fetch) and then updated as achievement progression messages are
- * processed.
- *
- * Ownership/lifetime: the returned pointer is owned by the monitor/session and
- * remains valid until the next update or until monitoring stops.
- *
- * @return Cached gamerscore snapshot, or NULL if not available yet.
- */
 const gamerscore_t *get_current_gamerscore(void) {
     return g_current_session.gamerscore;
 }
 
-/**
- * @brief Get the currently cached achievements list from the active session.
- *
- * Ownership/lifetime: the returned pointer is owned by the monitor/session and
- * may be replaced when the current game changes or when monitoring stops.
- *
- * @return Cached achievements list, or NULL if not available.
- */
 const achievement_t *get_current_game_achievements() {
     return g_current_session.achievements;
 }
 
-/**
- * @brief Subscribe to game-played events.
- *
- * Current behavior:
- * - Each call registers an additional callback (fan-out).
- * - There is currently no unsubscribe API; callbacks live until process exit.
- * - If a game is already known at subscription time, the callback is invoked
- *   immediately with the cached game.
- *
- * Threading: callbacks may be invoked from the monitor thread.
- */
 void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
 
     if (!callback) {
@@ -943,15 +892,6 @@ void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
     }
 }
 
-/**
- * @brief Subscribe to achievement progression events.
- *
- * Current behavior:
- * - Each call registers an additional callback (fan-out).
- * - There is currently no unsubscribe API; callbacks live until process exit.
- *
- * Threading: callbacks may be invoked from the monitor thread.
- */
 void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t callback) {
 
     if (!callback) {
@@ -970,17 +910,6 @@ void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t ca
     g_achievements_updated_subscriptions = new_subscription;
 }
 
-/**
- * @brief Subscribe to connection state change events.
- *
- * Current behavior:
- * - Each call registers an additional callback (fan-out).
- * - There is currently no unsubscribe API; callbacks live until process exit.
- * - If the monitor context already exists, the callback is invoked immediately
- *   with the current connection state.
- *
- * Threading: callbacks may be invoked from the monitor thread.
- */
 void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callback) {
     if (!callback) {
         return;

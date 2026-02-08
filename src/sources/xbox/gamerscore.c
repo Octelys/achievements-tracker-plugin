@@ -237,12 +237,6 @@ static const struct obs_source_info *xbox_source_get(void) {
 //	Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Register the Xbox Gamerscore source with OBS.
- *
- * Registers the source type and subscribes to Xbox monitor events so the
- * displayed gamerscore stays up to date.
- */
 void xbox_gamerscore_source_register(void) {
 
     g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
