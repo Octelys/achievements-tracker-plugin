@@ -38,7 +38,8 @@ A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement
 Once configured, the source will automatically display:
 - Using the **Xbox Cover** source, the cover of the game currently active on your Xbox One console will be shown
 - Using the **Xbox Gamerscore** source: your current gamerscore will be shown
-- TBD **Achievements Mode**: Current game's unlocked achievements count (e.g., "15 / 50 Achievements")
+- Using the **Xbox Achievements Unlocked Count** source: the number of achievements you've unlocked for the current game
+- Using the **Xbox Achievements Total Count** source: the total number of achievements available for the current game
 
 The plugin subscribes Xbox Live to get real-time updates of:
 - The currently active game
@@ -72,7 +73,9 @@ achievements-tracker-plugin/
 │   │   ├── log.c.in                    # Logging (CMake-configured)
 │   │   └── log.h                       # Logging API
 │   ├── drawing/
+│   │   ├── color.c/h                   # Color handling utilities
 │   │   ├── image.c/h                   # Image rendering helpers
+│   │   └── text.c/h                    # Text rendering helpers
 │   ├── encoding/
 │   │   └── base64.c/h                  # Base64 URL-safe encoding
 │   ├── io/
@@ -84,11 +87,25 @@ achievements-tracker-plugin/
 │   ├── oauth/
 │   │   ├── util.c/h                    # OAuth helpers (PKCE, code exchange)
 │   │   └── xbox-live.c/h               # Xbox Live OAuth & XSTS token flows
-│   ├── sources/xbox/                   # OBS source implementations
-│   │   ├── account.c/h                 # Xbox Account source
-│   │   ├── game_cover.c/h              # Xbox Game Cover source
-│   │   └── gamerscore.c/h              # Xbox Gamerscore source
+│   ├── sources/                        # OBS source implementations
+│   │   ├── common/                     # Shared source utilities
+│   │   │   ├── image_source.c/h        # Common image source functionality
+│   │   │   └── text_source.c/h         # Common text source functionality
+│   │   └── xbox/                       # Xbox-specific sources
+│   │       ├── account.c/h             # Xbox Account source (authentication)
+│   │       ├── achievement_description.c/h  # Achievement description text source
+│   │       ├── achievement_icon.c/h    # Achievement icon image source
+│   │       ├── achievement_name.c/h    # Achievement name text source
+│   │       ├── achievements_total_count.c/h  # Total achievements count text source
+│   │       ├── achievements_unlocked_count.c/h  # Unlocked achievements count text source
+│   │       ├── game_cover.c/h          # Xbox Game Cover image source
+│   │       ├── gamerpic.c/h            # Xbox Gamerpic image source
+│   │       ├── gamerscore.c/h          # Xbox Gamerscore text source
+│   │       └── gamertag.c/h            # Xbox Gamertag text source
+│   ├── system/
+│   │   └── font.c/h                    # System font discovery
 │   ├── text/
+│   │   ├── convert.c/h                 # Text conversion utilities
 │   │   └── parsers.c/h                 # Text/response parsing utilities
 │   ├── time/
 │   │   └── time.c/h                    # ISO-8601 timestamp parsing
@@ -99,10 +116,10 @@ achievements-tracker-plugin/
 │       ├── xbox_monitor.c/h            # Real-time activity monitoring
 │       └── xbox_session.c/h            # Session management
 ├── test/
+│   ├── test_convert.c                  # Text conversion tests
 │   ├── test_crypto.c                   # Cryptographic signing tests
 │   ├── test_encoder.c                  # Base64 encoding tests
 │   ├── test_parsers.c                  # Text parser tests
-│   ├── test_time.c                     # ISO-8601 parsing tests
 │   ├── test_types.c                    # Common types tests
 │   ├── test_xbox_session.c             # Xbox session tests
 │   ├── unity_config.h                  # Unity test framework config

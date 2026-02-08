@@ -334,6 +334,8 @@ target_sources(
     src/sources/xbox/achievement_name.c
     src/sources/xbox/achievement_description.c
     src/sources/xbox/achievement_icon.c
+    src/sources/xbox/achievements_unlocked_count.c
+    src/sources/xbox/achievements_total_count.c
     src/sources/common/text_source.c
     src/sources/common/image_source.c
     src/crypto/crypto.c
