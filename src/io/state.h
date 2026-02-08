@@ -185,6 +185,49 @@ void state_set_achievement_description_configuration(const achievement_descripti
 achievement_description_configuration_t *state_get_achievement_description_configuration();
 
 /**
+ * @brief Set the achievements unlocked count source configuration.
+ *
+ * Stores the configuration for the achievements unlocked count display source,
+ * including font path, text size, and color. The configuration is persisted to disk.
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_achievements_unlocked_count_configuration(
+    const achievements_unlocked_count_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored achievements unlocked count source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFFFF (white)
+ * - Default size: 48 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with bfree().
+ */
+achievements_unlocked_count_configuration_t *state_get_achievements_unlocked_count_configuration();
+
+/**
+ * @brief Set the achievements total count source configuration.
+ *
+ * Stores the configuration for the achievements total count display source,
+ * including font path, text size, and color. The configuration is persisted to disk.
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_achievements_total_count_configuration(const achievements_total_count_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored achievements total count source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFFFF (white)
+ * - Default size: 48 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with bfree().
+ */
+achievements_total_count_configuration_t *state_get_achievements_total_count_configuration();
+
+/**
  * @brief Clear all in-memory state (and typically any persisted state).
  *
  * After calling this, all getters are expected to return NULL until new values

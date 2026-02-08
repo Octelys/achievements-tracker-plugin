@@ -48,6 +48,16 @@
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT "source_achievement_description_font"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALIGN "source_achievement_description_align"
 
+#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_COLOR "source_achievements_unlocked_count_color"
+#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_SIZE "source_achievements_unlocked_count_size"
+#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT "source_achievements_unlocked_count_font"
+#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_ALIGN "source_achievements_unlocked_count_align"
+
+#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_COLOR "source_achievements_total_count_color"
+#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_SIZE "source_achievements_total_count_size"
+#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT "source_achievements_total_count_font"
+#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_ALIGN "source_achievements_total_count_align"
+
 /**
  * @brief Global in-memory persisted state.
  *
@@ -450,6 +460,68 @@ achievement_description_configuration_t *state_get_achievement_description_confi
     configuration->font_size                               = size == 0 ? 12 : size;
     configuration->font_path                               = bstrdup(font_path);
     configuration->align                                   = align; // 0 = left (default), 1 = right
+
+    return configuration;
+}
+
+void state_set_achievements_unlocked_count_configuration(
+    const achievements_unlocked_count_configuration_t *configuration) {
+
+    if (!configuration) {
+        return;
+    }
+
+    obs_data_set_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_COLOR, configuration->color);
+    obs_data_set_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_SIZE, configuration->font_size);
+    obs_data_set_string(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT, configuration->font_path);
+    obs_data_set_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_ALIGN, configuration->align);
+
+    save_state(g_state);
+}
+
+achievements_unlocked_count_configuration_t *state_get_achievements_unlocked_count_configuration() {
+
+    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_COLOR);
+    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_SIZE);
+    const char *font_path = obs_data_get_string(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT);
+    uint32_t    align     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_ALIGN);
+
+    achievements_unlocked_count_configuration_t *configuration =
+        bzalloc(sizeof(achievements_unlocked_count_configuration_t));
+    configuration->color     = color == 0 ? 0xFFFFFFFF : color;
+    configuration->font_size = size == 0 ? 48 : size;
+    configuration->font_path = bstrdup(font_path);
+    configuration->align     = align; // 0 = left (default), 1 = right
+
+    return configuration;
+}
+
+void state_set_achievements_total_count_configuration(const achievements_total_count_configuration_t *configuration) {
+
+    if (!configuration) {
+        return;
+    }
+
+    obs_data_set_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_COLOR, configuration->color);
+    obs_data_set_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_SIZE, configuration->font_size);
+    obs_data_set_string(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT, configuration->font_path);
+    obs_data_set_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_ALIGN, configuration->align);
+
+    save_state(g_state);
+}
+
+achievements_total_count_configuration_t *state_get_achievements_total_count_configuration() {
+
+    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_COLOR);
+    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_SIZE);
+    const char *font_path = obs_data_get_string(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT);
+    uint32_t    align     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_ALIGN);
+
+    achievements_total_count_configuration_t *configuration = bzalloc(sizeof(achievements_total_count_configuration_t));
+    configuration->color                                    = color == 0 ? 0xFFFFFFFF : color;
+    configuration->font_size                                = size == 0 ? 48 : size;
+    configuration->font_path                                = bstrdup(font_path);
+    configuration->align                                    = align; // 0 = left (default), 1 = right
 
     return configuration;
 }

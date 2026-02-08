@@ -211,6 +211,42 @@ typedef struct achievement_description_configuration {
 } achievement_description_configuration_t;
 
 /**
+ * @brief Configuration used by the achievements unlocked count overlay/renderer.
+ *
+ * Ownership:
+ * - Strings are treated as borrowed pointers unless otherwise documented by the
+ *   caller.
+ */
+typedef struct achievements_unlocked_count_configuration {
+    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
+    const char  *font_path;
+    /** Font size in pixels (height passed to FreeType). */
+    uint32_t     font_size;
+    /** Packed RGBA color in 0xRRGGBBAA format. */
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
+} achievements_unlocked_count_configuration_t;
+
+/**
+ * @brief Configuration used by the achievements total count overlay/renderer.
+ *
+ * Ownership:
+ * - Strings are treated as borrowed pointers unless otherwise documented by the
+ *   caller.
+ */
+typedef struct achievements_total_count_configuration {
+    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
+    const char  *font_path;
+    /** Font size in pixels (height passed to FreeType). */
+    uint32_t     font_size;
+    /** Packed RGBA color in 0xRRGGBBAA format. */
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
+} achievements_total_count_configuration_t;
+
+/**
  * @brief Dummy type to ensure OpenSSL public types are available to consumers.
  *
  * This header intentionally re-exports OpenSSL's @c EVP_PKEY type.
