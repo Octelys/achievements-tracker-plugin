@@ -12,36 +12,12 @@
 /**
  * @file parsers.c
  * @brief Implementation of lightweight JSON message classifiers and parsers.
- *
- * This module parses a couple of known Xbox JSON message shapes using cJSON.
- * It is used for:
- *  - Detecting whether a message is a presence message or an achievement message.
- *  - Extracting the currently played game (title/id) from presence messages.
- *  - Parsing achievement progression updates.
- *  - Parsing achievement metadata including media assets and Gamerscore rewards.
- *
- * Allocation/ownership:
- *  - Returned structs are allocated with bzalloc().
- *  - Most strings returned by helpers are duplicated on the heap (bstrdup/strdup).
- *  - The caller owns returned objects and is responsible for freeing them.
  */
 
 //  --------------------------------------------------------------------------------------------------------------------
 //  Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Read a string value from an achievement object at a given index.
- *
- * This helper builds a cJSON pointer of the form:
- *   /achievements/<achievement_index>/<property_name>
- * and returns a duplicated string.
- *
- * @param json_root          Parsed JSON root object.
- * @param achievement_index Index in the "achievements" array.
- * @param property_name     Property name to read.
- * @return Newly allocated string (caller must bfree()), or NULL if missing.
- */
 static char *get_node_string(cJSON *json_root, int achievement_index, const char *property_name) {
 
     char property_key[512] = "";
@@ -56,17 +32,6 @@ static char *get_node_string(cJSON *json_root, int achievement_index, const char
     return bstrdup(property_node->valuestring);
 }
 
-/**
- * @brief Read a boolean value stored as a string from an achievement object.
- *
- * Some responses encode booleans as strings. This helper reads the string value
- * and returns true if it equals "true".
- *
- * @param json_root          Parsed JSON root object.
- * @param achievement_index Index in the "achievements" array.
- * @param property_name     Property name to read.
- * @return true if the underlying value equals "true"; false otherwise.
- */
 static bool get_node_bool(cJSON *json_root, int achievement_index, const char *property_name) {
 
     const char *property_value = get_node_string(json_root, achievement_index, property_name);
@@ -78,17 +43,6 @@ static bool get_node_bool(cJSON *json_root, int achievement_index, const char *p
     return strcmp(property_value, "true") == 0;
 }
 
-/**
- * @brief Read a boolean value stored as a string from an achievement object.
- *
- * Some responses encode booleans as strings. This helper reads the string value
- * and returns true if it equals "true".
- *
- * @param json_root          Parsed JSON root object.
- * @param achievement_index Index in the "achievements" array.
- * @param property_name     Property name to read.
- * @return true if the underlying value equals "true"; false otherwise.
- */
 static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, const char *property_name) {
 
     const char *property_value = get_node_string(json_root, achievement_index, property_name);
@@ -115,15 +69,6 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
     return unix_timestamp;
 }
 
-/**
- * @brief Check whether a given JSON pointer exists in the document.
- *
- * Parses @p json_string and uses cJSONUtils_GetPointer with @p node_key.
- *
- * @param json_string JSON message text.
- * @param node_key    cJSON pointer string (e.g. "/presenceDetails").
- * @return true if the node exists; false otherwise.
- */
 static bool contains_node(const char *json_string, const char *node_key) {
 
     cJSON *json_message  = NULL;
@@ -154,36 +99,16 @@ cleanup:
 //  Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Determine if a message looks like an achievement message.
- *
- * Currently implemented as the presence of the top-level "/serviceConfigId" node.
- */
 bool is_achievement_message(const char *json_string) {
 
     return contains_node(json_string, "/serviceConfigId");
 }
 
-/**
- * @brief Determine if a message looks like a presence message.
- *
- * Currently implemented as the presence of the top-level "/presenceDetails" node.
- */
 bool is_presence_message(const char *json_string) {
 
     return contains_node(json_string, "/presenceDetails");
 }
 
-/**
- * @brief Parse the played game information out of a presence message.
- *
- * This inspects up to the first few entries of "/presenceDetails" and returns
- * the first entry marked as a game ("isGame" true), then reads presenceText and
- * titleId.
- *
- * @param json_string Presence JSON message.
- * @return Newly allocated game_t on success; NULL if no game is found or parsing fails.
- */
 game_t *parse_game(const char *json_string) {
 
     cJSON  *json_root = NULL;
@@ -260,15 +185,6 @@ cleanup:
     return game;
 }
 
-/**
- * @brief Parse achievement progression updates.
- *
- * Iterates the "/progression" array and builds a linked list of
- * achievement_progress_t elements.
- *
- * @param json_string Achievement progression JSON message.
- * @return Head of a newly allocated linked list, or NULL on failure/no items.
- */
 achievement_progress_t *parse_achievement_progress(const char *json_string) {
 
     cJSON                  *json_root            = NULL;
@@ -360,21 +276,6 @@ cleanup:
     return achievement_progress;
 }
 
-/**
- * @brief Parse full achievement metadata.
- *
- * Iterates over the "/achievements" array and builds a linked list of
- * achievement_t elements.
- *
- * For each achievement it extracts:
- *  - basic metadata (id, serviceConfigId, name, descriptions, progressState)
- *  - isSecret
- *  - mediaAssets[] (urls)
- *  - rewards[] filtered to Gamerscore rewards
- *
- * @param json_string Achievements JSON message.
- * @return Head of a newly allocated linked list, or NULL on failure/no items.
- */
 achievement_t *parse_achievements(const char *json_string) {
 
     cJSON         *json_root    = NULL;

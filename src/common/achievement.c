@@ -2,18 +2,6 @@
 #include "memory.h"
 #include <obs-module.h>
 
-/**
- * @brief Deep-copies a linked list of media assets.
- *
- * Allocates a new list where each node is duplicated and the @c url string is
- * copied. The returned list is independent from the input list.
- *
- * @param media_asset Head of the source @c media_asset_t linked list (may be NULL).
- *
- * @return Head of the newly allocated list, or NULL if @p media_asset is NULL.
- *         The caller owns the returned list and must free it with
- *         @ref free_media_asset.
- */
 media_asset_t *copy_media_asset(const media_asset_t *media_asset) {
     if (!media_asset) {
         return NULL;
@@ -45,14 +33,6 @@ media_asset_t *copy_media_asset(const media_asset_t *media_asset) {
     return root_copy;
 }
 
-/**
- * @brief Frees a linked list of media assets and sets the caller's pointer to NULL.
- *
- * Frees each node's internal allocations (currently @c url) and then the node
- * itself. Safe to call with NULL or with @c *media_asset == NULL.
- *
- * @param[in,out] media_asset Address of the head pointer to free.
- */
 void free_media_asset(media_asset_t **media_asset) {
 
     if (!media_asset || !*media_asset) {
@@ -73,18 +53,6 @@ void free_media_asset(media_asset_t **media_asset) {
     *media_asset = NULL;
 }
 
-/**
- * @brief Deep-copies a linked list of rewards.
- *
- * Allocates a new list where each node and its @c value string are duplicated.
- * The returned list is independent from the input list.
- *
- * @param reward Head of the source @c reward_t linked list (may be NULL).
- *
- * @return Head of the newly allocated list, or NULL if @p reward is NULL.
- *         The caller owns the returned list and must free it with
- *         @ref free_reward.
- */
 reward_t *copy_reward(const reward_t *reward) {
 
     if (!reward) {
@@ -118,14 +86,6 @@ reward_t *copy_reward(const reward_t *reward) {
     return root_copy;
 }
 
-/**
- * @brief Frees a linked list of rewards and sets the caller's pointer to NULL.
- *
- * Frees each node's internal allocations (currently @c value) and then the node
- * itself. Safe to call with NULL or with @c *reward == NULL.
- *
- * @param[in,out] reward Address of the head pointer to free.
- */
 void free_reward(reward_t **reward) {
 
     if (!reward || !*reward) {
@@ -147,18 +107,6 @@ void free_reward(reward_t **reward) {
     *reward = NULL;
 }
 
-/**
- * @brief Deep-copies a linked list of achievements.
- *
- * Allocates a new list where each achievement node is duplicated, including all
- * strings and nested linked lists (media assets and rewards).
- *
- * @param achievement Head of the source @c achievement_t linked list (may be NULL).
- *
- * @return Head of the newly allocated list, or NULL if @p achievement is NULL.
- *         The caller owns the returned list and must free it with
- *         @ref free_achievement.
- */
 achievement_t *copy_achievement(const achievement_t *achievement) {
 
     if (!achievement) {
@@ -200,16 +148,6 @@ achievement_t *copy_achievement(const achievement_t *achievement) {
     return root_copy;
 }
 
-/**
- * @brief Frees a linked list of achievements and sets the caller's pointer to NULL.
- *
- * Frees each achievement's internal strings and nested lists (media assets and
- * rewards) and then frees the achievement nodes.
- *
- * Safe to call with NULL or with @c *achievement == NULL.
- *
- * @param[in,out] achievement Address of the head pointer to free.
- */
 void free_achievement(achievement_t **achievement) {
 
     if (!achievement || !*achievement) {
@@ -237,13 +175,6 @@ void free_achievement(achievement_t **achievement) {
     *achievement = NULL;
 }
 
-/**
- * @brief Counts the number of achievements in a linked list.
- *
- * @param achievements Head of the @c achievement_t linked list (may be NULL).
- *
- * @return Number of nodes in the list. Returns 0 if @p achievements is NULL.
- */
 int count_achievements(const achievement_t *achievements) {
     int                  count   = 0;
     const achievement_t *current = achievements;
@@ -256,19 +187,6 @@ int count_achievements(const achievement_t *achievements) {
     return count;
 }
 
-/**
- * @brief Sorts achievements with unlocked ones first (by timestamp descending), then locked ones.
- *
- * This function reorders the achievements linked list in-place so that:
- * - Unlocked achievements (unlocked_timestamp != 0) appear first, ordered by
- *   timestamp descending (most recently unlocked first)
- * - Locked achievements (unlocked_timestamp == 0) appear after all unlocked ones
- *
- * Uses an in-place insertion sort algorithm with no memory allocation.
- *
- * @param achievements Pointer to the head of the achievements list. The head may be
- *        updated if the first achievement changes position.
- */
 void sort_achievements(achievement_t **achievements) {
 
     if (!achievements || !*achievements || !(*achievements)->next) {

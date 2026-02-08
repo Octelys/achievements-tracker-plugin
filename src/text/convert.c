@@ -85,27 +85,6 @@ static int64_t get_days_from_civil(int y, unsigned m, unsigned d) {
     return days_1970;
 }
 
-/**
- * @brief Parses an ISO-8601 UTC timestamp and converts it to Unix seconds.
- *
- * Supported formats:
- * - `YYYY-MM-DDTHH:MM:SSZ`
- * - `YYYY-MM-DDTHH:MM:SS.sssZ` with up to 9 fractional digits.
- *
- * Fractional seconds are returned as nanoseconds in @p out_fraction_ns.
- *
- * Notes:
- * - The parser is strict: it requires a trailing `Z` and rejects extra
- *   characters.
- * - Seconds in the range 0..60 are accepted (to allow leap seconds), but values
- *   > 60 are rejected.
- *
- * @param iso8601 Input timestamp string (UTC).
- * @param[out] out_unix_seconds Output Unix timestamp in seconds.
- * @param[out] out_fraction_ns Output fractional part in nanoseconds.
- *
- * @return True on success, false on parse/validation failure.
- */
 bool convert_iso8601_utc_to_unix(const char *iso8601, int64_t *out_unix_seconds, int32_t *out_fraction_ns) {
     if (!iso8601 || !out_unix_seconds || !out_fraction_ns)
         return false;

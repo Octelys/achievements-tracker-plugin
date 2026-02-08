@@ -793,17 +793,6 @@ cleanup:
 //  Public
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Start Xbox Live authentication on a background thread.
- *
- * Allocates an internal authentication context and launches a pthread.
- * Completion is signaled via @p callback.
- *
- * @param data     Opaque pointer passed back to @p callback.
- * @param callback Completion callback (must be non-NULL).
- *
- * @return true if the worker thread was successfully created; false otherwise.
- */
 bool xbox_live_authenticate(void *data, on_xbox_live_authenticated_t callback) {
 
     device_t *device = state_get_device();
@@ -823,31 +812,6 @@ bool xbox_live_authenticate(void *data, on_xbox_live_authenticated_t callback) {
     return pthread_create(&ctx->thread, NULL, start_authentication_flow, ctx) == 0;
 }
 
-/**
- * @brief Get the currently stored Xbox identity, refreshing tokens if needed.
- *
- * This is a convenience helper around the state subsystem:
- *  - If an identity is already present and its token is not expired, it is
- *    returned immediately.
- *  - If the token is expired, this function attempts to refresh authentication
- *    using the persisted device identity and refresh token.
- *
- * Side-effects:
- *  - May perform network requests to refresh tokens.
- *  - May persist updated tokens/identity via the state subsystem.
- *
- * Threading:
- *  - This function is synchronous and may block while performing network I/O.
- *  - Call from a worker thread (not the OBS render thread).
- *
- * Ownership:
- *  - Returns an xbox_identity_t allocated/returned by state_get_xbox_identity().
- *    The caller owns the returned object and must free it consistently with the
- *    state subsystem contract.
- *
- * @return Xbox identity on success; NULL if no identity is available or refresh
- *         fails.
- */
 xbox_identity_t *xbox_live_get_identity(void) {
 
     xbox_identity_t *identity = state_get_xbox_identity();

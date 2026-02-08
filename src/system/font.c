@@ -33,19 +33,6 @@ static int compare_fonts_by_name(const void *a, const void *b) {
     return strcasecmp(fa->name, fb->name);
 }
 
-/**
- * @brief Get a list of all available fonts on the system.
- *
- * On macOS, this uses CoreText to enumerate fonts.
- * On Linux, this will use fontconfig.
- * On Windows, this will enumerate the Fonts directory.
- *
- * The returned list is sorted alphabetically by font name.
- *
- * @param out_count Pointer to receive the number of fonts found.
- * @return Array of font_t structures (caller must free with font_list_free).
- *         Returns NULL on failure.
- */
 font_t *font_list_available(size_t *out_count) {
 
     if (!out_count) {
@@ -158,12 +145,6 @@ font_t *font_list_available(size_t *out_count) {
 #endif
 }
 
-/**
- * @brief Free a font list returned by font_list_available.
- *
- * @param fonts Array of font_t structures.
- * @param count Number of elements in the array.
- */
 void font_list_free(font_t *fonts, size_t count) {
 
     if (!fonts) {

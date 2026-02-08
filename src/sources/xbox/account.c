@@ -268,16 +268,9 @@ static const struct obs_source_info *xbox_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//	Public functions
+//      Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Registers the Xbox Account source with OBS and starts monitoring.
- *
- * Registers the source so it is available in OBS. Also subscribes to the "game
- * played" monitor callback. If an identity is already present in state, starts
- * background monitoring immediately.
- */
 void xbox_account_source_register(void) {
 
     obs_register_source(xbox_source_get());

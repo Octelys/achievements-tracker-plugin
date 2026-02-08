@@ -256,18 +256,6 @@ static const struct obs_source_info *xbox_source_get(void) {
 //	Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Register the Xbox Gamertag source with OBS.
- *
- * Initializes the gamertag source by:
- * - Allocating and loading the configuration from persistent state
- * - Setting a default font path if none is configured
- * - Registering the source type with OBS
- * - Subscribing to Xbox monitor callbacks for connection changes
- *
- * This function should be called once during plugin initialization to make the source
- * available in OBS. The source will automatically update when the Xbox connection changes.
- */
 void xbox_gamertag_source_register(void) {
 
     g_configuration = state_get_gamertag_configuration();

@@ -300,21 +300,6 @@ static const struct obs_source_info *xbox_source_get(void) {
 //	Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Register the Xbox Achievement Name source with OBS.
- *
- * Initializes the achievement name source by:
- * - Allocating and loading the configuration from persistent state
- * - Setting a default font path if none is configured
- * - Registering the source type with OBS
- * - Subscribing to Xbox monitor callbacks for connection changes and achievement progress
- *
- * This function should be called once during plugin initialization to make the source
- * available in OBS. The source will automatically update when achievements are unlocked.
- *
- * @note Allocates g_configuration which persists for the lifetime of the plugin.
- * @note TODO: A default font path should be embedded with the plugin rather than hardcoded.
- */
 void xbox_achievement_name_source_register(void) {
 
     g_configuration = bzalloc(sizeof(gamerscore_configuration_t));

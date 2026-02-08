@@ -452,21 +452,9 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//	Public functions
+//      Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Register the Xbox Achievement Icon source with OBS.
- *
- * Initializes the achievement icon source by:
- * - Registering the source type with OBS
- * - Subscribing to Xbox monitor callbacks for connection changes and achievement progress
- *
- * This function should be called once during plugin initialization to make the source
- * available in OBS. The source will automatically update when achievements are unlocked.
- *
- * @note The global g_achievement_icon cache persists for the lifetime of the plugin.
- */
 void xbox_achievement_icon_source_register(void) {
 
     obs_register_source(xbox_achievement_icon_source_get());

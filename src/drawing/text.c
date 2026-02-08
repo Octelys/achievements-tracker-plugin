@@ -91,24 +91,6 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
     }
 }
 
-/**
- * @brief Create a text rendering context by rasterizing text with FreeType.
- *
- * This function loads a TrueType/OpenType font, rasterizes the provided text string
- * into an RGBA bitmap, and uploads it as an OBS texture. The resulting texture can
- * be drawn efficiently without re-rendering the glyphs on every frame.
- *
- * Layout behavior:
- * - Text is rendered into a canvas of the specified size.
- * - If align is TEXT_ALIGN_RIGHT, text is right-aligned within the canvas.
- * - If align is TEXT_ALIGN_LEFT, text is left-aligned within the canvas with padding.
- *
- * @param config Text rendering configuration (font path, font size, color, alignment).
- * @param size   Canvas dimensions (width and height in pixels).
- * @param text   NUL-terminated UTF-8 string to render.
- * @return Newly allocated text context with an uploaded OBS texture, or NULL on failure.
- *         The caller must free the returned context with @ref text_context_destroy.
- */
 text_context_t *text_context_create(const text_source_config_t *config, source_size_t size, const char *text) {
 
     text_context_t *out = NULL;

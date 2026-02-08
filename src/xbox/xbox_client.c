@@ -93,20 +93,6 @@ static bool str_replace(char *s, const char *needle, const char *replacement) {
     return changed;
 }
 
-/**
- * @brief Fetch the cover image URL for a given game.
- *
- * Calls the Xbox TitleHub decoration/image endpoint and attempts to extract a
- * poster or box art image URL from the response. If no such image is available,
- * falls back to the display image URL.
- *
- * Requires an authenticated Xbox identity to be present in the persistent state.
- *
- * @param game Game to fetch the cover for (may be NULL).
- * @return Newly allocated URL string on success, or NULL on error / if not
- *         available. The caller owns the returned string and must free it with
- *         @ref bfree.
- */
 char *xbox_get_game_cover(const game_t *game) {
 
     char *display_image_url = NULL;
@@ -217,15 +203,6 @@ cleanup:
     return display_image_url;
 }
 
-/**
- * @brief Fetch the current user's gamerscore.
- *
- * Performs a profile batch settings call and extracts the "Gamerscore" setting.
- * Requires an authenticated Xbox identity to be present in the persistent state.
- *
- * @param[out] out_gamerscore Output location for the gamerscore value.
- * @return true if the gamerscore was successfully retrieved and parsed; false otherwise.
- */
 bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
 
     if (!out_gamerscore) {
@@ -311,17 +288,6 @@ cleanup:
     return result;
 }
 
-/**
- * @brief Fetch the current authenticated user's avatar URL.
- *
- * Performs a profile batch settings call and extracts the "GameDisplayPicRaw"
- * setting. Requires an authenticated Xbox identity to be present in the
- * persistent state.
- *
- * @return Newly allocated URL string on success, or NULL on error / if not
- *         available. The caller owns the returned string and must free it with
- *         @ref bfree.
- */
 const char *xbox_fetch_gamerpic() {
 
     xbox_identity_t *identity = state_get_xbox_identity();
@@ -399,19 +365,6 @@ cleanup:
     return gamerpic_url;
 }
 
-/**
- * @brief Retrieve the game currently being played by the authenticated user.
- *
- * Calls the Xbox Presence endpoint and searches for the first non-"Home" title
- * with state "Active".
- *
- * Notes:
- *  - Requires an authenticated Xbox identity to be present in the persistent state.
- *  - The returned game_t owns its id/title strings.
- *
- * @return Newly allocated game_t on success, or NULL if the user is offline,
- *         no active game is found, or on error.
- */
 game_t *xbox_get_current_game(void) {
 
     obs_log(LOG_INFO, "Retrieving current game");
@@ -533,18 +486,6 @@ cleanup:
     return game;
 }
 
-/**
- * @brief Retrieve the list of achievements for a given game.
- *
- * Calls the achievements endpoint for the authenticated user and parses the
- * response JSON into an achievement_t linked list.
- *
- * Requires an authenticated Xbox identity to be present in the persistent state.
- *
- * @param game Game for which achievements should be fetched (may be NULL).
- * @return Head of a newly allocated linked list of achievements, or NULL on error.
- *         The caller owns the returned list and must free it.
- */
 achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     if (!game) {
