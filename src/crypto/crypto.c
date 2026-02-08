@@ -17,18 +17,6 @@
 
 #include "common/types.h"
 
-/**
- * @brief Debug helper that exports an EC keypair to PEM and logs/prints it.
- *
- * This function writes the public key (SubjectPublicKeyInfo) and then the
- * private key (PKCS#8) to a memory BIO, and logs/prints the PEM blocks.
- *
- * @warning This is intended for local debugging only. It logs / prints private
- *          key material, which is unsafe for production builds.
- *
- * @param pkey The key to export. Must be an EC P-256 keypair (public-only keys
- *             will export only the public portion).
- */
 void crypto_print_keys(const EVP_PKEY *pkey) {
 
     if (!pkey) {
@@ -216,22 +204,6 @@ static int get_p256_private_scalar_32(const EVP_PKEY *pkey, unsigned char out32[
 #endif
 }
 
-/**
- * @brief Serialize an EC P-256 key to a compact JSON structure.
- *
- * The returned JSON is a JWK-like object:
- *  - kty: "EC"
- *  - crv: "P-256"
- *  - x, y: base64url-encoded affine coordinates (32 bytes each)
- *  - d: base64url-encoded private scalar (optional)
- *  - alg/use: fixed metadata used by the caller
- *
- * @param pkey            Source key.
- * @param include_private If true, include the private scalar field "d".
- *
- * @return Heap-allocated JSON string (caller must free with bfree()), or NULL
- *         on error.
- */
 char *crypto_to_string(const EVP_PKEY *pkey, bool include_private) {
     unsigned char point[1 + 32 + 32];
     size_t        point_len         = 0;
@@ -354,23 +326,6 @@ static int b64url_decode_32(const char *in, uint8_t out[32]) {
     return 1;
 }
 
-/**
- * @brief Parse a JSON-serialized EC P-256 key into an OpenSSL EVP_PKEY.
- *
- * The input JSON is expected to be compatible with the output of
- * crypto_to_string(): it must include "kty":"EC", "crv":"P-256" and the
- * base64url fields "x" and "y". If @p expect_private is true, it must also
- * include the private scalar field "d".
- *
- * Public keys are imported via EVP_PKEY_fromdata with EVP_PKEY_PUBLIC_KEY.
- * Private keys are imported as a keypair (public point + private scalar) via
- * EVP_PKEY_fromdata with EVP_PKEY_KEYPAIR.
- *
- * @param key_json        JSON string.
- * @param expect_private  If true, require and import the private scalar.
- * @return A newly created EVP_PKEY on success (caller owns it and must free via
- *         EVP_PKEY_free), or NULL on failure.
- */
 EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
 
     if (!key_json)
@@ -518,14 +473,6 @@ done:
     return pkey;
 }
 
-/**
- * @brief Generate a fresh EC P-256 keypair.
- *
- * Uses OpenSSL EVP_PKEY keygen APIs with curve NID_X9_62_prime256v1.
- *
- * @return Newly generated EVP_PKEY on success (caller must EVP_PKEY_free), or
- *         NULL on failure.
- */
 EVP_PKEY *crypto_generate_keys(void) {
     EVP_PKEY     *pkey = NULL;
     EVP_PKEY_CTX *ctx  = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
@@ -722,32 +669,6 @@ done:
     return ok;
 }
 
-/**
- * @brief Create the binary signature header required by the Xbox request policy.
- *
- * This function builds the "to-be-signed" buffer from:
- *  - policy version (u32, BE)
- *  - a 0 byte delimiter
- *  - timestamp (u64, BE) in Windows 100ns units
- *  - a 0 byte delimiter
- *  - HTTP method "POST" + NUL
- *  - URL path+query + NUL
- *  - authorization token + NUL
- *  - JSON payload + NUL
- *
- * It then signs the buffer using ECDSA over P-256 with SHA-256, and returns a
- * header blob:
- *  - policy version (u32, BE)
- *  - timestamp (u64, BE)
- *  - signature (64 bytes, P1363)
- *
- * @param private_key         EC P-256 private key.
- * @param url                 Full request URL.
- * @param authorization_token Authorization token string.
- * @param payload             Request payload string.
- * @param out_len             Receives the length of the returned header.
- * @return Newly allocated header buffer (caller must bfree()), or NULL on error.
- */
 uint8_t *crypto_sign(const EVP_PKEY *private_key, const char *url, const char *authorization_token, const char *payload,
                      size_t *out_len) {
 

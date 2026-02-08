@@ -3,22 +3,6 @@
 #include <obs-module.h>
 #include <graphics/graphics.h>
 
-/**
- * @brief Draw a texture as a sprite, optionally using an already-active effect.
- *
- * Behavior depends on whether @p effect is provided:
- *  - If @p effect is non-NULL, the caller is assumed to have already entered an
- *    effect loop (e.g. via gs_effect_loop()). This function will only bind the
- *    texture to the effect param named "image" (if present) and draw the sprite.
- *  - If @p effect is NULL, this function uses OBS's default effect
- *    (OBS_EFFECT_DEFAULT), binds the "image" param, and runs the effect loop
- *    itself with technique "Draw".
- *
- * @param texture Texture to draw. If NULL, the function returns immediately.
- * @param width   Draw width in pixels.
- * @param height  Draw height in pixels.
- * @param effect  Optional effect that is already active in the caller.
- */
 void draw_texture(gs_texture_t *texture, const uint32_t width, const uint32_t height, gs_effect_t *effect) {
 
     if (!texture) {

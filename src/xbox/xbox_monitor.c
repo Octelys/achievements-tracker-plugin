@@ -763,12 +763,6 @@ static void *monitoring_thread(void *arg) {
 //  Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Start the Xbox RTA monitor.
- *
- * Allocates a global monitoring context, builds the auth header from the
- * persisted Xbox identity, and starts the background networking thread.
- */
 bool xbox_monitoring_start() {
 
     if (g_monitoring_context) {
@@ -825,9 +819,6 @@ bool xbox_monitoring_start() {
     return true;
 }
 
-/**
- * @brief Stop the Xbox RTA monitor and free resources.
- */
 void xbox_monitoring_stop(void) {
 
     if (!g_monitoring_context) {
@@ -858,9 +849,6 @@ void xbox_monitoring_stop(void) {
     obs_log(LOG_INFO, "Monitoring | Monitoring stopped");
 }
 
-/**
- * @brief Return whether monitoring is currently active.
- */
 bool xbox_monitoring_is_active(void) {
     if (!g_monitoring_context) {
         return false;
