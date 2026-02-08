@@ -330,6 +330,7 @@ target_sources(
     src/sources/xbox/gamerpic.c
     src/sources/xbox/game_cover.c
     src/sources/xbox/gamerscore.c
+    src/sources/xbox/gamertag.c
     src/sources/xbox/achievement_name.c
     src/sources/xbox/achievement_description.c
     src/sources/xbox/achievement_icon.c

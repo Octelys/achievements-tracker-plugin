@@ -122,6 +122,27 @@ void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamers
 gamerscore_configuration_t *state_get_gamerscore_configuration();
 
 /**
+ * @brief Set the gamertag source configuration.
+ *
+ * Stores the configuration for the gamertag display source, including font path,
+ * text size, color, and alignment. The configuration is persisted to disk.
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_gamertag_configuration(const gamertag_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored gamertag source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFF (white)
+ * - Default size: 12 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with bfree().
+ */
+gamertag_configuration_t *state_get_gamertag_configuration();
+
+/**
  * @brief Set the achievement name source configuration.
  *
  * Stores the configuration for the achievement name display source, including

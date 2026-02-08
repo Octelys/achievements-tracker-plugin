@@ -33,6 +33,11 @@
 #define GAMERSCORE_CONFIGURATION_FONT "source_gamerscore_font"
 #define GAMERSCORE_CONFIGURATION_ALIGN "source_gamerscore_align"
 
+#define GAMERTAG_CONFIGURATION_COLOR "source_gamertag_color"
+#define GAMERTAG_CONFIGURATION_SIZE "source_gamertag_size"
+#define GAMERTAG_CONFIGURATION_FONT "source_gamertag_font"
+#define GAMERTAG_CONFIGURATION_ALIGN "source_gamertag_align"
+
 #define ACHIEVEMENT_NAME_CONFIGURATION_COLOR "source_achievement_name_color"
 #define ACHIEVEMENT_NAME_CONFIGURATION_SIZE "source_achievement_name_size"
 #define ACHIEVEMENT_NAME_CONFIGURATION_FONT "source_achievement_name_font"
@@ -439,6 +444,56 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
     gamerscore_configuration->align                      = align;
 
     return gamerscore_configuration;
+}
+
+/**
+ * @brief Set the gamertag source configuration.
+ *
+ * Stores the gamertag display configuration (font path, size, color, align) in
+ * the in-memory state and persists it to disk via save_state(). If configuration
+ * is NULL, this function returns early without making changes.
+ *
+ * @param configuration Configuration to store (may be NULL to skip).
+ */
+void state_set_gamertag_configuration(const gamertag_configuration_t *configuration) {
+
+    if (!configuration) {
+        return;
+    }
+
+    obs_data_set_int(g_state, GAMERTAG_CONFIGURATION_COLOR, configuration->color);
+    obs_data_set_int(g_state, GAMERTAG_CONFIGURATION_SIZE, configuration->size);
+    obs_data_set_string(g_state, GAMERTAG_CONFIGURATION_FONT, configuration->font_path);
+    obs_data_set_int(g_state, GAMERTAG_CONFIGURATION_ALIGN, configuration->align);
+
+    save_state(g_state);
+}
+
+/**
+ * @brief Get the currently stored gamertag source configuration.
+ *
+ * Retrieves the gamertag configuration from the in-memory state, applying
+ * default values where needed:
+ * - If color is 0, defaults to 0xFFFFFF (white)
+ * - If size is 0, defaults to 12 pixels
+ * - Font path is duplicated and must be freed by the caller
+ *
+ * @return Newly allocated gamertag_configuration_t. Caller must free with bfree().
+ */
+gamertag_configuration_t *state_get_gamertag_configuration() {
+
+    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_COLOR);
+    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_SIZE);
+    uint32_t    align     = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_ALIGN);
+    const char *font_path = obs_data_get_string(g_state, GAMERTAG_CONFIGURATION_FONT);
+
+    gamertag_configuration_t *configuration = bzalloc(sizeof(gamertag_configuration_t));
+    configuration->color                    = color == 0 ? 0xFFFFFF : color;
+    configuration->size                     = size == 0 ? 12 : size;
+    configuration->font_path                = bstrdup(font_path);
+    configuration->align                    = align;
+
+    return configuration;
 }
 
 /**

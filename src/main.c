@@ -5,6 +5,7 @@
 #include "sources/xbox/gamerpic.h"
 #include "sources/xbox/game_cover.h"
 #include "sources/xbox/gamerscore.h"
+#include "sources/xbox/gamertag.h"
 
 #include "io/state.h"
 #include "sources/xbox/achievement_name.h"
@@ -22,6 +23,7 @@ bool obs_module_load(void) {
     xbox_gamerpic_source_register();
     xbox_game_cover_source_register();
     xbox_gamerscore_source_register();
+    xbox_gamertag_source_register();
     xbox_achievement_name_source_register();
     xbox_achievement_description_source_register();
     xbox_achievement_icon_source_register();

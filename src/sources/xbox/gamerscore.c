@@ -73,7 +73,7 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
     int total_gamerscore = gamerscore_compute(gamerscore);
 
     //  Computes the total gamerscore and activate the switch to reload the texture with the new number.
-    snprintf(g_gamerscore, sizeof(g_gamerscore), "%d", total_gamerscore);
+    snprintf(g_gamerscore, sizeof(g_gamerscore), "%dG", total_gamerscore);
     g_must_reload = true;
 
     obs_log(LOG_INFO, "Gamerscore is %" PRId64, total_gamerscore);
