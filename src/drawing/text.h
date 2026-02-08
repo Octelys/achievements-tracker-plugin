@@ -16,7 +16,7 @@ extern "C" {
  */
 typedef enum text_align {
     /** Align text to the left edge of the canvas. */
-    TEXT_ALIGN_LEFT = 0,
+    TEXT_ALIGN_LEFT  = 0,
     /** Align text to the right edge of the canvas. */
     TEXT_ALIGN_RIGHT = 1,
 } text_align_t;

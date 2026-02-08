@@ -298,8 +298,8 @@ static obs_properties_t *source_get_properties(void *data) {
     obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
 
     // Text alignment dropdown.
-    obs_property_t *align_list = obs_properties_add_list(p, "text_align", "Text alignment",
-                                                          OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_t *align_list =
+        obs_properties_add_list(p, "text_align", "Text alignment", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
     obs_property_list_add_int(align_list, "Left", 0);
     obs_property_list_add_int(align_list, "Right", 1);
 

@@ -211,7 +211,10 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
         }
 
         /* TODO Move to constant */
-        snprintf(g_achievement_icon.image_url, sizeof(g_achievement_icon.image_url), "%s&w=128&h=128&format=png", achievement->icon_url);
+        snprintf(g_achievement_icon.image_url,
+                 sizeof(g_achievement_icon.image_url),
+                 "%s&w=128&h=128&format=png",
+                 achievement->icon_url);
         download_achievement_icon_from_url(achievement->icon_url);
     } else {
         /* No achievement or empty URL: clear cached URL and force texture to be freed on the next render */
