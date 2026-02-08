@@ -25,10 +25,9 @@
  * @return Pointer to the matching achievement node within @p achievements, or
  *         NULL if not found.
  */
-static const achievement_t *find_achievement_by_id(const achievement_progress_t *progress,
-                                                   const achievement_t          *achievements) {
+static achievement_t *find_achievement_by_id(const achievement_progress_t *progress, achievement_t *achievements) {
 
-    const achievement_t *current = achievements;
+    achievement_t *current = achievements;
 
     while (current) {
 
@@ -98,6 +97,9 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game) {
 
     session->game         = copy_game(game);
     session->achievements = xbox_get_game_achievements(game);
+
+    /* Sort the achievements from the most recent unlocked to the locked ones */
+    sort_achievements(&session->achievements);
 }
 
 /**
@@ -124,7 +126,7 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
 
     /* TODO Let's make sure the progress is achieved */
 
-    const achievement_t *achievement = find_achievement_by_id(progress, session->achievements);
+    achievement_t *achievement = find_achievement_by_id(progress, session->achievements);
 
     if (!achievement) {
         obs_log(LOG_ERROR,
@@ -132,6 +134,13 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
                 progress->id ? progress->id : "(null)");
         return;
     }
+
+    /* Updates the achievement status */
+    achievement->progress_state     = bstrdup(progress->progress_state);
+    achievement->unlocked_timestamp = progress->unlocked_timestamp;
+
+    /* Sort the achievements from the most recent unlocked to the locked ones */
+    sort_achievements(&session->achievements);
 
     const reward_t *reward = achievement->rewards;
 
@@ -177,6 +186,8 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
         }
         last_unlocked_achievement->next = unlocked_achievement;
     }
+
+    /* Sort achievements from the most recent unlocked achievement first and then locked achievements */
 
     obs_log(LOG_INFO,
             "New achievement unlocked: %s (%d G)! Gamerscore is now %d",

@@ -58,7 +58,7 @@ typedef struct achievement {
     /** Display name. */
     const char          *name;
     /** Progress state (service-provided string). */
-    const char          *progress_state;
+    char                *progress_state;
     /** Linked list of media assets associated with this achievement. */
     const media_asset_t *media_assets;
     /** Whether the achievement is secret. */
@@ -153,6 +153,8 @@ void free_achievement(achievement_t **achievement);
  * @return Number of nodes in the list. Returns 0 if @p achievements is NULL.
  */
 int count_achievements(const achievement_t *achievements);
+
+void sort_achievements(achievement_t **achievements);
 
 #ifdef __cplusplus
 }

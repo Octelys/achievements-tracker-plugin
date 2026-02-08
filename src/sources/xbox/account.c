@@ -248,7 +248,7 @@ static const char *source_get_name(void *unused) {
     return "Xbox Account";
 }
 
-static struct obs_source_info xbox_gamerscore_source = {
+static struct obs_source_info xbox_account_source = {
     .id             = "xbox_account_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
@@ -264,7 +264,7 @@ static struct obs_source_info xbox_gamerscore_source = {
 };
 
 static const struct obs_source_info *xbox_source_get(void) {
-    return &xbox_gamerscore_source;
+    return &xbox_account_source;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------

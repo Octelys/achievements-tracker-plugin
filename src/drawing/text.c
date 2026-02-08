@@ -99,37 +99,31 @@ static void blit_glyph_rgba(uint8_t *dst, uint32_t dst_w, uint32_t dst_h, const 
  * be drawn efficiently without re-rendering the glyphs on every frame.
  *
  * Layout behavior:
- * - If @p width and @p height are both zero, the function auto-sizes the texture
- *   to fit the text with minimal padding.
- * - If @p width is non-zero, the texture is set to that width and text is
- *   right-aligned within the canvas.
- * - If @p height is non-zero, the texture height is set to that value.
+ * - Text is rendered into a canvas of the specified size.
+ * - If align is TEXT_ALIGN_RIGHT, text is right-aligned within the canvas.
+ * - If align is TEXT_ALIGN_LEFT, text is left-aligned within the canvas with padding.
  *
- * The function performs two passes when auto-sizing:
- * 1. Measure pass: load glyphs to compute bounding box.
- * 2. Render pass: rasterize glyphs into the RGBA buffer.
- *
- * When a fixed width is provided, text is right-aligned by measuring total advance
- * and starting pen position from the right edge minus padding.
- *
- * @param ttf_path Full path to a TrueType or OpenType font file.
- * @param width Canvas width in pixels. Set to 0 to auto-size based on text.
- * @param height Canvas height in pixels. Set to 0 to auto-size based on text.
- * @param text NUL-terminated UTF-8 string to render (currently treated as single-byte).
- * @param px_size Font size in pixels (pixel height passed to FreeType).
- * @param color Packed RGBA color in 0xRRGGBBAA format.
+ * @param config Text rendering configuration (font path, font size, color, alignment).
+ * @param size   Canvas dimensions (width and height in pixels).
+ * @param text   NUL-terminated UTF-8 string to render.
  * @return Newly allocated text context with an uploaded OBS texture, or NULL on failure.
  *         The caller must free the returned context with @ref text_context_destroy.
  */
-text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32_t height, const char *text,
-                                    uint32_t px_size, uint32_t color) {
+text_context_t *text_context_create(const text_source_config_t *config, source_size_t size, const char *text) {
 
     text_context_t *out = NULL;
 
-    if (!ttf_path || !text) {
+    if (!config || !config->font_path || !text) {
         obs_log(LOG_WARNING, "Unable to create the text context: invalid text parameters");
         return out;
     }
+
+    const char        *ttf_path = config->font_path;
+    const uint32_t     px_size  = config->font_size;
+    const uint32_t     color    = config->color;
+    const text_align_t align    = config->align;
+    const uint32_t     width    = size.width;
+    const uint32_t     height   = size.height;
 
     obs_log(LOG_INFO, "Loading font %s into a texture", ttf_path);
 
@@ -233,13 +227,13 @@ text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32
         h = height < 16 ? 16 : height;
     }
 
-    size_t   size = (size_t)w * (size_t)h * 4;
-    uint8_t *rgba = bzalloc(size);
+    size_t   buffer_size = (size_t)w * (size_t)h * 4;
+    uint8_t *rgba        = bzalloc(buffer_size);
 
     if (!rgba) {
         obs_log(LOG_WARNING,
                 "Unable to create the text context: unable to allocate a new rgba array of size %" PRIu64,
-                (uint64_t)size);
+                (uint64_t)buffer_size);
         FT_Done_Face(face);
         FT_Done_FreeType(ft);
         return out;
@@ -248,14 +242,19 @@ text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32
     int32_t pen_x;
 
     if (width > 0) {
-        // Measure text width for right alignment.
-        int32_t total_advance = 0;
-        for (size_t i = 0; text[i] != '\0'; i++) {
-            if (FT_Load_Char(face, (unsigned char)text[i], FT_LOAD_NO_BITMAP) == 0) {
-                total_advance += (int32_t)(face->glyph->advance.x >> 6);
+        if (align == TEXT_ALIGN_RIGHT) {
+            // Measure text width for right alignment.
+            int32_t total_advance = 0;
+            for (size_t i = 0; text[i] != '\0'; i++) {
+                if (FT_Load_Char(face, (unsigned char)text[i], FT_LOAD_NO_BITMAP) == 0) {
+                    total_advance += (int32_t)(face->glyph->advance.x >> 6);
+                }
             }
+            pen_x = (int32_t)w - (int32_t)padding - total_advance;
+        } else {
+            // Left alignment: start from left edge with padding.
+            pen_x = (int32_t)padding;
         }
-        pen_x = (int32_t)w - (int32_t)padding - total_advance;
     } else {
         pen_x = (int32_t)padding + offset_x;
     }

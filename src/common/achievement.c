@@ -255,3 +255,84 @@ int count_achievements(const achievement_t *achievements) {
 
     return count;
 }
+
+/**
+ * @brief Sorts achievements with unlocked ones first (by timestamp descending), then locked ones.
+ *
+ * This function reorders the achievements linked list in-place so that:
+ * - Unlocked achievements (unlocked_timestamp != 0) appear first, ordered by
+ *   timestamp descending (most recently unlocked first)
+ * - Locked achievements (unlocked_timestamp == 0) appear after all unlocked ones
+ *
+ * Uses an in-place insertion sort algorithm with no memory allocation.
+ *
+ * @param achievements Pointer to the head of the achievements list. The head may be
+ *        updated if the first achievement changes position.
+ */
+void sort_achievements(achievement_t **achievements) {
+
+    if (!achievements || !*achievements || !(*achievements)->next) {
+        return;
+    }
+
+    achievement_t *sorted  = NULL;
+    achievement_t *current = *achievements;
+
+    /* Insertion sort: take each node from the original list and insert it in sorted order */
+    while (current) {
+        achievement_t *next = current->next;
+
+        /* Insert current into the sorted list at the correct position */
+        if (!sorted) {
+            /* First node in sorted list */
+            sorted       = current;
+            sorted->next = NULL;
+        } else {
+            /* Determine if current should go before sorted head */
+            bool should_insert_before_head = false;
+
+            if (sorted->unlocked_timestamp == 0 && current->unlocked_timestamp != 0) {
+                /* Current is unlocked, head is locked */
+                should_insert_before_head = true;
+            } else if (current->unlocked_timestamp != 0 && sorted->unlocked_timestamp != 0 &&
+                       current->unlocked_timestamp > sorted->unlocked_timestamp) {
+                /* Both unlocked, current has more recent timestamp */
+                should_insert_before_head = true;
+            }
+
+            if (should_insert_before_head) {
+                /* Insert at head */
+                current->next = sorted;
+                sorted        = current;
+            } else {
+                /* Find the correct position in the sorted list */
+                achievement_t *search = sorted;
+                while (search->next) {
+                    bool should_insert_here = false;
+
+                    if (search->next->unlocked_timestamp == 0 && current->unlocked_timestamp != 0) {
+                        /* Current is unlocked, next is locked */
+                        should_insert_here = true;
+                    } else if (current->unlocked_timestamp != 0 && search->next->unlocked_timestamp != 0 &&
+                               current->unlocked_timestamp > search->next->unlocked_timestamp) {
+                        /* Both unlocked, current has more recent timestamp */
+                        should_insert_here = true;
+                    }
+
+                    if (should_insert_here) {
+                        break;
+                    }
+                    search = search->next;
+                }
+
+                /* Insert current after search */
+                current->next = search->next;
+                search->next  = current;
+            }
+        }
+
+        current = next;
+    }
+
+    *achievements = sorted;
+}

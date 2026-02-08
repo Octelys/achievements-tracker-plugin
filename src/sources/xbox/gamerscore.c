@@ -21,34 +21,18 @@
  *    initializes the texture in the video_render callback.
  */
 
+#include "sources/common/text_source.h"
 #include "drawing/text.h"
 
 #include <graphics/graphics.h>
-#include <graphics/image-file.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
-#include <curl/curl.h>
-#include <util/platform.h>
 
-#include "drawing/color.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "system/font.h"
 #include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
-
-typedef struct xbox_account_source {
-    /** OBS source instance. */
-    obs_source_t *source;
-
-    /** Output width in pixels. */
-    uint32_t width;
-
-    /** Output height in pixels. */
-    uint32_t height;
-
-} xbox_account_source_t;
 
 static char            g_gamerscore[64];
 static bool            g_must_reload;
@@ -72,7 +56,7 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
     int total_gamerscore = gamerscore_compute(gamerscore);
 
     //  Computes the total gamerscore and activate the switch to reload the texture with the new number.
-    snprintf(g_gamerscore, sizeof(g_gamerscore), "%d", total_gamerscore);
+    snprintf(g_gamerscore, sizeof(g_gamerscore), "%dG", total_gamerscore);
     g_must_reload = true;
 
     obs_log(LOG_INFO, "Gamerscore is %" PRId64, total_gamerscore);
@@ -126,12 +110,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_account_source_t *s = bzalloc(sizeof(*s));
-    s->source                = source;
-    s->width                 = 600;
-    s->height                = 200;
-
-    return s;
+    return text_source_create(source, (source_size_t){600, 200});
 }
 
 /**
@@ -139,7 +118,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_account_source_t *source = data;
+    text_source_base_t *source = data;
 
     if (!source) {
         return;
@@ -155,14 +134,14 @@ static void on_source_destroy(void *data) {
 
 /** @brief OBS callback returning the configured source width. */
 static uint32_t source_get_width(void *data) {
-    const xbox_account_source_t *s = data;
-    return s->width;
+    const text_source_base_t *s = data;
+    return s ? s->size.width : 0;
 }
 
 /** @brief OBS callback returning the configured source height. */
 static uint32_t source_get_height(void *data) {
-    const xbox_account_source_t *s = data;
-    return s->height;
+    const text_source_base_t *s = data;
+    return s ? s->size.height : 0;
 }
 
 /**
@@ -174,21 +153,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     UNUSED_PARAMETER(data);
 
-    if (obs_data_has_user_value(settings, "text_color")) {
-        const uint32_t argb            = (uint32_t)obs_data_get_int(settings, "text_color");
-        g_default_configuration->color = color_argb_to_rgba(argb);
-        g_must_reload                  = true;
-    }
-
-    if (obs_data_has_user_value(settings, "text_size")) {
-        g_default_configuration->size = (uint32_t)obs_data_get_int(settings, "text_size");
-        g_must_reload                 = true;
-    }
-
-    if (obs_data_has_user_value(settings, "text_font")) {
-        g_default_configuration->font_path = obs_data_get_string(settings, "text_font");
-        g_must_reload                      = true;
-    }
+    text_source_update_properties(settings, (text_source_config_t *)g_default_configuration, &g_must_reload);
 
     state_set_gamerscore_configuration(g_default_configuration);
 }
@@ -204,34 +169,21 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    xbox_account_source_t *source = data;
+    text_source_base_t *source = data;
 
     if (!source) {
         return;
     }
 
-    if (g_must_reload || !g_text_context) {
-
-        if (g_text_context) {
-            text_context_destroy(g_text_context);
-            g_text_context = NULL;
-        }
-
-        g_text_context = text_context_create(g_default_configuration->font_path,
-                                             source->width,
-                                             source->height,
-                                             g_gamerscore,
-                                             g_default_configuration->size,
-                                             g_default_configuration->color);
-
-        g_must_reload = false;
-    }
-
-    if (!g_text_context) {
+    if (!text_source_reload_if_needed(&g_text_context,
+                                      &g_must_reload,
+                                      (const text_source_config_t *)g_default_configuration,
+                                      source,
+                                      g_gamerscore)) {
         return;
     }
 
-    text_context_draw(g_text_context, effect);
+    text_source_render_unscaled(g_text_context, effect);
 }
 
 /**
@@ -243,28 +195,8 @@ static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
 
-    /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
-
-    // Font dropdown.
-    obs_property_t *font_list_prop =
-        obs_properties_add_list(p, "text_font", "Font", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
-
-    size_t  font_count = 0;
-    font_t *fonts      = font_list_available(&font_count);
-
-    if (fonts) {
-        for (size_t i = 0; i < font_count; i++) {
-            if (fonts[i].name && fonts[i].path) {
-                // Display name shown in UI, path stored as value.
-                obs_property_list_add_string(font_list_prop, fonts[i].name, fonts[i].path);
-            }
-        }
-        font_list_free(fonts, font_count);
-    }
-
-    obs_properties_add_color(p, "text_color", "Text color");
-    obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
+    text_source_add_properties(p);
 
     return p;
 }

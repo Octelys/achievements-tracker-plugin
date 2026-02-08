@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/types.h"
 #include "graphics/graphics.h"
 
 #ifdef __cplusplus
@@ -27,25 +28,17 @@ typedef struct text_context {
 } text_context_t;
 
 /**
- * @brief Create a text context by rasterizing @p text using the font at @p ttf_path.
+ * @brief Create a text context by rasterizing @p text using the provided configuration.
  *
- * If @p width/@p height are non-zero, the function renders into that fixed canvas size.
- * Otherwise, it computes a minimal texture size based on glyph bounds.
+ * Renders text into a canvas of the specified size. Text is baseline-aligned and
+ * positioned according to the alignment setting in the config.
  *
- * Current layout behavior:
- * - Text is baseline-aligned.
- * - If @p width is non-zero, the text is right-aligned within the canvas.
- *
- * @param ttf_path Path to a .ttf/.otf font file.
- * @param width Canvas width in pixels. Set to 0 to auto-size.
- * @param height Canvas height in pixels. Set to 0 to auto-size.
- * @param text NUL-terminated UTF-8 string (currently treated as single-byte/ASCII for glyph indexing).
- * @param px_size Font size (pixel height) passed to FreeType.
- * @param color Packed RGBA color in 0xRRGGBBAA format.
+ * @param config Text rendering configuration (font path, font size, color, alignment).
+ * @param size   Canvas dimensions (width and height in pixels).
+ * @param text   NUL-terminated UTF-8 string to render.
  * @return Newly allocated text context, or NULL on error.
  */
-text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32_t height, const char *text,
-                                    uint32_t px_size, uint32_t color);
+text_context_t *text_context_create(const text_source_config_t *config, source_size_t size, const char *text);
 
 /**
  * @brief Destroy a text context and its underlying GPU texture.

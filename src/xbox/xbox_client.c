@@ -589,7 +589,7 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Response: %s", response_json);
+    obs_log(LOG_DEBUG, "Response: %s", response_json);
 
     achievements = parse_achievements(response_json);
 
