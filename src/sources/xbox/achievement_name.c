@@ -4,6 +4,7 @@
 
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
+#include <graphics/matrix4.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
 #include <curl/curl.h>
@@ -21,10 +22,10 @@ typedef struct xbox_account_source {
     /** OBS source instance. */
     obs_source_t *source;
 
-    /** Output width in pixels. */
+    /** Canvas width in pixels. */
     uint32_t width;
 
-    /** Output height in pixels. */
+    /** Canvas height in pixels. */
     uint32_t height;
 
 } xbox_account_source_t;
@@ -107,8 +108,8 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
 /**
  * @brief OBS callback creating a new achievement name source instance.
  *
- * Allocates and initializes the source data structure with default dimensions.
- * The source is configured to display text at 600x200 pixels.
+ * Allocates and initializes the source data structure with a default canvas size.
+ * The canvas provides a fixed bounding box; text renders at actual size within it.
  *
  * @param settings Source settings (unused).
  * @param source   OBS source instance pointer.
@@ -151,37 +152,43 @@ static void on_source_destroy(void *data) {
 }
 
 /**
- * @brief OBS callback returning the configured source width.
+ * @brief OBS callback returning the source canvas width.
+ *
+ * Returns a fixed canvas width that provides stable dimensions for OBS transforms.
+ * The text texture may be smaller and is drawn at actual size within this canvas.
  *
  * @param data Source instance data.
- * @return Width in pixels (600).
+ * @return Canvas width in pixels.
  */
 static uint32_t source_get_width(void *data) {
     const xbox_account_source_t *s = data;
-    return s->width;
+    return s ? s->width : 16;
 }
 
 /**
- * @brief OBS callback returning the configured source height.
+ * @brief OBS callback returning the source canvas height.
+ *
+ * Returns a fixed canvas height that provides stable dimensions for OBS transforms.
+ * The text texture may be smaller and is drawn at actual size within this canvas.
  *
  * @param data Source instance data.
- * @return Height in pixels (200).
+ * @return Canvas height in pixels.
  */
 static uint32_t source_get_height(void *data) {
     const xbox_account_source_t *s = data;
-    return s->height;
+    return s ? s->height : 16;
 }
 
 /**
  * @brief OBS callback invoked when source settings are updated.
  *
- * Processes changes to text color, size, and font from the OBS properties UI.
+ * Processes changes to text color, size, font, and alignment from the OBS properties UI.
  * When settings change, updates the global configuration and triggers a text
  * context reload. The updated configuration is persisted to disk via the state
  * management system.
  *
  * @param data Source instance data (unused).
- * @param settings Updated OBS settings data containing text_color, text_size, and text_font.
+ * @param settings Updated OBS settings data containing text_color, text_size, text_font, and text_align.
  */
 static void on_source_update(void *data, obs_data_t *settings) {
 
@@ -241,6 +248,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
             g_text_context = NULL;
         }
 
+        // Create texture at exact source dimensions to prevent scaling.
+        // Text renders at actual font size within this fixed canvas.
         g_text_context = text_context_create(g_configuration->font_path,
                                              source->width,
                                              source->height,
@@ -256,7 +265,23 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
+    // Get the current transformation matrix to extract translation
+    struct matrix4 current_matrix;
+    gs_matrix_get(&current_matrix);
+
+
+    // Extract translation from the matrix
+    float trans_x = current_matrix.t.x;
+    float trans_y = current_matrix.t.y;
+
+    // Build a new matrix: translation only (no scaling)
+    gs_matrix_push();
+    gs_matrix_identity();
+    gs_matrix_translate3f(trans_x, trans_y, 0.0f);
+
     text_context_draw(g_text_context, effect);
+
+    gs_matrix_pop();
 }
 
 /**
@@ -266,6 +291,9 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  * - Font dropdown: Lists all available system fonts
  * - Text color picker: RGBA color selector for the text
  * - Text size slider: Integer value from 10 to 164 pixels
+ * - Text alignment dropdown: Left or Right alignment
+ *
+ * Source dimensions automatically adjust to fit the rendered text.
  *
  * @param data Source instance data (unused).
  * @return Newly created obs_properties_t structure containing the UI controls.

@@ -25,6 +25,7 @@
 
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
+#include <graphics/matrix4.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
 #include <curl/curl.h>
@@ -190,6 +191,11 @@ static void on_source_update(void *data, obs_data_t *settings) {
         g_must_reload                      = true;
     }
 
+    if (obs_data_has_user_value(settings, "text_align")) {
+        g_default_configuration->align = (uint32_t)obs_data_get_int(settings, "text_align");
+        g_must_reload                  = true;
+    }
+
     state_set_gamerscore_configuration(g_default_configuration);
 }
 
@@ -223,7 +229,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
                                              g_gamerscore,
                                              g_default_configuration->size,
                                              g_default_configuration->color,
-                                             TEXT_ALIGN_RIGHT);
+                                             (text_align_t)g_default_configuration->align);
 
         g_must_reload = false;
     }
@@ -232,7 +238,23 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
+    // Get the current transformation matrix to extract translation
+    struct matrix4 current_matrix;
+    gs_matrix_get(&current_matrix);
+
+
+    // Extract translation from the matrix
+    float trans_x = current_matrix.t.x;
+    float trans_y = current_matrix.t.y;
+
+    // Build a new matrix: translation only (no scaling)
+    gs_matrix_push();
+    gs_matrix_identity();
+    gs_matrix_translate3f(trans_x, trans_y, 0.0f);
+
     text_context_draw(g_text_context, effect);
+
+    gs_matrix_pop();
 }
 
 /**
@@ -266,6 +288,12 @@ static obs_properties_t *source_get_properties(void *data) {
 
     obs_properties_add_color(p, "text_color", "Text color");
     obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
+
+    // Text alignment dropdown.
+    obs_property_t *align_list =
+        obs_properties_add_list(p, "text_align", "Text alignment", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_list_add_int(align_list, "Left", TEXT_ALIGN_LEFT);
+    obs_property_list_add_int(align_list, "Right", TEXT_ALIGN_RIGHT);
 
     return p;
 }

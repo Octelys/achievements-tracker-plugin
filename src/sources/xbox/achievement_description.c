@@ -4,6 +4,7 @@
 
 #include <graphics/graphics.h>
 #include <graphics/image-file.h>
+#include <graphics/matrix4.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
 #include <curl/curl.h>
@@ -255,7 +256,23 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
+    // Get the current transformation matrix to extract translation
+    struct matrix4 current_matrix;
+    gs_matrix_get(&current_matrix);
+
+
+    // Extract translation from the matrix
+    float trans_x = current_matrix.t.x;
+    float trans_y = current_matrix.t.y;
+
+    // Build a new matrix: translation only (no scaling)
+    gs_matrix_push();
+    gs_matrix_identity();
+    gs_matrix_translate3f(trans_x, trans_y, 0.0f);
+
     text_context_draw(g_text_context, effect);
+
+    gs_matrix_pop();
 }
 
 /**

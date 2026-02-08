@@ -114,6 +114,8 @@ typedef struct gamerscore_configuration {
     uint32_t    size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t    color;
+    /** Text alignment (0 = left, 1 = right). */
+    uint32_t    align;
 } gamerscore_configuration_t;
 
 /**
