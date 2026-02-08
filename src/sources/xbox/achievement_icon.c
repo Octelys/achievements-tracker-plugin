@@ -188,6 +188,39 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 }
 
 /**
+ * @brief Event handler called when a new game starts being played.
+ *
+ * Fetches the cover-art URL for the given game and triggers a download.
+ *
+ * @param game Currently played game information.
+ */
+static void on_xbox_game_played(const game_t *game) {
+
+    UNUSED_PARAMETER(game);
+
+    const achievement_t *achievement = get_current_game_achievements();
+
+    if (achievement && achievement->icon_url) {
+        if (strcasecmp(achievement->icon_url, g_achievement_icon.image_url) == 0) {
+            /* Icon URL hasn't changed, no need to download/reload */
+            return;
+        }
+
+        /* TODO Move to constant */
+        snprintf(g_achievement_icon.image_url,
+                 sizeof(g_achievement_icon.image_url),
+                 "%s&w=128&h=128&format=png",
+                 achievement->icon_url);
+        download_achievement_icon_from_url(achievement->icon_url);
+    } else {
+        /* No achievement or empty URL: clear cached URL and force texture to be freed on the next render */
+        g_achievement_icon.image_url[0]  = '\0';
+        g_achievement_icon.image_path[0] = '\0';
+        g_achievement_icon.must_reload   = true;
+    }
+}
+
+/**
  * @brief Xbox monitor callback invoked when achievement progress is updated.
  *
  * Retrieves the current game's most recent achievement and updates the icon display
@@ -439,5 +472,6 @@ void xbox_achievement_icon_source_register(void) {
     obs_register_source(xbox_achievement_icon_source_get());
 
     xbox_subscribe_connected_changed(&on_connection_changed);
+    xbox_subscribe_game_played(&on_xbox_game_played);
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
 }

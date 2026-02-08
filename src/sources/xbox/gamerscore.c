@@ -242,7 +242,6 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     struct matrix4 current_matrix;
     gs_matrix_get(&current_matrix);
 
-
     // Extract translation from the matrix
     float trans_x = current_matrix.t.x;
     float trans_y = current_matrix.t.y;

@@ -82,6 +82,22 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 }
 
 /**
+ * @brief Event handler called when a new game starts being played.
+ *
+ * Fetches the cover-art URL for the given game and triggers a download.
+ *
+ * @param game Currently played game information.
+ */
+static void on_xbox_game_played(const game_t *game) {
+
+    UNUSED_PARAMETER(game);
+
+    const achievement_t *achievement = get_current_game_achievements();
+
+    update_achievement_name(achievement);
+}
+
+/**
  * @brief Xbox monitor callback invoked when achievement progress is updated.
  *
  * Retrieves the current game's most recent achievement and updates the display
@@ -269,7 +285,6 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     struct matrix4 current_matrix;
     gs_matrix_get(&current_matrix);
 
-
     // Extract translation from the matrix
     float trans_x = current_matrix.t.x;
     float trans_y = current_matrix.t.y;
@@ -412,5 +427,6 @@ void xbox_achievement_name_source_register(void) {
     obs_register_source(xbox_source_get());
 
     xbox_subscribe_connected_changed(&on_connection_changed);
+    xbox_subscribe_game_played(&on_xbox_game_played);
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
 }
