@@ -222,7 +222,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
                                              source->height,
                                              g_gamerscore,
                                              g_default_configuration->size,
-                                             g_default_configuration->color);
+                                             g_default_configuration->color,
+                                             TEXT_ALIGN_RIGHT);
 
         g_must_reload = false;
     }

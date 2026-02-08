@@ -130,6 +130,8 @@ typedef struct achievement_name_configuration {
     uint32_t    size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t    color;
+    /** Text alignment (0 = left, 1 = right). */
+    uint32_t    align;
 } achievement_name_configuration_t;
 
 /**
@@ -146,6 +148,8 @@ typedef struct achievement_description_configuration {
     uint32_t    size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t    color;
+    /** Text alignment (0 = left, 1 = right). */
+    uint32_t    align;
 } achievement_description_configuration_t;
 
 /**

@@ -12,6 +12,16 @@ extern "C" {
  */
 
 /**
+ * @brief Text alignment options.
+ */
+typedef enum text_align {
+    /** Align text to the left edge of the canvas. */
+    TEXT_ALIGN_LEFT = 0,
+    /** Align text to the right edge of the canvas. */
+    TEXT_ALIGN_RIGHT = 1,
+} text_align_t;
+
+/**
  * @brief Opaque-ish text rendering context.
  *
  * Holds a GPU texture containing the rendered text and its dimensions.
@@ -32,9 +42,11 @@ typedef struct text_context {
  * If @p width/@p height are non-zero, the function renders into that fixed canvas size.
  * Otherwise, it computes a minimal texture size based on glyph bounds.
  *
- * Current layout behavior:
+ * Text layout behavior:
  * - Text is baseline-aligned.
- * - If @p width is non-zero, the text is right-aligned within the canvas.
+ * - If @p width is non-zero and @p align is TEXT_ALIGN_RIGHT, text is right-aligned within the canvas.
+ * - If @p width is non-zero and @p align is TEXT_ALIGN_LEFT, text is left-aligned within the canvas.
+ * - If @p width is zero, alignment is ignored and the texture auto-sizes to fit the text.
  *
  * @param ttf_path Path to a .ttf/.otf font file.
  * @param width Canvas width in pixels. Set to 0 to auto-size.
@@ -42,10 +54,11 @@ typedef struct text_context {
  * @param text NUL-terminated UTF-8 string (currently treated as single-byte/ASCII for glyph indexing).
  * @param px_size Font size (pixel height) passed to FreeType.
  * @param color Packed RGBA color in 0xRRGGBBAA format.
+ * @param align Text alignment (TEXT_ALIGN_LEFT or TEXT_ALIGN_RIGHT). Only applies when width > 0.
  * @return Newly allocated text context, or NULL on error.
  */
 text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32_t height, const char *text,
-                                    uint32_t px_size, uint32_t color);
+                                    uint32_t px_size, uint32_t color, text_align_t align);
 
 /**
  * @brief Destroy a text context and its underlying GPU texture.

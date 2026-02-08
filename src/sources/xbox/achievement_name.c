@@ -203,6 +203,11 @@ static void on_source_update(void *data, obs_data_t *settings) {
         g_must_reload              = true;
     }
 
+    if (obs_data_has_user_value(settings, "text_align")) {
+        g_configuration->align = (uint32_t)obs_data_get_int(settings, "text_align");
+        g_must_reload          = true;
+    }
+
     state_set_achievement_name_configuration(g_configuration);
 }
 
@@ -241,7 +246,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
                                              source->height,
                                              g_achievement_name,
                                              g_configuration->size,
-                                             g_configuration->color);
+                                             g_configuration->color,
+                                             (text_align_t)g_configuration->align);
 
         g_must_reload = false;
     }
@@ -290,6 +296,12 @@ static obs_properties_t *source_get_properties(void *data) {
 
     obs_properties_add_color(p, "text_color", "Text color");
     obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
+
+    // Text alignment dropdown.
+    obs_property_t *align_list = obs_properties_add_list(p, "text_align", "Text alignment",
+                                                          OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_list_add_int(align_list, "Left", 0);
+    obs_property_list_add_int(align_list, "Right", 1);
 
     return p;
 }
