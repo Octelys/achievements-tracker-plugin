@@ -11,6 +11,9 @@
  * @brief Implementation of common functionality for text-based OBS sources.
  */
 
+/** Default duration for each fade phase (in seconds). */
+#define TEXT_TRANSITION_DEFAULT_DURATION 0.3f
+
 text_source_base_t *text_source_create(obs_source_t *source, source_size_t size) {
 
     text_source_base_t *base = bzalloc(sizeof(*base));
@@ -21,11 +24,17 @@ text_source_base_t *text_source_create(obs_source_t *source, source_size_t size)
     base->source = source;
     base->size   = size;
 
+    // Initialize transition state
+    base->transition.phase    = TEXT_TRANSITION_NONE;
+    base->transition.opacity  = 1.0f;
+    base->transition.duration = TEXT_TRANSITION_DEFAULT_DURATION;
+    base->pending_text        = NULL;
+
     return base;
 }
 
-bool text_source_reload_if_needed(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
-                                  const text_source_base_t *base, const char *text) {
+bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
+                                  text_source_base_t *base, const char *text) {
 
     if (!must_reload || !ctx || !config || !base) {
         return ctx != NULL && *ctx != NULL;
@@ -35,6 +44,26 @@ bool text_source_reload_if_needed(text_context_t **ctx, bool *must_reload, const
         return true;
     }
 
+    // If we already have a context and need to reload, start a fade-out transition
+    if (*ctx && base->transition.phase == TEXT_TRANSITION_NONE) {
+        // Store the new text for later and start fading out
+        if (base->pending_text) {
+            bfree(base->pending_text);
+        }
+        base->pending_text       = bstrdup(text);
+        base->transition.phase   = TEXT_TRANSITION_FADE_OUT;
+        base->transition.opacity = 1.0f;
+        *must_reload             = false;
+        return true;
+    }
+
+    // If we're in a transition, don't reload yet
+    if (base->transition.phase != TEXT_TRANSITION_NONE) {
+        *must_reload = false;
+        return *ctx != NULL;
+    }
+
+    // No existing context or transition complete - create new context
     if (*ctx) {
         text_context_destroy(*ctx);
         *ctx = NULL;
@@ -42,14 +71,20 @@ bool text_source_reload_if_needed(text_context_t **ctx, bool *must_reload, const
 
     *ctx = text_context_create(config, base->size, text);
 
+    // Start fade-in if we created a new context
+    if (*ctx) {
+        base->transition.phase   = TEXT_TRANSITION_FADE_IN;
+        base->transition.opacity = 0.0f;
+    }
+
     *must_reload = false;
 
     return *ctx != NULL;
 }
 
-void text_source_render_unscaled(text_context_t *ctx, gs_effect_t *effect) {
+void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect_t *effect) {
 
-    if (!ctx) {
+    if (!ctx || !base) {
         return;
     }
 
@@ -66,9 +101,75 @@ void text_source_render_unscaled(text_context_t *ctx, gs_effect_t *effect) {
     gs_matrix_identity();
     gs_matrix_translate3f(trans_x, trans_y, 0.0f);
 
+    // Apply transition opacity using color multiplier
+    float opacity = base->transition.opacity;
+
+    // Use blend state to apply opacity
+    gs_blend_state_push();
+    gs_blend_function(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA);
+
+    // Set draw color with opacity
+    struct vec4 color;
+    vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
+
+    gs_effect_t *active_effect = effect ? effect : obs_get_base_effect(OBS_EFFECT_DEFAULT);
+    if (active_effect) {
+        gs_eparam_t *color_param = gs_effect_get_param_by_name(active_effect, "color");
+        if (color_param) {
+            gs_effect_set_vec4(color_param, &color);
+        }
+    }
+
     text_context_draw(ctx, effect);
 
+    gs_blend_state_pop();
     gs_matrix_pop();
+}
+
+void text_source_tick(text_source_base_t *base, text_context_t **ctx,
+                      const text_source_config_t *config, float seconds) {
+
+    if (!base || !ctx || !config) {
+        return;
+    }
+
+    float duration = base->transition.duration;
+    if (duration <= 0.0f) {
+        duration = TEXT_TRANSITION_DEFAULT_DURATION;
+    }
+
+    switch (base->transition.phase) {
+    case TEXT_TRANSITION_FADE_OUT:
+        base->transition.opacity -= seconds / duration;
+        if (base->transition.opacity <= 0.0f) {
+            base->transition.opacity = 0.0f;
+            // Fade-out complete, switch to the pending text
+            if (*ctx) {
+                text_context_destroy(*ctx);
+                *ctx = NULL;
+            }
+            if (base->pending_text) {
+                *ctx = text_context_create(config, base->size, base->pending_text);
+                bfree(base->pending_text);
+                base->pending_text = NULL;
+            }
+            // Start fade-in
+            base->transition.phase = TEXT_TRANSITION_FADE_IN;
+        }
+        break;
+
+    case TEXT_TRANSITION_FADE_IN:
+        base->transition.opacity += seconds / duration;
+        if (base->transition.opacity >= 1.0f) {
+            base->transition.opacity = 1.0f;
+            base->transition.phase   = TEXT_TRANSITION_NONE;
+        }
+        break;
+
+    case TEXT_TRANSITION_NONE:
+    default:
+        break;
+    }
 }
 
 void text_source_add_properties(obs_properties_t *props) {

@@ -175,7 +175,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_reload_if_needed(&g_text_context,
+    if (!text_source_reload(&g_text_context,
                                       &g_must_reload,
                                       (const text_source_config_t *)g_default_configuration,
                                       source,
@@ -183,7 +183,26 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    text_source_render_unscaled(g_text_context, effect);
+    text_source_render(g_text_context, source, effect);
+}
+
+/**
+ * @brief OBS callback for animation tick.
+ *
+ * Updates fade transition animations.
+ */
+static void on_source_video_tick(void *data, float seconds) {
+
+    text_source_base_t *source = data;
+
+    if (!source) {
+        return;
+    }
+
+    text_source_tick(source,
+                     &g_text_context,
+                     (const text_source_config_t *)g_default_configuration,
+                     seconds);
 }
 
 /**
@@ -222,7 +241,7 @@ static struct obs_source_info xbox_gamerscore_source = {
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
     .get_height     = source_get_height,
-    .video_tick     = NULL,
+    .video_tick     = on_source_video_tick,
     .video_render   = on_source_video_render,
 };
 

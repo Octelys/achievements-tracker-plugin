@@ -499,8 +499,9 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
         return NULL;
     }
 
-    achievement_t *achievements  = NULL;
-    char          *response_json = NULL;
+    achievement_t *all_achievements = NULL;
+    achievement_t *last_achievement = NULL;
+    char          *continuation_token = NULL;
 
     char headers[4096];
     snprintf(headers,
@@ -513,31 +514,75 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     obs_log(LOG_DEBUG, "Headers: %s", headers);
 
-    /* Sends the request */
-    char presence_url[512];
-    snprintf(presence_url, sizeof(presence_url), XBOX_ACHIEVEMENTS_ENDPOINT, identity->xid, game->id);
+    /* Pagination loop: keep fetching until no continuation token */
+    do {
+        char          *response_json = NULL;
+        achievement_t *page_achievements = NULL;
 
-    long http_code = 0;
-    response_json  = http_get(presence_url, headers, NULL, &http_code);
+        /* Build the URL with or without continuation token */
+        char achievements_url[1024];
+        if (continuation_token) {
+            snprintf(achievements_url, sizeof(achievements_url),
+                     XBOX_ACHIEVEMENTS_ENDPOINT "&continuationToken=%s",
+                     identity->xid, game->id, continuation_token);
+            bfree(continuation_token);
+            continuation_token = NULL;
+        } else {
+            snprintf(achievements_url, sizeof(achievements_url),
+                     XBOX_ACHIEVEMENTS_ENDPOINT,
+                     identity->xid, game->id);
+        }
 
-    if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "Failed to fetch the games achievements: received status code %d", http_code);
-        goto cleanup;
-    }
+        long http_code = 0;
+        response_json  = http_get(achievements_url, headers, NULL, &http_code);
 
-    if (!response_json) {
-        obs_log(LOG_ERROR, "Failed to fetch the games achievements: received no response");
-        goto cleanup;
-    }
+        if (http_code < 200 || http_code >= 300) {
+            obs_log(LOG_ERROR, "Failed to fetch the games achievements: received status code %ld", http_code);
+            FREE(response_json);
+            break;
+        }
 
-    obs_log(LOG_DEBUG, "Response: %s", response_json);
+        if (!response_json) {
+            obs_log(LOG_ERROR, "Failed to fetch the games achievements: received no response");
+            break;
+        }
 
-    achievements = parse_achievements(response_json);
+        obs_log(LOG_DEBUG, "Response length: %zu bytes", strlen(response_json));
 
-    obs_log(LOG_INFO, "Received %d achievements for game %s", count_achievements(achievements), game->title);
+        /* Parse achievements from this page */
+        page_achievements = parse_achievements(response_json);
 
-cleanup:
-    FREE(response_json);
+        if (page_achievements) {
+            /* Append to the full list */
+            if (!all_achievements) {
+                all_achievements = page_achievements;
+            } else {
+                last_achievement->next = page_achievements;
+            }
 
-    return achievements;
+            /* Find the new last achievement */
+            last_achievement = page_achievements;
+            while (last_achievement->next) {
+                last_achievement = last_achievement->next;
+            }
+        }
+
+        /* Check for continuation token in pagingInfo */
+        cJSON *root = cJSON_Parse(response_json);
+        if (root) {
+            cJSON *paging_info = cJSONUtils_GetPointer(root, "/pagingInfo/continuationToken");
+            if (paging_info && paging_info->valuestring && paging_info->valuestring[0] != '\0') {
+                continuation_token = bstrdup(paging_info->valuestring);
+                obs_log(LOG_DEBUG, "Found continuation token, fetching next page...");
+            }
+            cJSON_Delete(root);
+        }
+
+        FREE(response_json);
+
+    } while (continuation_token);
+
+    obs_log(LOG_INFO, "Received %d achievements for game %s", count_achievements(all_achievements), game->title);
+
+    return all_achievements;
 }

@@ -47,7 +47,7 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
 
     const char *property_value = get_node_string(json_root, achievement_index, property_name);
 
-    obs_log(LOG_INFO, "%s=%s", property_name, property_value);
+    obs_log(LOG_DEBUG, "%s=%s", property_name, property_value);
 
     if (!property_value || strlen(property_value) == 0) {
         return 0;
@@ -64,7 +64,7 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
         return 0;
     }
 
-    obs_log(LOG_INFO, "%s=%" PRId64, property_name, unix_timestamp);
+    obs_log(LOG_DEBUG, "%s=%" PRId64, property_name, unix_timestamp);
 
     return unix_timestamp;
 }

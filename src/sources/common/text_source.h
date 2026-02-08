@@ -18,7 +18,32 @@ extern "C" {
  * - Text context reload logic
  * - Unscaled rendering (preventing OBS transform scaling)
  * - Common properties UI (font, color, size, alignment)
+ * - Fade transitions when text changes
  */
+
+/**
+ * @brief Transition phase for text fade animations.
+ */
+typedef enum text_transition_phase {
+    /** No transition active, text is fully visible. */
+    TEXT_TRANSITION_NONE = 0,
+    /** Fading out the old text. */
+    TEXT_TRANSITION_FADE_OUT,
+    /** Fading in the new text. */
+    TEXT_TRANSITION_FADE_IN,
+} text_transition_phase_t;
+
+/**
+ * @brief Transition state for text fade animations.
+ */
+typedef struct text_transition_state {
+    /** Current transition phase. */
+    text_transition_phase_t phase;
+    /** Current opacity (0.0 to 1.0). */
+    float                   opacity;
+    /** Duration of each fade phase in seconds. */
+    float                   duration;
+} text_transition_state_t;
 
 /**
  * @brief Base structure for text-based sources.
@@ -31,6 +56,12 @@ typedef struct text_source_base {
 
     /** Output dimensions. */
     source_size_t size;
+
+    /** Transition state for fade animations. */
+    text_transition_state_t transition;
+
+    /** Pending text to display after fade-out completes. */
+    char *pending_text;
 
 } text_source_base_t;
 
@@ -46,21 +77,23 @@ typedef struct text_source_base {
 text_source_base_t *text_source_create(obs_source_t *source, source_size_t size);
 
 /**
- * @brief Reload text context if needed.
+ * @brief Reload text context if needed, with fade transition support.
  *
- * Creates or recreates the text context when the must_reload flag is set or
- * when the context doesn't exist. Handles destruction of the old context.
- * Uses the base's size for the texture dimensions.
+ * When must_reload is set and a context already exists, this initiates a fade-out
+ * transition and stores the new text as pending. The actual reload happens when
+ * the fade-out completes (handled by text_source_tick).
+ *
+ * If no context exists, creates the context immediately and starts a fade-in.
  *
  * @param ctx         Pointer to the text context pointer (will be updated).
  * @param must_reload Pointer to the reload flag (will be cleared on reload).
  * @param config      Text source configuration (font, size, color, alignment).
- * @param base        Text source base containing canvas dimensions.
+ * @param base        Text source base containing canvas dimensions and transition state.
  * @param text        Text string to render.
  * @return true if context is valid and ready to render, false otherwise.
  */
-bool text_source_reload_if_needed(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
-                                  const text_source_base_t *base, const char *text);
+bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
+                                  text_source_base_t *base, const char *text);
 
 /**
  * @brief Render text with inverse scaling to prevent OBS transform scaling.
@@ -68,11 +101,28 @@ bool text_source_reload_if_needed(text_context_t **ctx, bool *must_reload, const
  * Extracts the current translation from the OBS transform matrix and renders
  * the text at that position without any scaling. This ensures text always
  * renders at its actual pixel size regardless of source transforms.
+ * Applies the current transition opacity for fade animations.
  *
  * @param ctx    Text context to render.
+ * @param base   Text source base containing transition state.
  * @param effect Effect to use for rendering. Pass NULL to use default effect.
  */
-void text_source_render_unscaled(text_context_t *ctx, gs_effect_t *effect);
+void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect_t *effect);
+
+/**
+ * @brief Update the transition animation state.
+ *
+ * Call this from the video_tick callback to advance fade animations.
+ * When a fade-out completes and pending text exists, triggers a reload
+ * and begins the fade-in phase.
+ *
+ * @param base        Text source base containing transition state.
+ * @param ctx         Pointer to the text context pointer (will be updated on text switch).
+ * @param config      Text source configuration.
+ * @param seconds     Time elapsed since last tick.
+ */
+void text_source_tick(text_source_base_t *base, text_context_t **ctx,
+                      const text_source_config_t *config, float seconds);
 
 /**
  * @brief Add common text properties to a properties panel.
