@@ -1,46 +1,12 @@
 #include "sources/xbox/achievement_icon.h"
 
-#include <graphics/graphics.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
-#include <curl/curl.h>
-#include <inttypes.h>
 
-#include "drawing/image.h"
 #include "oauth/xbox-live.h"
-#include "crypto/crypto.h"
+#include "sources/common/image_source.h"
 #include "xbox/xbox_client.h"
 #include "xbox/xbox_monitor.h"
-
-#include <net/http/http.h>
-
-typedef struct xbox_achievement_icon_source {
-    /** OBS source instance. */
-    obs_source_t *source;
-
-    /** Source draw width in pixels (used by get_width/video_render). */
-    uint32_t width;
-
-    /** Source draw height in pixels (used by get_height/video_render). */
-    uint32_t height;
-} xbox_achievement_icon_source_t;
-
-/**
- * @brief Runtime cache for the downloaded achievement icon image.
- */
-typedef struct achievement_icon {
-    /** Last fetched achievement icon URL (used to detect changes). */
-    char image_url[1024];
-
-    /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
-    char image_path[512];
-
-    /** GPU texture created from the downloaded image (owned by this module). */
-    gs_texture_t *image_texture;
-
-    /** If true, the next render tick should reload the texture from image_path. */
-    bool must_reload;
-} achievement_icon_t;
 
 /**
  * @brief Global singleton achievement icon cache.
@@ -48,100 +14,7 @@ typedef struct achievement_icon {
  * This source is implemented as a singleton that stores the current achievement icon
  * in a global cache.
  */
-static achievement_icon_t g_achievement_icon;
-
-//  --------------------------------------------------------------------------------------------------------------------
-//	Private functions
-//  --------------------------------------------------------------------------------------------------------------------
-
-/**
- * @brief Download achievement icon image from a URL into a temporary file.
- *
- * The file path is stored in g_achievement_icon.image_path and g_achievement_icon.must_reload
- * is set to true so the graphics thread can create a texture on the next render.
- *
- * @param image_url Achievement icon image URL. If NULL or empty, this function is a no-op.
- */
-static void download_achievement_icon_from_url(const char *image_url) {
-
-    if (!image_url || image_url[0] == '\0') {
-        return;
-    }
-
-    obs_log(LOG_INFO, "Downloading Xbox Achievement Icon image from URL: %s", image_url);
-
-    /* Downloads the image in memory */
-    uint8_t *data = NULL;
-    size_t   size = 0;
-
-    if (!http_download(image_url, &data, &size)) {
-        obs_log(LOG_WARNING, "Unable to download Achievement Icon image from URL: %s", image_url);
-        return;
-    }
-
-    obs_log(LOG_INFO, "Downloaded %zu bytes for Achievement Icon image", size);
-
-    /* Write the bytes to a temp file and use gs_texture_create_from_file() on the render thread */
-    snprintf(g_achievement_icon.image_path,
-             sizeof(g_achievement_icon.image_path),
-             "%s/obs_plugin_temp_achievement_icon.png",
-             getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
-
-    FILE *temp_file = fopen(g_achievement_icon.image_path, "wb");
-
-    if (!temp_file) {
-        obs_log(LOG_ERROR, "Failed to create temp file for Achievement Icon image");
-        bfree(data);
-        return;
-    }
-    fwrite(data, 1, size, temp_file);
-    fclose(temp_file);
-    bfree(data);
-
-    /* Force its reload into a texture on the next render */
-    g_achievement_icon.must_reload = true;
-}
-
-/**
- * @brief Load the downloaded achievement icon image into a gs_texture_t.
- *
- * If g_achievement_icon.must_reload is false, this function does nothing.
- *
- * This must be called from a context where entering/leaving graphics is allowed
- * (typically from video_render).
- */
-static void load_texture_from_file() {
-
-    if (!g_achievement_icon.must_reload) {
-        return;
-    }
-
-    /* Now load the image from the temporary file using OBS graphics */
-    obs_enter_graphics();
-
-    /* Free existing texture */
-    if (g_achievement_icon.image_texture) {
-        gs_texture_destroy(g_achievement_icon.image_texture);
-        g_achievement_icon.image_texture = NULL;
-    }
-
-    if (g_achievement_icon.image_path[0] != '\0') {
-        g_achievement_icon.image_texture = gs_texture_create_from_file(g_achievement_icon.image_path);
-    }
-
-    obs_leave_graphics();
-
-    g_achievement_icon.must_reload = false;
-
-    /* Clean up temp file */
-    remove(g_achievement_icon.image_path);
-
-    if (g_achievement_icon.image_texture) {
-        obs_log(LOG_INFO, "New Achievement Icon texture has been successfully loaded");
-    } else {
-        obs_log(LOG_WARNING, "Failed to create Achievement Icon texture from the downloaded file");
-    }
-}
+static image_source_cache_t g_achievement_icon;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
@@ -167,23 +40,12 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
         const achievement_t *achievement = get_current_game_achievements();
 
         if (achievement && achievement->icon_url) {
-            if (strcasecmp(achievement->icon_url, g_achievement_icon.image_url) == 0) {
-                /* Icon URL hasn't changed, no need to download/reload */
-                return;
-            }
-
-            snprintf(g_achievement_icon.image_url, sizeof(g_achievement_icon.image_url), "%s", achievement->icon_url);
-            download_achievement_icon_from_url(achievement->icon_url);
+            image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
         } else {
-            /* No achievement or empty URL: clear cached URL and force texture to be freed on the next render */
-            g_achievement_icon.image_url[0]  = '\0';
-            g_achievement_icon.image_path[0] = '\0';
-            g_achievement_icon.must_reload   = true;
+            image_source_clear(&g_achievement_icon);
         }
     } else {
-        g_achievement_icon.image_url[0]  = '\0';
-        g_achievement_icon.image_path[0] = '\0';
-        g_achievement_icon.must_reload   = true;
+        image_source_clear(&g_achievement_icon);
     }
 }
 
@@ -201,22 +63,9 @@ static void on_xbox_game_played(const game_t *game) {
     const achievement_t *achievement = get_current_game_achievements();
 
     if (achievement && achievement->icon_url) {
-        if (strcasecmp(achievement->icon_url, g_achievement_icon.image_url) == 0) {
-            /* Icon URL hasn't changed, no need to download/reload */
-            return;
-        }
-
-        /* TODO Move to constant */
-        snprintf(g_achievement_icon.image_url,
-                 sizeof(g_achievement_icon.image_url),
-                 "%s&w=128&h=128&format=png",
-                 achievement->icon_url);
-        download_achievement_icon_from_url(achievement->icon_url);
+        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
     } else {
-        /* No achievement or empty URL: clear cached URL and force texture to be freed on the next render */
-        g_achievement_icon.image_url[0]  = '\0';
-        g_achievement_icon.image_path[0] = '\0';
-        g_achievement_icon.must_reload   = true;
+        image_source_clear(&g_achievement_icon);
     }
 }
 
@@ -238,22 +87,9 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
     const achievement_t *achievement = get_current_game_achievements();
 
     if (achievement && achievement->icon_url) {
-        if (strcasecmp(achievement->icon_url, g_achievement_icon.image_url) == 0) {
-            /* Icon URL hasn't changed, no need to download/reload */
-            return;
-        }
-
-        /* TODO Move to constant */
-        snprintf(g_achievement_icon.image_url,
-                 sizeof(g_achievement_icon.image_url),
-                 "%s&w=128&h=128&format=png",
-                 achievement->icon_url);
-        download_achievement_icon_from_url(achievement->icon_url);
+        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
     } else {
-        /* No achievement or empty URL: clear cached URL and force texture to be freed on the next render */
-        g_achievement_icon.image_url[0]  = '\0';
-        g_achievement_icon.image_path[0] = '\0';
-        g_achievement_icon.must_reload   = true;
+        image_source_clear(&g_achievement_icon);
     }
 }
 
@@ -268,8 +104,8 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
  * @return Width in pixels (200).
  */
 static uint32_t source_get_width(void *data) {
-    const xbox_achievement_icon_source_t *s = data;
-    return s->width;
+    const image_source_data_t *s = data;
+    return s->size.width;
 }
 
 /**
@@ -279,8 +115,8 @@ static uint32_t source_get_width(void *data) {
  * @return Height in pixels (200).
  */
 static uint32_t source_get_height(void *data) {
-    const xbox_achievement_icon_source_t *s = data;
-    return s->height;
+    const image_source_data_t *s = data;
+    return s->size.height;
 }
 
 /**
@@ -304,16 +140,16 @@ static const char *source_get_name(void *unused) {
  *
  * @param settings Source settings (unused).
  * @param source   OBS source instance pointer.
- * @return Newly allocated xbox_achievement_icon_source_t structure, or NULL on failure.
+ * @return Newly allocated image_source_data_t structure, or NULL on failure.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_achievement_icon_source_t *s = bzalloc(sizeof(*s));
-    s->source                         = source;
-    s->width                          = 200;
-    s->height                         = 200;
+    image_source_data_t *s = bzalloc(sizeof(*s));
+    s->source              = source;
+    s->size.width          = 200;
+    s->size.height         = 200;
 
     return s;
 }
@@ -328,19 +164,13 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_achievement_icon_source_t *source = data;
+    image_source_data_t *source = data;
 
     if (!source) {
         return;
     }
 
-    /* Free image resources */
-    if (g_achievement_icon.image_texture) {
-        obs_enter_graphics();
-        gs_texture_destroy(g_achievement_icon.image_texture);
-        obs_leave_graphics();
-        g_achievement_icon.image_texture = NULL;
-    }
+    image_source_destroy(&g_achievement_icon);
 
     bfree(source);
 }
@@ -371,19 +201,17 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    xbox_achievement_icon_source_t *source = data;
+    image_source_data_t *source = data;
 
     if (!source) {
         return;
     }
 
     /* Load image if needed (deferred load in graphics context) */
-    load_texture_from_file();
+    image_source_reload_if_needed(&g_achievement_icon);
 
     /* Render the image if we have a texture */
-    if (g_achievement_icon.image_texture) {
-        draw_texture(g_achievement_icon.image_texture, source->width, source->height, effect);
-    }
+    image_source_render(&g_achievement_icon, source->size, effect);
 }
 
 /**
@@ -456,6 +284,8 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 //  --------------------------------------------------------------------------------------------------------------------
 
 void xbox_achievement_icon_source_register(void) {
+
+    image_source_cache_init(&g_achievement_icon, "Achievement Icon", "achievement_icon");
 
     obs_register_source(xbox_achievement_icon_source_get());
 
