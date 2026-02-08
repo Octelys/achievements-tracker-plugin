@@ -17,34 +17,18 @@
  *    initializes the texture in the video_render callback.
  */
 
+#include "sources/common/text_source.h"
 #include "drawing/text.h"
 
 #include <graphics/graphics.h>
-#include <graphics/image-file.h>
-#include <graphics/matrix4.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
-#include <util/platform.h>
 
-#include "drawing/color.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "system/font.h"
 #include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
-
-typedef struct xbox_gamertag_source {
-    /** OBS source instance. */
-    obs_source_t *source;
-
-    /** Output width in pixels. */
-    uint32_t width;
-
-    /** Output height in pixels. */
-    uint32_t height;
-
-} xbox_gamertag_source_t;
 
 static char            g_gamertag[256];
 static bool            g_must_reload;
@@ -107,18 +91,13 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
  *
  * @param settings Source settings (unused).
  * @param source   OBS source instance pointer.
- * @return Newly allocated xbox_gamertag_source_t structure, or NULL on failure.
+ * @return Newly allocated text_source_base_t structure, or NULL on failure.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_gamertag_source_t *s = bzalloc(sizeof(*s));
-    s->source                 = source;
-    s->width                  = 600;
-    s->height                 = 200;
-
-    return s;
+    return text_source_create(source, (source_size_t){600, 200});
 }
 
 /**
@@ -131,7 +110,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_gamertag_source_t *source = data;
+    text_source_base_t *source = data;
 
     if (!source) {
         return;
@@ -147,14 +126,14 @@ static void on_source_destroy(void *data) {
 
 /** @brief OBS callback returning the configured source width. */
 static uint32_t source_get_width(void *data) {
-    const xbox_gamertag_source_t *s = data;
-    return s->width;
+    const text_source_base_t *s = data;
+    return s ? s->size.width : 0;
 }
 
 /** @brief OBS callback returning the configured source height. */
 static uint32_t source_get_height(void *data) {
-    const xbox_gamertag_source_t *s = data;
-    return s->height;
+    const text_source_base_t *s = data;
+    return s ? s->size.height : 0;
 }
 
 /**
@@ -172,26 +151,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     UNUSED_PARAMETER(data);
 
-    if (obs_data_has_user_value(settings, "text_color")) {
-        const uint32_t argb    = (uint32_t)obs_data_get_int(settings, "text_color");
-        g_configuration->color = color_argb_to_rgba(argb);
-        g_must_reload          = true;
-    }
-
-    if (obs_data_has_user_value(settings, "text_size")) {
-        g_configuration->size = (uint32_t)obs_data_get_int(settings, "text_size");
-        g_must_reload         = true;
-    }
-
-    if (obs_data_has_user_value(settings, "text_font")) {
-        g_configuration->font_path = obs_data_get_string(settings, "text_font");
-        g_must_reload              = true;
-    }
-
-    if (obs_data_has_user_value(settings, "text_align")) {
-        g_configuration->align = (uint32_t)obs_data_get_int(settings, "text_align");
-        g_must_reload          = true;
-    }
+    text_source_update_properties(settings, (text_source_config_t *)g_configuration, &g_must_reload);
 
     state_set_gamertag_configuration(g_configuration);
 }
@@ -213,50 +173,21 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    xbox_gamertag_source_t *source = data;
+    text_source_base_t *source = data;
 
     if (!source) {
         return;
     }
 
-    if (g_must_reload || !g_text_context) {
-
-        if (g_text_context) {
-            text_context_destroy(g_text_context);
-            g_text_context = NULL;
-        }
-
-        g_text_context = text_context_create(g_configuration->font_path,
-                                             source->width,
-                                             source->height,
-                                             g_gamertag,
-                                             g_configuration->size,
-                                             g_configuration->color,
-                                             (text_align_t)g_configuration->align);
-
-        g_must_reload = false;
-    }
-
-    if (!g_text_context) {
+    if (!text_source_reload_if_needed(&g_text_context,
+                                      &g_must_reload,
+                                      (const text_source_config_t *)g_configuration,
+                                      source,
+                                      g_gamertag)) {
         return;
     }
 
-    // Get the current transformation matrix to extract translation
-    struct matrix4 current_matrix;
-    gs_matrix_get(&current_matrix);
-
-    // Extract translation from the matrix
-    float trans_x = current_matrix.t.x;
-    float trans_y = current_matrix.t.y;
-
-    // Build a new matrix: translation only (no scaling)
-    gs_matrix_push();
-    gs_matrix_identity();
-    gs_matrix_translate3f(trans_x, trans_y, 0.0f);
-
-    text_context_draw(g_text_context, effect);
-
-    gs_matrix_pop();
+    text_source_render_unscaled(g_text_context, effect);
 }
 
 /**
@@ -275,34 +206,8 @@ static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
 
-    /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
-
-    // Font dropdown.
-    obs_property_t *font_list_prop =
-        obs_properties_add_list(p, "text_font", "Font", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
-
-    size_t  font_count = 0;
-    font_t *fonts      = font_list_available(&font_count);
-
-    if (fonts) {
-        for (size_t i = 0; i < font_count; i++) {
-            if (fonts[i].name && fonts[i].path) {
-                // Display name shown in UI, path stored as value.
-                obs_property_list_add_string(font_list_prop, fonts[i].name, fonts[i].path);
-            }
-        }
-        font_list_free(fonts, font_count);
-    }
-
-    obs_properties_add_color(p, "text_color", "Text color");
-    obs_properties_add_int(p, "text_size", "Text size", 10, 164, 1);
-
-    // Text alignment dropdown.
-    obs_property_t *align_list =
-        obs_properties_add_list(p, "text_align", "Text alignment", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-    obs_property_list_add_int(align_list, "Left", TEXT_ALIGN_LEFT);
-    obs_property_list_add_int(align_list, "Right", TEXT_ALIGN_RIGHT);
+    text_source_add_properties(p);
 
     return p;
 }

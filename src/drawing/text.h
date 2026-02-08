@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/types.h"
 #include "graphics/graphics.h"
 
 #ifdef __cplusplus
@@ -10,16 +11,6 @@ extern "C" {
  * @file text.h
  * @brief Lightweight FreeType-backed text renderer that uploads glyphs to an OBS texture.
  */
-
-/**
- * @brief Text alignment options.
- */
-typedef enum text_align {
-    /** Align text to the left edge of the canvas. */
-    TEXT_ALIGN_LEFT  = 0,
-    /** Align text to the right edge of the canvas. */
-    TEXT_ALIGN_RIGHT = 1,
-} text_align_t;
 
 /**
  * @brief Opaque-ish text rendering context.
@@ -37,28 +28,17 @@ typedef struct text_context {
 } text_context_t;
 
 /**
- * @brief Create a text context by rasterizing @p text using the font at @p ttf_path.
+ * @brief Create a text context by rasterizing @p text using the provided configuration.
  *
- * If @p width/@p height are non-zero, the function renders into that fixed canvas size.
- * Otherwise, it computes a minimal texture size based on glyph bounds.
+ * Renders text into a canvas of the specified size. Text is baseline-aligned and
+ * positioned according to the alignment setting in the config.
  *
- * Text layout behavior:
- * - Text is baseline-aligned.
- * - If @p width is non-zero and @p align is TEXT_ALIGN_RIGHT, text is right-aligned within the canvas.
- * - If @p width is non-zero and @p align is TEXT_ALIGN_LEFT, text is left-aligned within the canvas.
- * - If @p width is zero, alignment is ignored and the texture auto-sizes to fit the text.
- *
- * @param ttf_path Path to a .ttf/.otf font file.
- * @param width Canvas width in pixels. Set to 0 to auto-size.
- * @param height Canvas height in pixels. Set to 0 to auto-size.
- * @param text NUL-terminated UTF-8 string (currently treated as single-byte/ASCII for glyph indexing).
- * @param px_size Font size (pixel height) passed to FreeType.
- * @param color Packed RGBA color in 0xRRGGBBAA format.
- * @param align Text alignment (TEXT_ALIGN_LEFT or TEXT_ALIGN_RIGHT). Only applies when width > 0.
+ * @param config Text rendering configuration (font path, font size, color, alignment).
+ * @param size   Canvas dimensions (width and height in pixels).
+ * @param text   NUL-terminated UTF-8 string to render.
  * @return Newly allocated text context, or NULL on error.
  */
-text_context_t *text_context_create(const char *ttf_path, uint32_t width, uint32_t height, const char *text,
-                                    uint32_t px_size, uint32_t color, text_align_t align);
+text_context_t *text_context_create(const text_source_config_t *config, source_size_t size, const char *text);
 
 /**
  * @brief Destroy a text context and its underlying GPU texture.

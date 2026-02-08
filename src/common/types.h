@@ -101,6 +101,44 @@ typedef struct xbox_live_authenticate_result {
 } xbox_live_authenticate_result_t;
 
 /**
+ * @brief Size structure for sources.
+ *
+ * Groups width and height dimensions together.
+ */
+typedef struct source_size {
+    /** Width in pixels. */
+    uint32_t width;
+    /** Height in pixels. */
+    uint32_t height;
+} source_size_t;
+
+/**
+ * @brief Text alignment options.
+ */
+typedef enum text_align {
+    /** Align text to the left edge of the canvas. */
+    TEXT_ALIGN_LEFT  = 0,
+    /** Align text to the right edge of the canvas. */
+    TEXT_ALIGN_RIGHT = 1,
+} text_align_t;
+
+/**
+ * @brief Common configuration for text-based sources.
+ *
+ * Contains all the shared configuration fields used across text sources.
+ */
+typedef struct text_source_config {
+    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
+    const char  *font_path;
+    /** Font size in pixels (height passed to FreeType). */
+    uint32_t     font_size;
+    /** Packed RGBA color in 0xRRGGBBAA format. */
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
+} text_source_config_t;
+
+/**
  * @brief Configuration used by the gamerscore overlay/renderer.
  *
  * Ownership:
@@ -109,13 +147,13 @@ typedef struct xbox_live_authenticate_result {
  */
 typedef struct gamerscore_configuration {
     /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char *font_path;
+    const char  *font_path;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    size;
+    uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    color;
-    /** Text alignment (0 = left, 1 = right). */
-    uint32_t    align;
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
 } gamerscore_configuration_t;
 
 /**
@@ -127,17 +165,17 @@ typedef struct gamerscore_configuration {
  */
 typedef struct gamertag_configuration {
     /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char *font_path;
+    const char  *font_path;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    size;
+    uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    color;
-    /** Text alignment (0 = left, 1 = right). */
-    uint32_t    align;
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
 } gamertag_configuration_t;
 
 /**
- * @brief Configuration used by the gamerscore overlay/renderer.
+ * @brief Configuration used by the achievement name overlay/renderer.
  *
  * Ownership:
  * - Strings are treated as borrowed pointers unless otherwise documented by the
@@ -145,13 +183,13 @@ typedef struct gamertag_configuration {
  */
 typedef struct achievement_name_configuration {
     /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char *font_path;
+    const char  *font_path;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    size;
+    uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    color;
-    /** Text alignment (0 = left, 1 = right). */
-    uint32_t    align;
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
 } achievement_name_configuration_t;
 
 /**
@@ -163,13 +201,13 @@ typedef struct achievement_name_configuration {
  */
 typedef struct achievement_description_configuration {
     /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char *font_path;
+    const char  *font_path;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    size;
+    uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    color;
-    /** Text alignment (0 = left, 1 = right). */
-    uint32_t    align;
+    uint32_t     color;
+    /** Text alignment. */
+    text_align_t align;
 } achievement_description_configuration_t;
 
 /**
