@@ -245,7 +245,7 @@ static uint32_t source_get_height(void *data) {
 /**
  * @brief OBS callback invoked when source settings are updated.
  *
- * Processes changes to text color, size, font, and alignment from the OBS properties UI.
+ * Processes change to text color, size, font, and alignment from the OBS properties UI.
  * When settings change, updates the global configuration and triggers a text
  * context reload. The updated configuration is persisted to disk via the state
  * management system.
@@ -285,11 +285,13 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_reload(&g_text_context,
-                            &g_must_reload,
-                            (const text_source_config_t *)g_configuration,
-                            source,
-                            g_achievement_name)) {
+    bool texture_loaded = text_source_reload(&g_text_context,
+                                             &g_must_reload,
+                                             (const text_source_config_t *)g_configuration,
+                                             source,
+                                             g_achievement_name);
+
+    if (!texture_loaded) {
         return;
     }
 
