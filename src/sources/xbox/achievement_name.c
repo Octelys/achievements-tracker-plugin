@@ -356,7 +356,7 @@ static void on_source_video_tick(void *data, float seconds) {
         break;
 
     case DISPLAY_PHASE_LOCKED_ROTATION:
-        /* Update locked achievement display timer */
+        /* Update the locked achievement display timer */
         g_locked_display_timer -= seconds;
 
         if (g_locked_display_timer <= 0.0f) {

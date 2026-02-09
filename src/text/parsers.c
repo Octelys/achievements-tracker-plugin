@@ -66,7 +66,9 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
 
     obs_log(LOG_DEBUG, "%s=%" PRId64, property_name, unix_timestamp);
 
-    return unix_timestamp;
+    /* If the achievement is locked, the date returned is 0001-01-01, which in unix timestamp is definitely negative */
+    /* We assume a timestamp equals to 0 is a locked achievements */
+    return unix_timestamp > 0 ? unix_timestamp : 0;
 }
 
 static bool contains_node(const char *json_string, const char *node_key) {
