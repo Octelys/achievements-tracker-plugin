@@ -12,7 +12,7 @@
  */
 
 /** Default duration for each fade phase (in seconds). */
-#define TEXT_TRANSITION_DEFAULT_DURATION 0.3f
+#define TEXT_TRANSITION_DEFAULT_DURATION 2.0f
 
 text_source_base_t *text_source_create(obs_source_t *source, source_size_t size) {
 
@@ -34,7 +34,7 @@ text_source_base_t *text_source_create(obs_source_t *source, source_size_t size)
 }
 
 bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
-                                  text_source_base_t *base, const char *text) {
+                        text_source_base_t *base, const char *text) {
 
     if (!must_reload || !ctx || !config || !base) {
         return ctx != NULL && *ctx != NULL;
@@ -71,7 +71,8 @@ bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_sour
 
     *ctx = text_context_create(config, base->size, text);
 
-    // Start fade-in if we created a new context
+    // First time display: show immediately at full opacity (no fade-in)
+    // The fade-in is only used after a fade-out completes (handled in tick)
     if (*ctx) {
         base->transition.phase   = TEXT_TRANSITION_FADE_IN;
         base->transition.opacity = 0.0f;
@@ -84,7 +85,7 @@ bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_sour
 
 void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect_t *effect) {
 
-    if (!ctx || !base) {
+    if (!ctx || !base || !ctx->texture) {
         return;
     }
 
@@ -108,26 +109,49 @@ void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect
     gs_blend_state_push();
     gs_blend_function(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA);
 
-    // Set draw color with opacity
-    struct vec4 color;
-    vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
+    // If an effect is passed, we're inside OBS's render loop - just set params and draw
+    if (effect) {
+        gs_eparam_t *image_param = gs_effect_get_param_by_name(effect, "image");
+        if (image_param) {
+            gs_effect_set_texture(image_param, ctx->texture);
+        }
 
-    gs_effect_t *active_effect = effect ? effect : obs_get_base_effect(OBS_EFFECT_DEFAULT);
-    if (active_effect) {
-        gs_eparam_t *color_param = gs_effect_get_param_by_name(active_effect, "color");
+        gs_eparam_t *color_param = gs_effect_get_param_by_name(effect, "color");
         if (color_param) {
+            struct vec4 color;
+            vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
             gs_effect_set_vec4(color_param, &color);
         }
-    }
 
-    text_context_draw(ctx, effect);
+        gs_draw_sprite(ctx->texture, 0, ctx->width, ctx->height);
+    } else {
+        // No effect passed - we need to set up our own effect loop
+        gs_effect_t *default_effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+        if (default_effect) {
+            gs_eparam_t *image_param = gs_effect_get_param_by_name(default_effect, "image");
+            if (image_param) {
+                gs_effect_set_texture(image_param, ctx->texture);
+            }
+
+            gs_eparam_t *color_param = gs_effect_get_param_by_name(default_effect, "color");
+            if (color_param) {
+                struct vec4 color;
+                vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
+                gs_effect_set_vec4(color_param, &color);
+            }
+
+            while (gs_effect_loop(default_effect, "Draw")) {
+                gs_draw_sprite(ctx->texture, 0, ctx->width, ctx->height);
+            }
+        }
+    }
 
     gs_blend_state_pop();
     gs_matrix_pop();
 }
 
-void text_source_tick(text_source_base_t *base, text_context_t **ctx,
-                      const text_source_config_t *config, float seconds) {
+void text_source_tick(text_source_base_t *base, text_context_t **ctx, const text_source_config_t *config,
+                      float seconds) {
 
     if (!base || !ctx || !config) {
         return;

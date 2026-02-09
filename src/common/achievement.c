@@ -1,6 +1,7 @@
 #include "achievement.h"
 #include "memory.h"
 #include <obs-module.h>
+#include <stdlib.h>
 
 media_asset_t *copy_media_asset(const media_asset_t *media_asset) {
     if (!media_asset) {
@@ -185,6 +186,53 @@ int count_achievements(const achievement_t *achievements) {
     }
 
     return count;
+}
+
+const achievement_t *find_latest_unlocked_achievement(const achievement_t *achievements) {
+    const achievement_t *last_unlocked    = NULL;
+    int64_t              latest_timestamp = 0;
+
+    for (const achievement_t *a = achievements; a != NULL; a = a->next) {
+        if (a->unlocked_timestamp > latest_timestamp) {
+            latest_timestamp = a->unlocked_timestamp;
+            last_unlocked    = a;
+        }
+    }
+
+    return last_unlocked;
+}
+
+int count_locked_achievements(const achievement_t *achievements) {
+    int count = 0;
+
+    for (const achievement_t *a = achievements; a != NULL; a = a->next) {
+        if (a->unlocked_timestamp == 0) {
+            count++;
+        }
+    }
+    return count;
+}
+
+const achievement_t *get_random_locked_achievement(const achievement_t *achievements) {
+    int locked_count = count_locked_achievements(achievements);
+
+    if (locked_count == 0) {
+        return NULL;
+    }
+
+    int target_index  = rand() % locked_count;
+    int current_index = 0;
+
+    for (const achievement_t *a = achievements; a != NULL; a = a->next) {
+        if (a->unlocked_timestamp == 0) {
+            if (current_index == target_index) {
+                return a;
+            }
+            current_index++;
+        }
+    }
+
+    return NULL;
 }
 
 void sort_achievements(achievement_t **achievements) {

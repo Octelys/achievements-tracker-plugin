@@ -3,10 +3,29 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "common/achievement.h"
 #include "oauth/xbox-live.h"
 #include "sources/common/image_source.h"
-#include "xbox/xbox_client.h"
 #include "xbox/xbox_monitor.h"
+
+/** Duration to show the last unlocked achievement icon (seconds). */
+#define LAST_UNLOCKED_DISPLAY_DURATION 60.0f
+
+/** Duration to show each random locked achievement icon (seconds). */
+#define LOCKED_ACHIEVEMENT_DISPLAY_DURATION 15.0f
+
+/** Total duration to cycle through locked achievement icons (seconds). */
+#define LOCKED_CYCLE_TOTAL_DURATION 60.0f
+
+/**
+ * @brief Display cycle phase for achievement icon rotation.
+ */
+typedef enum display_cycle_phase {
+    /** Showing the last unlocked achievement icon. */
+    DISPLAY_PHASE_LAST_UNLOCKED,
+    /** Showing random locked achievement icons. */
+    DISPLAY_PHASE_LOCKED_ROTATION,
+} display_cycle_phase_t;
 
 /**
  * @brief Global singleton achievement icon cache.
@@ -15,6 +34,31 @@
  * in a global cache.
  */
 static image_source_cache_t g_achievement_icon;
+
+/** Current display cycle phase. */
+static display_cycle_phase_t g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
+
+/** Time remaining in the current display phase (seconds). */
+static float g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
+
+/** Time remaining for the current locked achievement display (seconds). */
+static float g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+/** Cached pointer to the last unlocked achievement. */
+static const achievement_t *g_last_unlocked = NULL;
+
+/**
+ * @brief Update the achievement icon display.
+ *
+ * @param achievement Achievement to display icon for. If NULL, clears the display.
+ */
+static void update_achievement_icon(const achievement_t *achievement) {
+    if (achievement && achievement->icon_url) {
+        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
+    } else {
+        image_source_clear(&g_achievement_icon);
+    }
+}
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
@@ -37,13 +81,16 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     if (is_connected) {
         obs_log(LOG_INFO, "Connected to Xbox Live - fetching achievement icon URL");
 
-        const achievement_t *achievement = get_current_game_achievements();
+        const achievement_t *achievements = get_current_game_achievements();
 
-        if (achievement && achievement->icon_url) {
-            image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
-        } else {
-            image_source_clear(&g_achievement_icon);
-        }
+        /* Find and cache the last unlocked achievement */
+        g_last_unlocked = find_latest_unlocked_achievement(achievements);
+
+        /* Reset display cycle */
+        g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
+        g_phase_timer   = LAST_UNLOCKED_DISPLAY_DURATION;
+
+        update_achievement_icon(g_last_unlocked);
     } else {
         image_source_clear(&g_achievement_icon);
     }
@@ -52,7 +99,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 /**
  * @brief Event handler called when a new game starts being played.
  *
- * Fetches the cover-art URL for the given game and triggers a download.
+ * Resets the display cycle and shows the last unlocked achievement icon.
  *
  * @param game Currently played game information.
  */
@@ -60,21 +107,24 @@ static void on_xbox_game_played(const game_t *game) {
 
     UNUSED_PARAMETER(game);
 
-    const achievement_t *achievement = get_current_game_achievements();
+    const achievement_t *achievements = get_current_game_achievements();
 
-    if (achievement && achievement->icon_url) {
-        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
-    } else {
-        image_source_clear(&g_achievement_icon);
-    }
+    /* Find and cache the last unlocked achievement */
+    g_last_unlocked = find_latest_unlocked_achievement(achievements);
+
+    /* Reset display cycle */
+    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+    g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+    g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+    update_achievement_icon(g_last_unlocked);
 }
 
 /**
  * @brief Xbox monitor callback invoked when achievement progress is updated.
  *
- * Retrieves the current game's most recent achievement and updates the icon display
- * to show the newly unlocked achievement's icon. This callback ensures the source
- * always displays the latest achievement that was unlocked.
+ * When a new achievement is unlocked, resets the display cycle to show the
+ * newly unlocked achievement's icon.
  *
  * @param gamerscore Updated gamerscore snapshot (unused).
  * @param progress   Achievement progress details (unused).
@@ -84,13 +134,17 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
     UNUSED_PARAMETER(gamerscore);
     UNUSED_PARAMETER(progress);
 
-    const achievement_t *achievement = get_current_game_achievements();
+    const achievement_t *achievements = get_current_game_achievements();
 
-    if (achievement && achievement->icon_url) {
-        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
-    } else {
-        image_source_clear(&g_achievement_icon);
-    }
+    /* Find and cache the last unlocked achievement */
+    g_last_unlocked = find_latest_unlocked_achievement(achievements);
+
+    /* Reset display cycle */
+    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+    g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+    g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+    update_achievement_icon(g_last_unlocked);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -215,6 +269,82 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 /**
+ * @brief OBS callback for animation tick.
+ *
+ * Manages the achievement icon display cycle, alternating between:
+ * - Showing the last unlocked achievement icon for 60 seconds
+ * - Showing random locked achievement icons (15 seconds each) for 60 seconds total
+ */
+static void on_source_video_tick(void *data, float seconds) {
+
+    UNUSED_PARAMETER(data);
+
+    /* Get current achievements list */
+    const achievement_t *achievements = get_current_game_achievements();
+    if (!achievements) {
+        return;
+    }
+
+    /* Update timers */
+    g_phase_timer -= seconds;
+
+    switch (g_display_phase) {
+    case DISPLAY_PHASE_LAST_UNLOCKED:
+        /* Check if it's time to switch to locked achievements rotation */
+        if (g_phase_timer <= 0.0f) {
+            /* Only switch if there are locked achievements to show */
+            if (count_locked_achievements(achievements) > 0) {
+                g_display_phase        = DISPLAY_PHASE_LOCKED_ROTATION;
+                g_phase_timer          = LOCKED_CYCLE_TOTAL_DURATION;
+                g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+                /* Show first random locked achievement */
+                const achievement_t *locked = get_random_locked_achievement(achievements);
+                if (locked) {
+                    update_achievement_icon(locked);
+                }
+            } else {
+                /* No locked achievements, keep showing last unlocked */
+                g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
+            }
+        }
+        break;
+
+    case DISPLAY_PHASE_LOCKED_ROTATION:
+        /* Update locked achievement display timer */
+        g_locked_display_timer -= seconds;
+
+        if (g_locked_display_timer <= 0.0f) {
+            /* Time for the next random locked achievement */
+            g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+            const achievement_t *locked = get_random_locked_achievement(achievements);
+            if (locked) {
+                update_achievement_icon(locked);
+            }
+        }
+
+        /* Check if the locked rotation phase is complete */
+        if (g_phase_timer <= 0.0f) {
+            g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
+            g_phase_timer   = LAST_UNLOCKED_DISPLAY_DURATION;
+
+            /* Switch back to last unlocked achievement */
+            if (g_last_unlocked) {
+                update_achievement_icon(g_last_unlocked);
+            } else {
+                /* Refresh the last unlocked in case it changed */
+                g_last_unlocked = find_latest_unlocked_achievement(achievements);
+                if (g_last_unlocked) {
+                    update_achievement_icon(g_last_unlocked);
+                }
+            }
+        }
+        break;
+    }
+}
+
+/**
  * @brief OBS callback constructing the properties UI for the achievement icon source.
  *
  * Shows connection status to Xbox Live. Currently provides no editable settings.
@@ -265,7 +395,7 @@ static struct obs_source_info xbox_achievement_icon_source_info = {
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
     .get_height     = source_get_height,
-    .video_tick     = NULL,
+    .video_tick     = on_source_video_tick,
 };
 
 /**

@@ -410,7 +410,7 @@ game_t *xbox_get_current_game(void) {
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Response: %s", response_json);
+    obs_log(LOG_INFO, "Response: %s", response_json);
 
     cJSON *root = cJSON_Parse(response_json);
 
@@ -499,8 +499,8 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
         return NULL;
     }
 
-    achievement_t *all_achievements = NULL;
-    achievement_t *last_achievement = NULL;
+    achievement_t *all_achievements   = NULL;
+    achievement_t *last_achievement   = NULL;
     char          *continuation_token = NULL;
 
     char headers[4096];
@@ -516,21 +516,22 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     /* Pagination loop: keep fetching until no continuation token */
     do {
-        char          *response_json = NULL;
+        char          *response_json     = NULL;
         achievement_t *page_achievements = NULL;
 
         /* Build the URL with or without continuation token */
         char achievements_url[1024];
         if (continuation_token) {
-            snprintf(achievements_url, sizeof(achievements_url),
+            snprintf(achievements_url,
+                     sizeof(achievements_url),
                      XBOX_ACHIEVEMENTS_ENDPOINT "&continuationToken=%s",
-                     identity->xid, game->id, continuation_token);
+                     identity->xid,
+                     game->id,
+                     continuation_token);
             bfree(continuation_token);
             continuation_token = NULL;
         } else {
-            snprintf(achievements_url, sizeof(achievements_url),
-                     XBOX_ACHIEVEMENTS_ENDPOINT,
-                     identity->xid, game->id);
+            snprintf(achievements_url, sizeof(achievements_url), XBOX_ACHIEVEMENTS_ENDPOINT, identity->xid, game->id);
         }
 
         long http_code = 0;

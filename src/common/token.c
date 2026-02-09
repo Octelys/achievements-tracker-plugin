@@ -50,7 +50,9 @@ bool token_is_expired(const token_t *token) {
     time_t current_time = now();
     bool   will_expire  = (int64_t)current_time >= expires_with_margin;
 
-    obs_log(LOG_INFO,
+    int severity = will_expire ? LOG_WARNING : LOG_DEBUG;
+
+    obs_log(severity,
             "Now is %lld. Token expires at %lld (effective at %lld). Status: %s",
             (long long)current_time,
             (long long)token->expires,

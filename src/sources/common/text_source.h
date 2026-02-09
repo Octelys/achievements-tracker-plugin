@@ -93,7 +93,7 @@ text_source_base_t *text_source_create(obs_source_t *source, source_size_t size)
  * @return true if context is valid and ready to render, false otherwise.
  */
 bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
-                                  text_source_base_t *base, const char *text);
+                        text_source_base_t *base, const char *text);
 
 /**
  * @brief Render text with inverse scaling to prevent OBS transform scaling.
@@ -121,8 +121,8 @@ void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect
  * @param config      Text source configuration.
  * @param seconds     Time elapsed since last tick.
  */
-void text_source_tick(text_source_base_t *base, text_context_t **ctx,
-                      const text_source_config_t *config, float seconds);
+void text_source_tick(text_source_base_t *base, text_context_t **ctx, const text_source_config_t *config,
+                      float seconds);
 
 /**
  * @brief Add common text properties to a properties panel.

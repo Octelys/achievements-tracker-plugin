@@ -155,6 +155,10 @@ game_t *parse_game(const char *json_string) {
 
         cJSON *game_title_value = cJSONUtils_GetPointer(json_root, game_title_key);
 
+        if (game_title_value->valuestring[0] == '\0') {
+            continue;
+        }
+
         obs_log(LOG_DEBUG, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
 
         char game_id_key[512];

@@ -180,10 +180,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     if (!text_source_reload(&g_text_context,
-                                      &g_must_reload,
-                                      (const text_source_config_t *)g_configuration,
-                                      source,
-                                      g_gamertag)) {
+                            &g_must_reload,
+                            (const text_source_config_t *)g_configuration,
+                            source,
+                            g_gamertag)) {
         return;
     }
 

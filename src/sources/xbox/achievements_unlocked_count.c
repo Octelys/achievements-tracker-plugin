@@ -188,10 +188,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     if (!text_source_reload(&g_text_context,
-                                      &g_must_reload,
-                                      (const text_source_config_t *)g_default_configuration,
-                                      source,
-                                      g_unlocked_count)) {
+                            &g_must_reload,
+                            (const text_source_config_t *)g_default_configuration,
+                            source,
+                            g_unlocked_count)) {
         return;
     }
 
@@ -211,10 +211,7 @@ static void on_source_video_tick(void *data, float seconds) {
         return;
     }
 
-    text_source_tick(source,
-                     &g_text_context,
-                     (const text_source_config_t *)g_default_configuration,
-                     seconds);
+    text_source_tick(source, &g_text_context, (const text_source_config_t *)g_default_configuration, seconds);
 }
 
 /**

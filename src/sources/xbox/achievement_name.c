@@ -1,6 +1,7 @@
 #include "sources/xbox/achievement_name.h"
 
 #include "sources/common/text_source.h"
+#include "common/achievement.h"
 #include "drawing/text.h"
 
 #include <graphics/graphics.h>
@@ -13,9 +14,43 @@
 
 #define NO_FLIP 0
 
+/** Duration to show the last unlocked achievement (seconds). */
+#define LAST_UNLOCKED_DISPLAY_DURATION 60.0f
+
+/** Duration to show each random locked achievement (seconds). */
+#define LOCKED_ACHIEVEMENT_DISPLAY_DURATION 15.0f
+
+/** Total duration to cycle through locked achievements (seconds). */
+#define LOCKED_CYCLE_TOTAL_DURATION 60.0f
+
+/**
+ * @brief Display cycle phase for achievement rotation.
+ */
+typedef enum display_cycle_phase {
+    /** Showing the last unlocked achievement. */
+    DISPLAY_PHASE_LAST_UNLOCKED,
+    /** Showing random locked achievements. */
+    DISPLAY_PHASE_LOCKED_ROTATION,
+} display_cycle_phase_t;
+
 static char            g_achievement_name[512];
 static bool            g_must_reload;
 static text_context_t *g_text_context;
+
+/** Current display cycle phase. */
+static display_cycle_phase_t g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
+
+/** Time remaining in the current display phase (seconds). */
+static float g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
+
+/** Time remaining for the current locked achievement display (seconds). */
+static float g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+/** Cached pointer to the last unlocked achievement. */
+static const achievement_t *g_last_unlocked = NULL;
+
+/** Flag to indicate achievement data has been updated. */
+static bool g_achievements_updated = false;
 
 /**
  * @brief Configuration for rendering the achievement name text.
@@ -40,7 +75,16 @@ static void update_achievement_name(const achievement_t *achievement) {
         return;
     }
 
-    snprintf(g_achievement_name, sizeof(g_achievement_name), "%sG - %s", achievement->rewards->value, achievement->name);
+    if (achievement->rewards && achievement->rewards->value) {
+        snprintf(g_achievement_name,
+                 sizeof(g_achievement_name),
+                 "%sG - %s",
+                 achievement->rewards->value,
+                 achievement->name);
+    } else {
+        snprintf(g_achievement_name, sizeof(g_achievement_name), "%s", achievement->name);
+    }
+
     g_must_reload = true;
 }
 
@@ -59,15 +103,23 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     UNUSED_PARAMETER(is_connected);
     UNUSED_PARAMETER(error_message);
 
-    const achievement_t *achievement = get_current_game_achievements();
+    const achievement_t *achievements = get_current_game_achievements();
 
-    update_achievement_name(achievement);
+    /* Find and cache the last unlocked achievement */
+    g_last_unlocked = find_latest_unlocked_achievement(achievements);
+
+    /* Reset display cycle to show the last unlocked achievement */
+    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+    g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+    g_achievements_updated = true;
+
+    update_achievement_name(g_last_unlocked);
 }
 
 /**
  * @brief Event handler called when a new game starts being played.
  *
- * Fetches the cover-art URL for the given game and triggers a download.
+ * Resets the display cycle and shows the last unlocked achievement for the new game.
  *
  * @param game Currently played game information.
  */
@@ -75,17 +127,25 @@ static void on_xbox_game_played(const game_t *game) {
 
     UNUSED_PARAMETER(game);
 
-    const achievement_t *achievement = get_current_game_achievements();
+    const achievement_t *achievements = get_current_game_achievements();
 
-    update_achievement_name(achievement);
+    /* Find and cache the last unlocked achievement */
+    g_last_unlocked = find_latest_unlocked_achievement(achievements);
+
+    /* Reset display cycle to show the last unlocked achievement */
+    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+    g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+    g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+    g_achievements_updated = true;
+
+    update_achievement_name(g_last_unlocked);
 }
 
 /**
  * @brief Xbox monitor callback invoked when achievement progress is updated.
  *
- * Retrieves the current game's most recent achievement and updates the display
- * to show the newly unlocked achievement. This callback ensures the source always
- * displays the latest achievement that was unlocked.
+ * When a new achievement is unlocked, resets the display cycle to show the
+ * newly unlocked achievement for a full minute before rotating.
  *
  * @param gamerscore Updated gamerscore snapshot (unused).
  * @param progress   Achievement progress details (unused).
@@ -95,9 +155,18 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
     UNUSED_PARAMETER(gamerscore);
     UNUSED_PARAMETER(progress);
 
-    const achievement_t *achievement = get_current_game_achievements();
+    const achievement_t *achievements = get_current_game_achievements();
 
-    update_achievement_name(achievement);
+    /* Find and cache the last unlocked achievement */
+    g_last_unlocked = find_latest_unlocked_achievement(achievements);
+
+    /* Reset display cycle to show the newly unlocked achievement */
+    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+    g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+    g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+    g_achievements_updated = true;
+
+    update_achievement_name(g_last_unlocked);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -217,10 +286,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     if (!text_source_reload(&g_text_context,
-                                      &g_must_reload,
-                                      (const text_source_config_t *)g_configuration,
-                                      source,
-                                      g_achievement_name)) {
+                            &g_must_reload,
+                            (const text_source_config_t *)g_configuration,
+                            source,
+                            g_achievement_name)) {
         return;
     }
 
@@ -230,7 +299,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 /**
  * @brief OBS callback for animation tick.
  *
- * Updates fade transition animations.
+ * Updates fade transition animations and manages the achievement display cycle.
+ * The cycle alternates between:
+ * - Showing the last unlocked achievement for 60 seconds
+ * - Showing random locked achievements (15 seconds each) for 60 seconds total
  */
 static void on_source_video_tick(void *data, float seconds) {
 
@@ -240,7 +312,80 @@ static void on_source_video_tick(void *data, float seconds) {
         return;
     }
 
+    /* Update fade transition animations */
     text_source_tick(source, &g_text_context, (const text_source_config_t *)g_configuration, seconds);
+
+    /* Get the current achievements list */
+    const achievement_t *achievements = get_current_game_achievements();
+
+    if (!achievements) {
+        return;
+    }
+
+    /* Update timers */
+    g_phase_timer -= seconds;
+
+    switch (g_display_phase) {
+    case DISPLAY_PHASE_LAST_UNLOCKED:
+        /* Check if it's time to switch to locked achievements rotation */
+        if (g_phase_timer <= 0.0f) {
+            obs_log(LOG_INFO, "Achievement Name: Switching to locked achievements rotation");
+            /* Only switch if there are locked achievements to show */
+            if (count_locked_achievements(achievements) > 0) {
+                g_display_phase        = DISPLAY_PHASE_LOCKED_ROTATION;
+                g_phase_timer          = LOCKED_CYCLE_TOTAL_DURATION;
+                g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+                /* Show the first random locked achievement */
+                const achievement_t *locked = get_random_locked_achievement(achievements);
+
+                if (locked) {
+                    obs_log(LOG_INFO, "Achievement Name: Showing random locked achievement: %s", locked->name);
+                    update_achievement_name(locked);
+                } else {
+                    obs_log(LOG_WARNING, "Achievement Name: No locked achievements to show");
+                }
+            } else {
+                obs_log(LOG_INFO, "Achievement Name: No locked achievements, keeping last unlocked");
+                /* No locked achievements, keep showing last unlocked */
+                g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
+            }
+        }
+        break;
+
+    case DISPLAY_PHASE_LOCKED_ROTATION:
+        /* Update locked achievement display timer */
+        g_locked_display_timer -= seconds;
+
+        if (g_locked_display_timer <= 0.0f) {
+            /* Time for the next random locked achievement */
+            g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+            const achievement_t *locked = get_random_locked_achievement(achievements);
+            if (locked) {
+                update_achievement_name(locked);
+            }
+        }
+
+        /* Check if the locked rotation phase is complete */
+        if (g_phase_timer <= 0.0f) {
+            obs_log(LOG_INFO, "Achievement Name: Locked achievements rotation complete");
+            g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
+            g_phase_timer   = LAST_UNLOCKED_DISPLAY_DURATION;
+
+            /* Switch back to the last unlocked achievement */
+            if (g_last_unlocked) {
+                update_achievement_name(g_last_unlocked);
+            } else {
+                /* Refresh the last unlocked in case it changed */
+                g_last_unlocked = find_latest_unlocked_achievement(achievements);
+                if (g_last_unlocked) {
+                    update_achievement_name(g_last_unlocked);
+                }
+            }
+        }
+        break;
+    }
 }
 
 /**
