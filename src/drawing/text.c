@@ -23,6 +23,64 @@
  */
 
 /**
+ * @brief Decode a UTF-8 character from a string.
+ *
+ * Reads a single Unicode code point from a UTF-8 encoded string and advances
+ * the pointer past the decoded character.
+ *
+ * @param[in,out] str Pointer to the current position in the UTF-8 string.
+ *                    Will be advanced past the decoded character.
+ * @return The decoded Unicode code point, or 0xFFFD (replacement character) on error.
+ */
+static uint32_t utf8_decode(const char **str) {
+    const unsigned char *s = (const unsigned char *)*str;
+    uint32_t             codepoint;
+    int                  bytes;
+
+    if (s[0] == 0) {
+        return 0;
+    }
+
+    if ((s[0] & 0x80) == 0) {
+        /* 1-byte sequence (ASCII): 0xxxxxxx */
+        codepoint = s[0];
+        bytes     = 1;
+    } else if ((s[0] & 0xE0) == 0xC0) {
+        /* 2-byte sequence: 110xxxxx 10xxxxxx */
+        if ((s[1] & 0xC0) != 0x80) {
+            *str += 1;
+            return 0xFFFD; /* Invalid continuation byte */
+        }
+        codepoint = ((uint32_t)(s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+        bytes     = 2;
+    } else if ((s[0] & 0xF0) == 0xE0) {
+        /* 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx */
+        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) {
+            *str += 1;
+            return 0xFFFD;
+        }
+        codepoint = ((uint32_t)(s[0] & 0x0F) << 12) | ((uint32_t)(s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+        bytes     = 3;
+    } else if ((s[0] & 0xF8) == 0xF0) {
+        /* 4-byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx */
+        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) {
+            *str += 1;
+            return 0xFFFD;
+        }
+        codepoint = ((uint32_t)(s[0] & 0x07) << 18) | ((uint32_t)(s[1] & 0x3F) << 12) | ((uint32_t)(s[2] & 0x3F) << 6) |
+                    (s[3] & 0x3F);
+        bytes = 4;
+    } else {
+        /* Invalid UTF-8 lead byte */
+        *str += 1;
+        return 0xFFFD;
+    }
+
+    *str += bytes;
+    return codepoint;
+}
+
+/**
  * @brief Blit a FreeType glyph bitmap into an RGBA buffer.
  *
  * The glyph bitmap is expected to be an 8-bit grayscale coverage mask. The
@@ -151,9 +209,13 @@ text_context_t *text_context_create(const text_source_config_t *config, source_s
         int32_t pen_x    = (int32_t)padding;
         int32_t baseline = (int32_t)padding + (int32_t)px_size;
 
-        for (size_t i = 0; text[i] != '\0'; i++) {
+        const char *p = text;
+        while (*p != '\0') {
+            uint32_t codepoint = utf8_decode(&p);
+            if (codepoint == 0)
+                break;
 
-            if (FT_Load_Char(face, (unsigned char)text[i], FT_LOAD_RENDER) != 0) {
+            if (FT_Load_Char(face, codepoint, FT_LOAD_RENDER) != 0) {
                 continue;
             }
 
@@ -225,16 +287,20 @@ text_context_t *text_context_create(const text_source_config_t *config, source_s
 
     if (width > 0) {
         if (align == TEXT_ALIGN_RIGHT) {
-            // Measure text width for right alignment.
-            int32_t total_advance = 0;
-            for (size_t i = 0; text[i] != '\0'; i++) {
-                if (FT_Load_Char(face, (unsigned char)text[i], FT_LOAD_NO_BITMAP) == 0) {
+            // Measure text width for the right alignment.
+            int32_t     total_advance = 0;
+            const char *p             = text;
+            while (*p != '\0') {
+                uint32_t codepoint = utf8_decode(&p);
+                if (codepoint == 0)
+                    break;
+                if (FT_Load_Char(face, codepoint, FT_LOAD_NO_BITMAP) == 0) {
                     total_advance += (int32_t)(face->glyph->advance.x >> 6);
                 }
             }
             pen_x = (int32_t)w - (int32_t)padding - total_advance;
         } else {
-            // Left alignment: start from left edge with padding.
+            // Left alignment: start from the left edge with padding.
             pen_x = (int32_t)padding;
         }
     } else {
@@ -243,12 +309,16 @@ text_context_t *text_context_create(const text_source_config_t *config, source_s
 
     int32_t baseline = (int32_t)padding + offset_y + (int32_t)px_size;
 
-    for (size_t i = 0; text[i] != '\0'; i++) {
+    const char *p = text;
+    while (*p != '\0') {
+        uint32_t codepoint = utf8_decode(&p);
+        if (codepoint == 0)
+            break;
 
-        int load_result = FT_Load_Char(face, (unsigned char)text[i], FT_LOAD_RENDER);
+        int load_result = FT_Load_Char(face, codepoint, FT_LOAD_RENDER);
 
         if (load_result != 0) {
-            obs_log(LOG_WARNING, "Unable to load glyph for '%c': %d", text[i], load_result);
+            obs_log(LOG_WARNING, "Unable to load glyph for codepoint U+%04X: %d", codepoint, load_result);
             continue;
         }
 

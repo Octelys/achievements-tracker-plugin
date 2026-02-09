@@ -29,6 +29,8 @@ static char *get_node_string(cJSON *json_root, int achievement_index, const char
         return NULL;
     }
 
+    /* Daddy’s Glasses */
+
     return bstrdup(property_node->valuestring);
 }
 
@@ -67,7 +69,7 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
     obs_log(LOG_DEBUG, "%s=%" PRId64, property_name, unix_timestamp);
 
     /* If the achievement is locked, the date returned is 0001-01-01, which in unix timestamp is definitely negative */
-    /* We assume a timestamp equals to 0 is a locked achievements */
+    /* We assume a timestamp equal to 0 is a locked achievement */
     return unix_timestamp > 0 ? unix_timestamp : 0;
 }
 
@@ -161,7 +163,7 @@ game_t *parse_game(const char *json_string) {
             continue;
         }
 
-        obs_log(LOG_DEBUG, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
+        obs_log(LOG_INFO, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
 
         char game_id_key[512];
         snprintf(game_id_key, sizeof(game_id_key), "/presenceDetails/%d/titleId", detail_index);

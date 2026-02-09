@@ -253,9 +253,9 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
     }
 
     if (obs_data_has_user_value(settings, "text_alternate_color")) {
-        const uint32_t argb    = (uint32_t)obs_data_get_int(settings, "text_alternate_color");
+        const uint32_t argb     = (uint32_t)obs_data_get_int(settings, "text_alternate_color");
         config->alternate_color = color_argb_to_rgba(argb);
-        *must_reload           = true;
+        *must_reload            = true;
     }
 
     if (obs_data_has_user_value(settings, "text_size")) {

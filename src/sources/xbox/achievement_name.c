@@ -24,7 +24,7 @@ static text_context_t *g_text_context;
  * xbox_achievement_name_source_register(). Contains font path, size, and color settings.
  */
 static achievement_name_configuration_t *g_configuration;
-static bool g_is_achievement_unlocked = false;
+static bool                              g_is_achievement_unlocked = false;
 
 /**
  * @brief Update and store the formatted achievement name string.
@@ -41,7 +41,7 @@ static void update_achievement_name(const achievement_t *achievement) {
         return;
     }
 
-    bool was_unlocked = g_is_achievement_unlocked;
+    bool was_unlocked         = g_is_achievement_unlocked;
     g_is_achievement_unlocked = achievement->unlocked_timestamp != 0;
 
     /* Force reload if the unlock state changed (color will be different) */
@@ -202,11 +202,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         .align     = g_configuration->align,
     };
 
-    bool texture_loaded = text_source_reload(&g_text_context,
-                                             &g_must_reload,
-                                             &render_config,
-                                             source,
-                                             g_achievement_name);
+    bool texture_loaded =
+        text_source_reload(&g_text_context, &g_must_reload, &render_config, source, g_achievement_name);
 
     if (!texture_loaded) {
         return;
