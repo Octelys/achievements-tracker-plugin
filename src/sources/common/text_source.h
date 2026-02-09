@@ -138,6 +138,16 @@ void text_source_tick(text_source_base_t *base, text_context_t **ctx, const text
 void text_source_add_properties(obs_properties_t *props);
 
 /**
+ * @brief Add alternate color property for locked achievements.
+ *
+ * Adds a color picker for the locked achievement text color.
+ * Call this after text_source_add_properties for sources that show achievements.
+ *
+ * @param props Properties panel to add the control to.
+ */
+void text_source_add_alternate_color_property(obs_properties_t *props);
+
+/**
  * @brief Process common text property updates.
  *
  * Checks for changes to text_color, text_size, text_font, and text_align

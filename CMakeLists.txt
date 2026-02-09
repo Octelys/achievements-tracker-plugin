@@ -338,6 +338,7 @@ target_sources(
     src/sources/xbox/achievements_total_count.c
     src/sources/common/text_source.c
     src/sources/common/image_source.c
+    src/sources/common/achievement_cycle.c
     src/crypto/crypto.c
     src/drawing/color.c
     src/drawing/image.c

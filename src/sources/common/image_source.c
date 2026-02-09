@@ -174,6 +174,15 @@ void image_source_render(image_source_cache_t *cache, source_size_t size, gs_eff
     draw_texture(cache->image_texture, size.width, size.height, effect);
 }
 
+void image_source_render_greyscale(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect) {
+
+    if (!cache || !cache->image_texture) {
+        return;
+    }
+
+    draw_texture_greyscale(cache->image_texture, size.width, size.height, effect);
+}
+
 void image_source_destroy(image_source_cache_t *cache) {
 
     if (!cache) {

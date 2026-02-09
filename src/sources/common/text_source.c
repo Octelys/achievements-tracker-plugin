@@ -231,6 +231,15 @@ void text_source_add_properties(obs_properties_t *props) {
     obs_property_list_add_int(align_list, "Right", TEXT_ALIGN_RIGHT);
 }
 
+void text_source_add_alternate_color_property(obs_properties_t *props) {
+
+    if (!props) {
+        return;
+    }
+
+    obs_properties_add_color(props, "text_alternate_color", "Locked achievement color");
+}
+
 void text_source_update_properties(obs_data_t *settings, text_source_config_t *config, bool *must_reload) {
 
     if (!settings || !must_reload || !config) {
@@ -241,6 +250,12 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
         const uint32_t argb = (uint32_t)obs_data_get_int(settings, "text_color");
         config->color       = color_argb_to_rgba(argb);
         *must_reload        = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_alternate_color")) {
+        const uint32_t argb    = (uint32_t)obs_data_get_int(settings, "text_alternate_color");
+        config->alternate_color = color_argb_to_rgba(argb);
+        *must_reload           = true;
     }
 
     if (obs_data_has_user_value(settings, "text_size")) {

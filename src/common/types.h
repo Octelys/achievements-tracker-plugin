@@ -134,6 +134,8 @@ typedef struct text_source_config {
     uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t     color;
+    /** Alternate color for locked achievements (0xRRGGBBAA format). */
+    uint32_t     alternate_color;
     /** Text alignment. */
     text_align_t align;
 } text_source_config_t;
@@ -188,6 +190,7 @@ typedef struct achievement_name_configuration {
     uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t     color;
+    uint32_t     alternate_color;
     /** Text alignment. */
     text_align_t align;
 } achievement_name_configuration_t;
@@ -206,6 +209,7 @@ typedef struct achievement_description_configuration {
     uint32_t     font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t     color;
+    uint32_t     alternate_color;
     /** Text alignment. */
     text_align_t align;
 } achievement_description_configuration_t;

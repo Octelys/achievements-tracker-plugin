@@ -39,11 +39,13 @@
 #define GAMERTAG_CONFIGURATION_ALIGN "source_gamertag_align"
 
 #define ACHIEVEMENT_NAME_CONFIGURATION_COLOR "source_achievement_name_color"
+#define ACHIEVEMENT_NAME_CONFIGURATION_ALTERNATE_COLOR "source_achievement_name_alternate_color"
 #define ACHIEVEMENT_NAME_CONFIGURATION_SIZE "source_achievement_name_size"
 #define ACHIEVEMENT_NAME_CONFIGURATION_FONT "source_achievement_name_font"
 #define ACHIEVEMENT_NAME_CONFIGURATION_ALIGN "source_achievement_name_align"
 
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_COLOR "source_achievement_description_color"
+#define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALTERNATE_COLOR "source_achievement_description_alternate_color"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE "source_achievement_description_size"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT "source_achievement_description_font"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALIGN "source_achievement_description_align"
@@ -411,6 +413,7 @@ void state_set_achievement_name_configuration(const achievement_name_configurati
     }
 
     obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_COLOR, configuration->color);
+    obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_ALTERNATE_COLOR, configuration->alternate_color);
     obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT, configuration->font_path);
     obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_ALIGN, configuration->align);
@@ -420,16 +423,18 @@ void state_set_achievement_name_configuration(const achievement_name_configurati
 
 achievement_name_configuration_t *state_get_achievement_name_configuration() {
 
-    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_COLOR);
-    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE);
-    const char *font_path = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT);
-    uint32_t    align     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_ALIGN);
+    uint32_t    color           = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_COLOR);
+    uint32_t    alternate_color = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_ALTERNATE_COLOR);
+    uint32_t    size            = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE);
+    const char *font_path       = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT);
+    uint32_t    align           = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_ALIGN);
 
     achievement_name_configuration_t *configuration = bzalloc(sizeof(achievement_name_configuration_t));
     configuration->color                            = color == 0 ? 0xFFFFFFFF : color;
+    configuration->alternate_color                  = alternate_color == 0 ? 0x7F7F7FFF : alternate_color;
     configuration->font_size                        = size == 0 ? 12 : size;
     configuration->font_path                        = bstrdup(font_path);
-    configuration->align                            = align; // 0 = left (default), 1 = right
+    configuration->align                            = align;
 
     return configuration;
 }
@@ -441,6 +446,7 @@ void state_set_achievement_description_configuration(const achievement_descripti
     }
 
     obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_COLOR, configuration->color);
+    obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALTERNATE_COLOR, configuration->alternate_color);
     obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT, configuration->font_path);
     obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALIGN, configuration->align);
@@ -450,16 +456,18 @@ void state_set_achievement_description_configuration(const achievement_descripti
 
 achievement_description_configuration_t *state_get_achievement_description_configuration() {
 
-    uint32_t    color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_COLOR);
-    uint32_t    size      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE);
-    const char *font_path = obs_data_get_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT);
-    uint32_t    align     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALIGN);
+    uint32_t    color           = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_COLOR);
+    uint32_t    alternate_color = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALTERNATE_COLOR);
+    uint32_t    size            = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE);
+    const char *font_path       = obs_data_get_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT);
+    uint32_t    align           = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ALIGN);
 
     achievement_description_configuration_t *configuration = bzalloc(sizeof(achievement_description_configuration_t));
     configuration->color                                   = color == 0 ? 0xFFFFFFFF : color;
+    configuration->alternate_color                         = alternate_color == 0 ? 0x7F7F7FFF : alternate_color;
     configuration->font_size                               = size == 0 ? 12 : size;
     configuration->font_path                               = bstrdup(font_path);
-    configuration->align                                   = align; // 0 = left (default), 1 = right
+    configuration->align                                   = align;
 
     return configuration;
 }

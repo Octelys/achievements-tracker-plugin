@@ -136,6 +136,19 @@ void image_source_reload_if_needed(image_source_cache_t *cache);
 void image_source_render(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect);
 
 /**
+ * @brief Render the cached texture in greyscale.
+ *
+ * Draws the texture at the specified dimensions using a greyscale effect.
+ * Uses luminance coefficients for perceptually accurate conversion.
+ * Does nothing if no texture is loaded.
+ *
+ * @param cache Image cache containing the texture to render.
+ * @param size  Dimensions to render at in pixels.
+ * @param effect Effect to use for rendering.
+ */
+void image_source_render_greyscale(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect);
+
+/**
  * @brief Destroy the texture and free graphics resources.
  *
  * Should be called when the source is destroyed. Enters graphics context

@@ -1,6 +1,7 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "sources/common/achievement_cycle.h"
 #include "sources/xbox/account.h"
 #include "sources/xbox/gamerpic.h"
 #include "sources/xbox/game_cover.h"
@@ -26,6 +27,10 @@ bool obs_module_load(void) {
     xbox_game_cover_source_register();
     xbox_gamerscore_source_register();
     xbox_gamertag_source_register();
+
+    /* Initialize the shared achievement display cycle before registering achievement sources */
+    achievement_cycle_init();
+
     xbox_achievement_name_source_register();
     xbox_achievement_description_source_register();
     xbox_achievement_icon_source_register();
@@ -38,5 +43,6 @@ bool obs_module_load(void) {
 }
 
 void obs_module_unload(void) {
+    achievement_cycle_destroy();
     obs_log(LOG_INFO, "plugin unloaded");
 }
