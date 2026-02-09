@@ -40,7 +40,13 @@ static void update_achievement_description(const achievement_t *achievement) {
         return;
     }
 
+    bool was_unlocked = g_is_achievement_unlocked;
     g_is_achievement_unlocked = achievement->unlocked_timestamp != 0;
+
+    /* Force reload if the unlock state changed (color will be different) */
+    if (was_unlocked != g_is_achievement_unlocked) {
+        g_must_reload = true;
+    }
 
     snprintf(g_achievement_description, sizeof(g_achievement_description), "%s", achievement->description);
     g_must_reload = true;
@@ -205,8 +211,19 @@ static void on_source_video_tick(void *data, float seconds) {
         return;
     }
 
+    /*
+     * Use alternate color for locked achievements.
+     * This config must match the one used in on_source_video_render.
+     */
+    text_source_config_t render_config = {
+        .font_path = g_configuration->font_path,
+        .font_size = g_configuration->font_size,
+        .color     = g_is_achievement_unlocked ? g_configuration->color : g_configuration->alternate_color,
+        .align     = g_configuration->align,
+    };
+
     /* Update fade transition animations */
-    text_source_tick(source, &g_text_context, (const text_source_config_t *)g_configuration, seconds);
+    text_source_tick(source, &g_text_context, &render_config, seconds);
 
     /* Update the shared achievement display cycle */
     achievement_cycle_tick(seconds);
