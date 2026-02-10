@@ -12,7 +12,7 @@
  */
 
 /** Default duration for each fade phase (in seconds). */
-#define TEXT_TRANSITION_DEFAULT_DURATION 2.0f
+#define TEXT_TRANSITION_DEFAULT_DURATION 0.5f
 
 text_source_base_t *text_source_create(obs_source_t *source, source_size_t size) {
 
@@ -102,42 +102,94 @@ void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect
     gs_matrix_identity();
     gs_matrix_translate3f(trans_x, trans_y, 0.0f);
 
-    // Apply transition opacity using color multiplier
+    // Apply transition opacity
     float opacity = base->transition.opacity;
 
-    // Use blend state to apply opacity
-    gs_blend_state_push();
-    gs_blend_function(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA);
+    // Create an inline effect with opacity support on first use
+    static gs_effect_t *opacity_effect        = NULL;
+    static bool         effect_load_attempted = false;
 
-    // If an effect is passed, we're inside OBS's render loop - just set params and draw
-    if (effect) {
-        gs_eparam_t *image_param = gs_effect_get_param_by_name(effect, "image");
+    if (!opacity_effect && !effect_load_attempted) {
+        effect_load_attempted = true;
+
+        const char *effect_code = "uniform float4x4 ViewProj;\n"
+                                  "uniform texture2d image;\n"
+                                  "uniform float4 color;\n"
+                                  "\n"
+                                  "sampler_state def_sampler {\n"
+                                  "    Filter   = Linear;\n"
+                                  "    AddressU = Clamp;\n"
+                                  "    AddressV = Clamp;\n"
+                                  "};\n"
+                                  "\n"
+                                  "struct VertInOut {\n"
+                                  "    float4 pos : POSITION;\n"
+                                  "    float2 uv  : TEXCOORD0;\n"
+                                  "};\n"
+                                  "\n"
+                                  "VertInOut VSDefault(VertInOut vert_in)\n"
+                                  "{\n"
+                                  "    VertInOut vert_out;\n"
+                                  "    vert_out.pos = mul(float4(vert_in.pos.xyz, 1.0), ViewProj);\n"
+                                  "    vert_out.uv  = vert_in.uv;\n"
+                                  "    return vert_out;\n"
+                                  "}\n"
+                                  "\n"
+                                  "float4 PSDrawOpacity(VertInOut vert_in) : TARGET\n"
+                                  "{\n"
+                                  "    float4 rgba = image.Sample(def_sampler, vert_in.uv);\n"
+                                  "    return rgba * color;\n"
+                                  "}\n"
+                                  "\n"
+                                  "technique Draw\n"
+                                  "{\n"
+                                  "    pass\n"
+                                  "    {\n"
+                                  "        vertex_shader = VSDefault(vert_in);\n"
+                                  "        pixel_shader  = PSDrawOpacity(vert_in);\n"
+                                  "    }\n"
+                                  "}\n";
+
+        char *error_string = NULL;
+        opacity_effect     = gs_effect_create(effect_code, "text_opacity_effect", &error_string);
+
+        if (error_string) {
+            blog(LOG_ERROR, "[TextSource] Opacity effect compile error: %s", error_string);
+            bfree(error_string);
+        }
+    }
+
+    UNUSED_PARAMETER(effect);
+
+    // Use our opacity-supporting effect
+    if (opacity_effect) {
+        gs_eparam_t *image_param = gs_effect_get_param_by_name(opacity_effect, "image");
         if (image_param) {
             gs_effect_set_texture(image_param, ctx->texture);
         }
 
-        gs_eparam_t *color_param = gs_effect_get_param_by_name(effect, "color");
+        gs_eparam_t *color_param = gs_effect_get_param_by_name(opacity_effect, "color");
         if (color_param) {
             struct vec4 color;
             vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
             gs_effect_set_vec4(color_param, &color);
         }
 
-        gs_draw_sprite(ctx->texture, 0, ctx->width, ctx->height);
+        gs_technique_t *tech = gs_effect_get_technique(opacity_effect, "Draw");
+        if (tech) {
+            gs_technique_begin(tech);
+            gs_technique_begin_pass(tech, 0);
+            gs_draw_sprite(ctx->texture, 0, ctx->width, ctx->height);
+            gs_technique_end_pass(tech);
+            gs_technique_end(tech);
+        }
     } else {
-        // No effect passed - we need to set up our own effect loop
+        // Fallback: draw without opacity
         gs_effect_t *default_effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
         if (default_effect) {
             gs_eparam_t *image_param = gs_effect_get_param_by_name(default_effect, "image");
             if (image_param) {
                 gs_effect_set_texture(image_param, ctx->texture);
-            }
-
-            gs_eparam_t *color_param = gs_effect_get_param_by_name(default_effect, "color");
-            if (color_param) {
-                struct vec4 color;
-                vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
-                gs_effect_set_vec4(color_param, &color);
             }
 
             while (gs_effect_loop(default_effect, "Draw")) {
@@ -146,7 +198,6 @@ void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect
         }
     }
 
-    gs_blend_state_pop();
     gs_matrix_pop();
 }
 
