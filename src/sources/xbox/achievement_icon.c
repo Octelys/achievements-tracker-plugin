@@ -42,10 +42,10 @@ typedef struct icon_transition_state {
 } icon_transition_state_t;
 
 static icon_transition_state_t g_transition = {
-    .phase = ICON_TRANSITION_NONE,
-    .opacity = 1.0f,
-    .duration = ICON_TRANSITION_DEFAULT_DURATION,
-    .pending_url = NULL,
+    .phase               = ICON_TRANSITION_NONE,
+    .opacity             = 1.0f,
+    .duration            = ICON_TRANSITION_DEFAULT_DURATION,
+    .pending_url         = NULL,
     .pending_is_unlocked = false,
 };
 
@@ -60,7 +60,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
 
         // Check if the icon URL or unlock state changed
         bool url_changed = (g_achievement_icon.image_url[0] == '\0') ||
-                          (strcmp(g_achievement_icon.image_url, achievement->icon_url) != 0);
+                           (strcmp(g_achievement_icon.image_url, achievement->icon_url) != 0);
         bool state_changed = (g_is_achievement_unlocked != new_is_unlocked);
 
         if ((url_changed || state_changed) && g_achievement_icon.image_texture) {
@@ -68,10 +68,10 @@ static void update_achievement_icon(const achievement_t *achievement) {
             if (g_transition.pending_url) {
                 bfree(g_transition.pending_url);
             }
-            g_transition.pending_url = bstrdup(achievement->icon_url);
+            g_transition.pending_url         = bstrdup(achievement->icon_url);
             g_transition.pending_is_unlocked = new_is_unlocked;
-            g_transition.phase = ICON_TRANSITION_FADE_OUT;
-            g_transition.opacity = 1.0f;
+            g_transition.phase               = ICON_TRANSITION_FADE_OUT;
+            g_transition.opacity             = 1.0f;
         } else {
             // No existing texture or first load - load immediately
             g_is_achievement_unlocked = new_is_unlocked;
@@ -79,15 +79,15 @@ static void update_achievement_icon(const achievement_t *achievement) {
 
             if (g_achievement_icon.image_texture) {
                 // Start fade-in
-                g_transition.phase = ICON_TRANSITION_FADE_IN;
+                g_transition.phase   = ICON_TRANSITION_FADE_IN;
                 g_transition.opacity = 0.0f;
             }
         }
     } else {
         image_source_clear(&g_achievement_icon);
         g_is_achievement_unlocked = false;
-        g_transition.phase = ICON_TRANSITION_NONE;
-        g_transition.opacity = 1.0f;
+        g_transition.phase        = ICON_TRANSITION_NONE;
+        g_transition.opacity      = 1.0f;
     }
 }
 

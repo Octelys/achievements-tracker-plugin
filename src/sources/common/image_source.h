@@ -146,7 +146,8 @@ void image_source_render(image_source_cache_t *cache, source_size_t size, gs_eff
  * @param effect  Effect to use for rendering.
  * @param opacity Opacity value (0.0 = fully transparent, 1.0 = fully opaque).
  */
-void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect, float opacity);
+void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                      float opacity);
 
 /**
  * @brief Render the cached texture in greyscale.
@@ -172,7 +173,8 @@ void image_source_render_greyscale(image_source_cache_t *cache, source_size_t si
  * @param effect  Effect to use for rendering.
  * @param opacity Opacity value (0.0 = fully transparent, 1.0 = fully opaque).
  */
-void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect, float opacity);
+void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                                float opacity);
 
 /**
  * @brief Destroy the texture and free graphics resources.

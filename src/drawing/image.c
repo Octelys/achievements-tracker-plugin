@@ -135,7 +135,8 @@ void draw_texture_greyscale(gs_texture_t *texture, const uint32_t width, const u
     }
 }
 
-void draw_texture_with_opacity(gs_texture_t *texture, const uint32_t width, const uint32_t height, gs_effect_t *effect, float opacity) {
+void draw_texture_with_opacity(gs_texture_t *texture, const uint32_t width, const uint32_t height, gs_effect_t *effect,
+                               float opacity) {
 
     UNUSED_PARAMETER(effect);
 
@@ -218,7 +219,8 @@ void draw_texture_with_opacity(gs_texture_t *texture, const uint32_t width, cons
     }
 }
 
-void draw_texture_greyscale_with_opacity(gs_texture_t *texture, const uint32_t width, const uint32_t height, gs_effect_t *effect, float opacity) {
+void draw_texture_greyscale_with_opacity(gs_texture_t *texture, const uint32_t width, const uint32_t height,
+                                         gs_effect_t *effect, float opacity) {
 
     UNUSED_PARAMETER(effect);
 
@@ -272,7 +274,7 @@ void draw_texture_greyscale_with_opacity(gs_texture_t *texture, const uint32_t w
                                   "    }\n"
                                   "}\n";
 
-        char *error_string        = NULL;
+        char *error_string       = NULL;
         greyscale_opacity_effect = gs_effect_create(effect_code, "greyscale_opacity_effect", &error_string);
 
         if (error_string) {

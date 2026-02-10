@@ -34,7 +34,8 @@ void draw_texture(gs_texture_t *texture, uint32_t width, uint32_t height, gs_eff
  * @param effect  Effect used to draw the texture.
  * @param opacity Opacity (0.0 = transparent, 1.0 = opaque).
  */
-void draw_texture_with_opacity(gs_texture_t *texture, uint32_t width, uint32_t height, gs_effect_t *effect, float opacity);
+void draw_texture_with_opacity(gs_texture_t *texture, uint32_t width, uint32_t height, gs_effect_t *effect,
+                               float opacity);
 
 /**
  * @brief Draw a texture in greyscale.
@@ -62,7 +63,8 @@ void draw_texture_greyscale(gs_texture_t *texture, uint32_t width, uint32_t heig
  * @param effect  Effect used to draw the texture.
  * @param opacity Opacity (0.0 = transparent, 1.0 = opaque).
  */
-void draw_texture_greyscale_with_opacity(gs_texture_t *texture, uint32_t width, uint32_t height, gs_effect_t *effect, float opacity);
+void draw_texture_greyscale_with_opacity(gs_texture_t *texture, uint32_t width, uint32_t height, gs_effect_t *effect,
+                                         float opacity);
 
 #ifdef __cplusplus
 }

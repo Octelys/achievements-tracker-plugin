@@ -183,7 +183,8 @@ void image_source_render_greyscale(image_source_cache_t *cache, source_size_t si
     draw_texture_greyscale(cache->image_texture, size.width, size.height, effect);
 }
 
-void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect, float opacity) {
+void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                      float opacity) {
 
     if (!cache || !cache->image_texture) {
         return;
@@ -192,7 +193,8 @@ void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t
     draw_texture_with_opacity(cache->image_texture, size.width, size.height, effect, opacity);
 }
 
-void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect, float opacity) {
+void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                                float opacity) {
 
     if (!cache || !cache->image_texture) {
         return;
