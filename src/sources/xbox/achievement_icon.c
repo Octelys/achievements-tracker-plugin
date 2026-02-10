@@ -18,6 +18,37 @@ static image_source_cache_t g_achievement_icon;
 
 static bool g_is_achievement_unlocked = false;
 
+/** Default duration for each fade phase (in seconds). */
+#define ICON_TRANSITION_DEFAULT_DURATION 0.5f
+
+/**
+ * @brief Transition phase for icon fade animations.
+ */
+typedef enum icon_transition_phase {
+    ICON_TRANSITION_NONE = 0,
+    ICON_TRANSITION_FADE_OUT,
+    ICON_TRANSITION_FADE_IN,
+} icon_transition_phase_t;
+
+/**
+ * @brief Transition state for icon fade animations.
+ */
+typedef struct icon_transition_state {
+    icon_transition_phase_t phase;
+    float                   opacity;
+    float                   duration;
+    char                   *pending_url;
+    bool                    pending_is_unlocked;
+} icon_transition_state_t;
+
+static icon_transition_state_t g_transition = {
+    .phase = ICON_TRANSITION_NONE,
+    .opacity = 1.0f,
+    .duration = ICON_TRANSITION_DEFAULT_DURATION,
+    .pending_url = NULL,
+    .pending_is_unlocked = false,
+};
+
 /**
  * @brief Update the achievement icon display.
  *
@@ -25,11 +56,38 @@ static bool g_is_achievement_unlocked = false;
  */
 static void update_achievement_icon(const achievement_t *achievement) {
     if (achievement && achievement->icon_url) {
-        g_is_achievement_unlocked = achievement->unlocked_timestamp != 0;
-        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
+        bool new_is_unlocked = achievement->unlocked_timestamp != 0;
+
+        // Check if the icon URL or unlock state changed
+        bool url_changed = (g_achievement_icon.image_url[0] == '\0') ||
+                          (strcmp(g_achievement_icon.image_url, achievement->icon_url) != 0);
+        bool state_changed = (g_is_achievement_unlocked != new_is_unlocked);
+
+        if ((url_changed || state_changed) && g_achievement_icon.image_texture) {
+            // Start a fade-out transition
+            if (g_transition.pending_url) {
+                bfree(g_transition.pending_url);
+            }
+            g_transition.pending_url = bstrdup(achievement->icon_url);
+            g_transition.pending_is_unlocked = new_is_unlocked;
+            g_transition.phase = ICON_TRANSITION_FADE_OUT;
+            g_transition.opacity = 1.0f;
+        } else {
+            // No existing texture or first load - load immediately
+            g_is_achievement_unlocked = new_is_unlocked;
+            image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
+
+            if (g_achievement_icon.image_texture) {
+                // Start fade-in
+                g_transition.phase = ICON_TRANSITION_FADE_IN;
+                g_transition.opacity = 0.0f;
+            }
+        }
     } else {
         image_source_clear(&g_achievement_icon);
         g_is_achievement_unlocked = false;
+        g_transition.phase = ICON_TRANSITION_NONE;
+        g_transition.opacity = 1.0f;
     }
 }
 
@@ -149,7 +207,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 /**
  * @brief OBS callback to render the achievement icon image.
  *
- * Loads a new texture if required and draws it using draw_texture().
+ * Loads a new texture if required and draws it with opacity for fade animations.
  * The texture is lazily loaded from the downloaded icon file on the first
  * render after an achievement unlock.
  *
@@ -167,27 +225,64 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     /* Load image if needed (deferred load in graphics context) */
     image_source_reload_if_needed(&g_achievement_icon);
 
+    /* Get current opacity from transition state */
+    float opacity = g_transition.opacity;
+
     if (g_is_achievement_unlocked) {
-        /* Render the image if we have a texture */
-        image_source_render(&g_achievement_icon, source->size, effect);
+        /* Render the image with opacity if we have a texture */
+        image_source_render_with_opacity(&g_achievement_icon, source->size, effect, opacity);
     } else {
-        static bool logged = false;
-        if (!logged) {
-            logged = true;
-            blog(LOG_INFO, "[AchievementIcon] Rendering greyscale (locked achievement)");
-        }
-        image_source_render_greyscale(&g_achievement_icon, source->size, effect);
+        image_source_render_greyscale_with_opacity(&g_achievement_icon, source->size, effect, opacity);
     }
 }
 
 /**
  * @brief OBS callback for animation tick.
  *
- * Delegates achievement display cycle management to the shared achievement_cycle module.
+ * Updates fade transition animations and delegates achievement display cycle
+ * management to the shared achievement_cycle module.
  */
 static void on_source_video_tick(void *data, float seconds) {
 
     UNUSED_PARAMETER(data);
+
+    /* Update fade transition animations */
+    float duration = g_transition.duration;
+    if (duration <= 0.0f) {
+        duration = ICON_TRANSITION_DEFAULT_DURATION;
+    }
+
+    switch (g_transition.phase) {
+    case ICON_TRANSITION_FADE_OUT:
+        g_transition.opacity -= seconds / duration;
+        if (g_transition.opacity <= 0.0f) {
+            g_transition.opacity = 0.0f;
+
+            /* Fade-out complete, load the pending icon */
+            if (g_transition.pending_url) {
+                g_is_achievement_unlocked = g_transition.pending_is_unlocked;
+                image_source_download_if_changed(&g_achievement_icon, g_transition.pending_url);
+                bfree(g_transition.pending_url);
+                g_transition.pending_url = NULL;
+            }
+
+            /* Start fade-in */
+            g_transition.phase = ICON_TRANSITION_FADE_IN;
+        }
+        break;
+
+    case ICON_TRANSITION_FADE_IN:
+        g_transition.opacity += seconds / duration;
+        if (g_transition.opacity >= 1.0f) {
+            g_transition.opacity = 1.0f;
+            g_transition.phase   = ICON_TRANSITION_NONE;
+        }
+        break;
+
+    case ICON_TRANSITION_NONE:
+    default:
+        break;
+    }
 
     /* Update the shared achievement display cycle */
     achievement_cycle_tick(seconds);

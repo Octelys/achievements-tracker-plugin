@@ -136,6 +136,19 @@ void image_source_reload_if_needed(image_source_cache_t *cache);
 void image_source_render(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect);
 
 /**
+ * @brief Render the cached texture with opacity.
+ *
+ * Draws the texture at the specified dimensions with the given opacity.
+ * Does nothing if no texture is loaded.
+ *
+ * @param cache   Image cache containing the texture to render.
+ * @param size    Dimensions to render at in pixels.
+ * @param effect  Effect to use for rendering.
+ * @param opacity Opacity value (0.0 = fully transparent, 1.0 = fully opaque).
+ */
+void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect, float opacity);
+
+/**
  * @brief Render the cached texture in greyscale.
  *
  * Draws the texture at the specified dimensions using a greyscale effect.
@@ -147,6 +160,19 @@ void image_source_render(image_source_cache_t *cache, source_size_t size, gs_eff
  * @param effect Effect to use for rendering.
  */
 void image_source_render_greyscale(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect);
+
+/**
+ * @brief Render the cached texture in greyscale with opacity.
+ *
+ * Draws the texture at the specified dimensions using a greyscale effect
+ * with the given opacity. Does nothing if no texture is loaded.
+ *
+ * @param cache   Image cache containing the texture to render.
+ * @param size    Dimensions to render at in pixels.
+ * @param effect  Effect to use for rendering.
+ * @param opacity Opacity value (0.0 = fully transparent, 1.0 = fully opaque).
+ */
+void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect, float opacity);
 
 /**
  * @brief Destroy the texture and free graphics resources.
