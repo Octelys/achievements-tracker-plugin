@@ -29,8 +29,6 @@ static char *get_node_string(cJSON *json_root, int achievement_index, const char
         return NULL;
     }
 
-    /* Daddy’s Glasses */
-
     return bstrdup(property_node->valuestring);
 }
 

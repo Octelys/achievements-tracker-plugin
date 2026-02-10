@@ -2,7 +2,7 @@
 #include "memory.h"
 #include "diagnostics/log.h"
 
-#include <_inttypes.h>
+#include <inttypes.h>
 #include <obs-module.h>
 #include <stdlib.h>
 
