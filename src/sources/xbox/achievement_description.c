@@ -13,9 +13,8 @@
 
 #define NO_FLIP 0
 
-static char            g_achievement_description[512];
-static bool            g_must_reload;
-static text_context_t *g_text_context;
+static char g_achievement_description[512];
+static bool g_must_reload;
 
 /**
  * @brief Configuration for rendering the achievement description text.
@@ -83,7 +82,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    return text_source_create(source, (source_size_t){600, 200});
+    return text_source_create(source);
 }
 
 /**
@@ -102,34 +101,29 @@ static void on_source_destroy(void *data) {
         return;
     }
 
-    if (g_text_context) {
-        text_context_destroy(g_text_context);
-        g_text_context = NULL;
-    }
-
-    bfree(source);
+    text_source_destroy(source);
 }
 
 /**
- * @brief OBS callback returning the configured source width.
+ * @brief OBS callback returning the natural text width.
  *
  * @param data Source instance data.
  * @return Width in pixels.
  */
 static uint32_t source_get_width(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.width : 0;
+    text_source_base_t *s = data;
+    return text_source_get_width(s);
 }
 
 /**
- * @brief OBS callback returning the configured source height.
+ * @brief OBS callback returning the natural text height.
  *
  * @param data Source instance data.
  * @return Height in pixels.
  */
 static uint32_t source_get_height(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.height : 0;
+    text_source_base_t *s = data;
+    return text_source_get_height(s);
 }
 
 /**
@@ -186,11 +180,11 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         .align     = g_configuration->align,
     };
 
-    if (!text_source_reload(&g_text_context, &g_must_reload, &render_config, source, g_achievement_description)) {
+    if (!text_source_reload(source, &g_must_reload, &render_config, g_achievement_description)) {
         return;
     }
 
-    text_source_render(g_text_context, source, effect);
+    text_source_render(source, effect);
 }
 
 /**
@@ -219,7 +213,7 @@ static void on_source_video_tick(void *data, float seconds) {
     };
 
     /* Update fade transition animations */
-    text_source_tick(source, &g_text_context, &render_config, seconds);
+    text_source_tick(source, &render_config, seconds);
 
     /* Update the shared achievement display cycle */
     achievement_cycle_tick(seconds);
@@ -299,14 +293,25 @@ static const struct obs_source_info *xbox_source_get(void) {
 
 void xbox_achievement_description_source_register(void) {
 
-    g_configuration = bzalloc(sizeof(achievement_description_configuration_t));
-
     g_configuration = state_get_achievement_description_configuration();
 
-    /* TODO A default font sheet path should be embedded with the plugin */
-    if (!g_configuration->font_path) {
-        g_configuration->font_path = "/Users/christophe/Downloads/font_sheet.png";
+    /* Force reset font if it looks like a path or is empty */
+    if (!g_configuration->font_path ||
+        strlen(g_configuration->font_path) == 0 ||
+        strchr(g_configuration->font_path, '/') != NULL ||
+        strstr(g_configuration->font_path, ".pdf") ||
+        strstr(g_configuration->font_path, ".png") ||
+        strstr(g_configuration->font_path, ".ttf") ||
+        strstr(g_configuration->font_path, ".otf") ||
+        strstr(g_configuration->font_path, "Downloads")) {
+
+        if (g_configuration->font_path) bfree((void*)g_configuration->font_path);
+        g_configuration->font_path = bstrdup("Arial");
+        obs_log(LOG_INFO, "[Achievement Description] Resetting font to 'Arial' to ensure visibility");
     }
+
+    // Ensure config is saved
+    state_set_achievement_description_configuration(g_configuration);
 
     obs_register_source(xbox_source_get());
 

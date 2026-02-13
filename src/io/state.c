@@ -368,8 +368,8 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
     const char *font_path = obs_data_get_string(g_state, GAMERSCORE_CONFIGURATION_FONT);
 
     gamerscore_configuration_t *gamerscore_configuration = bzalloc(sizeof(gamerscore_configuration_t));
-    gamerscore_configuration->color                      = color == 0 ? 0xFFFFFF : color;
-    gamerscore_configuration->font_size                  = size == 0 ? 12 : size;
+    gamerscore_configuration->color                      = color == 0 ? 0xFFFFFFFF : color;  // White with full opacity
+    gamerscore_configuration->font_size                  = size == 0 ? 48 : size;            // Larger default size
     gamerscore_configuration->font_path                  = bstrdup(font_path);
     gamerscore_configuration->align                      = align;
 
@@ -398,8 +398,8 @@ gamertag_configuration_t *state_get_gamertag_configuration() {
     const char *font_path = obs_data_get_string(g_state, GAMERTAG_CONFIGURATION_FONT);
 
     gamertag_configuration_t *configuration = bzalloc(sizeof(gamertag_configuration_t));
-    configuration->color                    = color == 0 ? 0xFFFFFF : color;
-    configuration->font_size                = size == 0 ? 12 : size;
+    configuration->color                    = color == 0 ? 0xFFFFFFFF : color;  // White with full opacity
+    configuration->font_size                = size == 0 ? 48 : size;            // Larger default size
     configuration->font_path                = bstrdup(font_path);
     configuration->align                    = align;
 

@@ -34,9 +34,8 @@
 
 #define NO_FLIP 0
 
-static char            g_gamerscore[64];
-static bool            g_must_reload;
-static text_context_t *g_text_context;
+static char g_gamerscore[64];
+static bool g_must_reload;
 
 /**
  * @brief Configuration for rendering digits from the font sheet.
@@ -110,7 +109,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    return text_source_create(source, (source_size_t){600, 200});
+    return text_source_create(source);
 }
 
 /**
@@ -124,24 +123,19 @@ static void on_source_destroy(void *data) {
         return;
     }
 
-    if (g_text_context) {
-        text_context_destroy(g_text_context);
-        g_text_context = NULL;
-    }
-
-    bfree(source);
+    text_source_destroy(source);
 }
 
-/** @brief OBS callback returning the configured source width. */
+/** @brief OBS callback returning the natural text width. */
 static uint32_t source_get_width(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.width : 0;
+    text_source_base_t *s = data;
+    return text_source_get_width(s);
 }
 
-/** @brief OBS callback returning the configured source height. */
+/** @brief OBS callback returning the natural text height. */
 static uint32_t source_get_height(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.height : 0;
+    text_source_base_t *s = data;
+    return text_source_get_height(s);
 }
 
 /**
@@ -175,15 +169,12 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_reload(&g_text_context,
-                            &g_must_reload,
-                            (const text_source_config_t *)g_default_configuration,
-                            source,
+    if (!text_source_reload(source, &g_must_reload, (const text_source_config_t *)g_default_configuration,
                             g_gamerscore)) {
         return;
     }
 
-    text_source_render(g_text_context, source, effect);
+    text_source_render(source, effect);
 }
 
 /**
@@ -199,7 +190,7 @@ static void on_source_video_tick(void *data, float seconds) {
         return;
     }
 
-    text_source_tick(source, &g_text_context, (const text_source_config_t *)g_default_configuration, seconds);
+    text_source_tick(source, (const text_source_config_t *)g_default_configuration, seconds);
 }
 
 /**
@@ -255,14 +246,25 @@ static const struct obs_source_info *xbox_source_get(void) {
 
 void xbox_gamerscore_source_register(void) {
 
-    g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
-
     g_default_configuration = state_get_gamerscore_configuration();
 
-    /* TODO A default font sheet path should be embedded with the plugin */
-    if (!g_default_configuration->font_path) {
-        g_default_configuration->font_path = "/Users/christophe/Downloads/font_sheet.png";
+    /* Force reset font if it looks like a path or is empty */
+    if (!g_default_configuration->font_path ||
+        strlen(g_default_configuration->font_path) == 0 ||
+        strchr(g_default_configuration->font_path, '/') != NULL ||
+        strstr(g_default_configuration->font_path, ".pdf") || // Was pointing to bad paths often
+        strstr(g_default_configuration->font_path, ".png") ||
+        strstr(g_default_configuration->font_path, ".ttf") ||
+        strstr(g_default_configuration->font_path, ".otf") ||
+        strstr(g_default_configuration->font_path, "Downloads")) {
+
+        if (g_default_configuration->font_path) bfree((void*)g_default_configuration->font_path);
+        g_default_configuration->font_path = bstrdup("Arial");
+        obs_log(LOG_INFO, "[Gamerscore] Resetting font to 'Arial' to ensure visibility");
     }
+
+    // Ensure config is saved
+    state_set_gamerscore_configuration(g_default_configuration);
 
     obs_register_source(xbox_source_get());
 

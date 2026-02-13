@@ -1,10 +1,12 @@
 #include "sources/common/text_source.h"
 
+#include <string.h>
 #include <graphics/graphics.h>
 #include <graphics/matrix4.h>
 
 #include "drawing/color.h"
 #include "system/font.h"
+#include "diagnostics/log.h"
 
 /**
  * @file text_source.c
@@ -14,197 +16,182 @@
 /** Default duration for each fade phase (in seconds). */
 #define TEXT_TRANSITION_DEFAULT_DURATION 0.5f
 
-text_source_base_t *text_source_create(obs_source_t *source, source_size_t size) {
-
+text_source_base_t *text_source_create(obs_source_t *source) {
     text_source_base_t *base = bzalloc(sizeof(*base));
+
     if (!base) {
         return NULL;
     }
 
-    base->source = source;
-    base->size   = size;
+    base->source                = source;
+    base->text_freetype_source  = NULL;
+    base->current_text          = NULL;
+    base->pending_text          = NULL;
 
     // Initialize transition state
     base->transition.phase    = TEXT_TRANSITION_NONE;
     base->transition.opacity  = 1.0f;
     base->transition.duration = TEXT_TRANSITION_DEFAULT_DURATION;
-    base->pending_text        = NULL;
 
     return base;
 }
 
-bool text_source_reload(text_context_t **ctx, bool *must_reload, const text_source_config_t *config,
-                        text_source_base_t *base, const char *text) {
+void text_source_destroy(text_source_base_t *base) {
 
-    if (!must_reload || !ctx || !config || !base) {
-        return ctx != NULL && *ctx != NULL;
-    }
-
-    if (!*must_reload && *ctx) {
-        return true;
-    }
-
-    // If we already have a context and need to reload, start a fade-out transition
-    if (*ctx && base->transition.phase == TEXT_TRANSITION_NONE) {
-        // Store the new text for later and start fading out
-        if (base->pending_text) {
-            bfree(base->pending_text);
-        }
-        base->pending_text       = bstrdup(text);
-        base->transition.phase   = TEXT_TRANSITION_FADE_OUT;
-        base->transition.opacity = 1.0f;
-        *must_reload             = false;
-        return true;
-    }
-
-    // If we're in a transition, don't reload yet
-    if (base->transition.phase != TEXT_TRANSITION_NONE) {
-        *must_reload = false;
-        return *ctx != NULL;
-    }
-
-    // No existing context or transition complete - create new context
-    if (*ctx) {
-        text_context_destroy(*ctx);
-        *ctx = NULL;
-    }
-
-    *ctx = text_context_create(config, base->size, text);
-
-    // First time display: show immediately at full opacity (no fade-in)
-    // The fade-in is only used after a fade-out completes (handled in tick)
-    if (*ctx) {
-        base->transition.phase   = TEXT_TRANSITION_FADE_IN;
-        base->transition.opacity = 0.0f;
-    }
-
-    *must_reload = false;
-
-    return *ctx != NULL;
-}
-
-void text_source_render(text_context_t *ctx, text_source_base_t *base, gs_effect_t *effect) {
-
-    if (!ctx || !base || !ctx->texture) {
+    if (!base) {
         return;
     }
 
-    // Get the current transformation matrix to extract translation
-    struct matrix4 current_matrix;
-    gs_matrix_get(&current_matrix);
+    if (base->text_freetype_source) {
+        obs_source_release(base->text_freetype_source);
+        base->text_freetype_source = NULL;
+    }
 
-    // Extract translation from the matrix
-    float trans_x = current_matrix.t.x;
-    float trans_y = current_matrix.t.y;
+    if (base->current_text) {
+        bfree(base->current_text);
+        base->current_text = NULL;
+    }
 
-    // Build a new matrix: translation only (no scaling)
-    gs_matrix_push();
-    gs_matrix_identity();
-    gs_matrix_translate3f(trans_x, trans_y, 0.0f);
+    if (base->pending_text) {
+        bfree(base->pending_text);
+        base->pending_text = NULL;
+    }
 
-    // Apply transition opacity
-    float opacity = base->transition.opacity;
+    bfree(base);
+}
 
-    // Create an inline effect with opacity support on first use
-    static gs_effect_t *opacity_effect        = NULL;
-    static bool         effect_load_attempted = false;
+bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_source_config_t *config,
+                        const char *text) {
 
-    if (!opacity_effect && !effect_load_attempted) {
-        effect_load_attempted = true;
+    if (!base || !must_reload || !config || !text) {
+        return base && base->text_freetype_source != NULL;
+    }
 
-        const char *effect_code = "uniform float4x4 ViewProj;\n"
-                                  "uniform texture2d image;\n"
-                                  "uniform float4 color;\n"
-                                  "\n"
-                                  "sampler_state def_sampler {\n"
-                                  "    Filter   = Linear;\n"
-                                  "    AddressU = Clamp;\n"
-                                  "    AddressV = Clamp;\n"
-                                  "};\n"
-                                  "\n"
-                                  "struct VertInOut {\n"
-                                  "    float4 pos : POSITION;\n"
-                                  "    float2 uv  : TEXCOORD0;\n"
-                                  "};\n"
-                                  "\n"
-                                  "VertInOut VSDefault(VertInOut vert_in)\n"
-                                  "{\n"
-                                  "    VertInOut vert_out;\n"
-                                  "    vert_out.pos = mul(float4(vert_in.pos.xyz, 1.0), ViewProj);\n"
-                                  "    vert_out.uv  = vert_in.uv;\n"
-                                  "    return vert_out;\n"
-                                  "}\n"
-                                  "\n"
-                                  "float4 PSDrawOpacity(VertInOut vert_in) : TARGET\n"
-                                  "{\n"
-                                  "    float4 rgba = image.Sample(def_sampler, vert_in.uv);\n"
-                                  "    return rgba * color;\n"
-                                  "}\n"
-                                  "\n"
-                                  "technique Draw\n"
-                                  "{\n"
-                                  "    pass\n"
-                                  "    {\n"
-                                  "        vertex_shader = VSDefault(vert_in);\n"
-                                  "        pixel_shader  = PSDrawOpacity(vert_in);\n"
-                                  "    }\n"
-                                  "}\n";
+    // If source already exists and we're not forcing a reload, keep it
+    if (!*must_reload && base->text_freetype_source) {
+        return true;
+    }
 
-        char *error_string = NULL;
-        opacity_effect     = gs_effect_create(effect_code, "text_opacity_effect", &error_string);
+    // Release existing text source if present
+    if (base->text_freetype_source) {
+        obs_source_release(base->text_freetype_source);
+        base->text_freetype_source = NULL;
+    }
 
-        if (error_string) {
-            blog(LOG_ERROR, "[TextSource] Opacity effect compile error: %s", error_string);
-            bfree(error_string);
-        }
+    // Create OBS text source settings
+    obs_data_t *settings = obs_data_create();
+
+    if (!settings) {
+        obs_log(LOG_ERROR, "[TextSource] Failed to create settings object");
+        return false;
+    }
+
+    // Set text content
+    obs_data_set_string(settings, "text", text);
+
+    // Set font using font object for FreeType sources
+    if (config->font_path && strlen(config->font_path) > 0) {
+        obs_data_t *font = obs_data_create();
+        obs_data_set_string(font, "face", config->font_path);
+        obs_data_set_int(font, "size", config->font_size);
+        obs_data_set_string(font, "style", "");
+        obs_data_set_int(font, "flags", 0);
+        obs_data_set_obj(settings, "font", font);
+        obs_data_release(font);
+    }
+
+    // Set color - convert from RGBA to ABGR for OBS
+    uint32_t rgba  = config->color;
+    uint8_t  r     = (rgba >> 24) & 0xFF;
+    uint8_t  g     = (rgba >> 16) & 0xFF;
+    uint8_t  b     = (rgba >> 8) & 0xFF;
+    uint8_t  a     = rgba & 0xFF;
+    uint32_t color = (a << 24) | (b << 16) | (g << 8) | r;
+
+    obs_data_set_int(settings, "color1", color);
+    obs_data_set_int(settings, "color2", color);
+    obs_data_set_int(settings, "opacity", 100);
+
+    // Enable outline, disable drop shadow
+    obs_data_set_bool(settings, "outline", true);
+    obs_data_set_bool(settings, "drop_shadow", false);
+
+
+    // Try to create a text source - try FreeType v2 first (most common on macOS)
+    base->text_freetype_source = obs_source_create_private("text_ft2_source_v2", "internal_text", settings);
+
+    if (!base->text_freetype_source) {
+        base->text_freetype_source = obs_source_create_private("text_ft2_source", "internal_text", settings);
+    }
+
+    if (!base->text_freetype_source) {
+        base->text_freetype_source = obs_source_create_private("text_gdiplus_v2", "internal_text", settings);
+    }
+
+    if (!base->text_freetype_source) {
+        base->text_freetype_source = obs_source_create_private("text_gdiplus", "internal_text", settings);
+    }
+
+    obs_data_release(settings);
+
+    if (!base->text_freetype_source) {
+        obs_log(LOG_ERROR, "[TextSource] Failed to create internal OBS text source - no text source type available");
+        *must_reload = false;
+        return false;
+    }
+
+
+    // Store current text
+    if (base->current_text) {
+        bfree(base->current_text);
+    }
+    base->current_text = bstrdup(text);
+
+    // Start with fade-in transition
+    base->transition.phase   = TEXT_TRANSITION_FADE_IN;
+    base->transition.opacity = 0.0f;
+
+    *must_reload = false;
+
+    return true;
+}
+
+void text_source_render(text_source_base_t *base, gs_effect_t *effect) {
+
+    if (!base || !base->text_freetype_source) {
+        return;
     }
 
     UNUSED_PARAMETER(effect);
 
-    // Use our opacity-supporting effect
-    if (opacity_effect) {
-        gs_eparam_t *image_param = gs_effect_get_param_by_name(opacity_effect, "image");
-        if (image_param) {
-            gs_effect_set_texture(image_param, ctx->texture);
-        }
+    // Apply transition opacity
+    const float opacity = base->transition.opacity;
 
-        gs_eparam_t *color_param = gs_effect_get_param_by_name(opacity_effect, "color");
+    gs_blend_state_push();
+    gs_enable_blending(true);
+    gs_blend_function(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA);
+
+    // Set color modulation for opacity (white with alpha)
+    struct vec4 color_vec;
+    vec4_set(&color_vec, 1.0f, 1.0f, 1.0f, opacity);
+
+    gs_effect_t *current_effect = gs_get_effect();
+
+    if (current_effect) {
+        gs_eparam_t *color_param = gs_effect_get_param_by_name(current_effect, "color");
         if (color_param) {
-            struct vec4 color;
-            vec4_set(&color, 1.0f, 1.0f, 1.0f, opacity);
-            gs_effect_set_vec4(color_param, &color);
-        }
-
-        gs_technique_t *tech = gs_effect_get_technique(opacity_effect, "Draw");
-        if (tech) {
-            gs_technique_begin(tech);
-            gs_technique_begin_pass(tech, 0);
-            gs_draw_sprite(ctx->texture, 0, ctx->width, ctx->height);
-            gs_technique_end_pass(tech);
-            gs_technique_end(tech);
-        }
-    } else {
-        // Fallback: draw without opacity
-        gs_effect_t *default_effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
-        if (default_effect) {
-            gs_eparam_t *image_param = gs_effect_get_param_by_name(default_effect, "image");
-            if (image_param) {
-                gs_effect_set_texture(image_param, ctx->texture);
-            }
-
-            while (gs_effect_loop(default_effect, "Draw")) {
-                gs_draw_sprite(ctx->texture, 0, ctx->width, ctx->height);
-            }
+            gs_effect_set_vec4(color_param, &color_vec);
         }
     }
 
-    gs_matrix_pop();
+    obs_source_video_render(base->text_freetype_source);
+
+    gs_blend_state_pop();
 }
 
-void text_source_tick(text_source_base_t *base, text_context_t **ctx, const text_source_config_t *config,
-                      float seconds) {
+void text_source_tick(text_source_base_t *base, const text_source_config_t *config, float seconds) {
 
-    if (!base || !ctx || !config) {
+    if (!base || !config) {
         return;
     }
 
@@ -214,25 +201,6 @@ void text_source_tick(text_source_base_t *base, text_context_t **ctx, const text
     }
 
     switch (base->transition.phase) {
-    case TEXT_TRANSITION_FADE_OUT:
-        base->transition.opacity -= seconds / duration;
-        if (base->transition.opacity <= 0.0f) {
-            base->transition.opacity = 0.0f;
-            // Fade-out complete, switch to the pending text
-            if (*ctx) {
-                text_context_destroy(*ctx);
-                *ctx = NULL;
-            }
-            if (base->pending_text) {
-                *ctx = text_context_create(config, base->size, base->pending_text);
-                bfree(base->pending_text);
-                base->pending_text = NULL;
-            }
-            // Start fade-in
-            base->transition.phase = TEXT_TRANSITION_FADE_IN;
-        }
-        break;
-
     case TEXT_TRANSITION_FADE_IN:
         base->transition.opacity += seconds / duration;
         if (base->transition.opacity >= 1.0f) {
@@ -241,6 +209,7 @@ void text_source_tick(text_source_base_t *base, text_context_t **ctx, const text
         }
         break;
 
+    case TEXT_TRANSITION_FADE_OUT:
     case TEXT_TRANSITION_NONE:
     default:
         break;
@@ -263,7 +232,7 @@ void text_source_add_properties(obs_properties_t *props) {
     if (fonts) {
         for (size_t i = 0; i < font_count; i++) {
             if (fonts[i].name && fonts[i].path) {
-                obs_property_list_add_string(font_list, fonts[i].name, fonts[i].path);
+                obs_property_list_add_string(font_list, fonts[i].name, fonts[i].name);
             }
         }
         font_list_free(fonts, font_count);
@@ -324,3 +293,18 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
         *must_reload  = true;
     }
 }
+
+uint32_t text_source_get_width(text_source_base_t *base) {
+    if (!base || !base->text_freetype_source) {
+        return 0;
+    }
+    return obs_source_get_width(base->text_freetype_source);
+}
+
+uint32_t text_source_get_height(text_source_base_t *base) {
+    if (!base || !base->text_freetype_source) {
+        return 0;
+    }
+    return obs_source_get_height(base->text_freetype_source);
+}
+
