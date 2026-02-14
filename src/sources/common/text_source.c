@@ -112,8 +112,7 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
     uint8_t  bottom_g     = (bottom_rgba >> 16) & 0xFF;
     uint8_t  bottom_b     = (bottom_rgba >> 8) & 0xFF;
     uint8_t  bottom_a     = bottom_rgba & 0xFF;
-    uint32_t bottom_color = (bottom_a << 24) | (bottom_b << 16) | (bottom_g << 8) |
-                                   bottom_r;
+    uint32_t bottom_color = (bottom_a << 24) | (bottom_b << 16) | (bottom_g << 8) | bottom_r;
 
     obs_data_set_int(settings, "color1", top_color);
     obs_data_set_int(settings, "color2", bottom_color);
