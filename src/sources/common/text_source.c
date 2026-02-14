@@ -5,7 +5,6 @@
 #include <graphics/matrix4.h>
 
 #include "drawing/color.h"
-#include "system/font.h"
 #include "diagnostics/log.h"
 
 /**
@@ -113,7 +112,8 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
     uint8_t  active_bottom_g     = (active_bottom_rgba >> 16) & 0xFF;
     uint8_t  active_bottom_b     = (active_bottom_rgba >> 8) & 0xFF;
     uint8_t  active_bottom_a     = active_bottom_rgba & 0xFF;
-    uint32_t active_bottom_color = (active_bottom_a << 24) | (active_bottom_b << 16) | (active_bottom_g << 8) | active_bottom_r;
+    uint32_t active_bottom_color = (active_bottom_a << 24) | (active_bottom_b << 16) | (active_bottom_g << 8) |
+                                   active_bottom_r;
 
     obs_data_set_int(settings, "color1", active_top_color);
     obs_data_set_int(settings, "color2", active_bottom_color);
