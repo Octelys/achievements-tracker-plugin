@@ -100,23 +100,23 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
     }
 
     // Set color - convert from RGBA to ABGR for OBS
-    uint32_t active_top_rgba  = config->active_top_color;
-    uint8_t  active_top_r     = (active_top_rgba >> 24) & 0xFF;
-    uint8_t  active_top_g     = (active_top_rgba >> 16) & 0xFF;
-    uint8_t  active_top_b     = (active_top_rgba >> 8) & 0xFF;
-    uint8_t  active_top_a     = active_top_rgba & 0xFF;
-    uint32_t active_top_color = (active_top_a << 24) | (active_top_b << 16) | (active_top_g << 8) | active_top_r;
+    uint32_t top_rgba  = config->active_top_color;
+    uint8_t  top_r     = (top_rgba >> 24) & 0xFF;
+    uint8_t  top_g     = (top_rgba >> 16) & 0xFF;
+    uint8_t  top_b     = (top_rgba >> 8) & 0xFF;
+    uint8_t  top_a     = top_rgba & 0xFF;
+    uint32_t top_color = (top_a << 24) | (top_b << 16) | (top_g << 8) | top_r;
 
-    uint32_t active_bottom_rgba  = config->active_bottom_color;
-    uint8_t  active_bottom_r     = (active_bottom_rgba >> 24) & 0xFF;
-    uint8_t  active_bottom_g     = (active_bottom_rgba >> 16) & 0xFF;
-    uint8_t  active_bottom_b     = (active_bottom_rgba >> 8) & 0xFF;
-    uint8_t  active_bottom_a     = active_bottom_rgba & 0xFF;
-    uint32_t active_bottom_color = (active_bottom_a << 24) | (active_bottom_b << 16) | (active_bottom_g << 8) |
-                                   active_bottom_r;
+    uint32_t bottom_rgba  = config->active_bottom_color;
+    uint8_t  bottom_r     = (bottom_rgba >> 24) & 0xFF;
+    uint8_t  bottom_g     = (bottom_rgba >> 16) & 0xFF;
+    uint8_t  bottom_b     = (bottom_rgba >> 8) & 0xFF;
+    uint8_t  bottom_a     = bottom_rgba & 0xFF;
+    uint32_t bottom_color = (bottom_a << 24) | (bottom_b << 16) | (bottom_g << 8) |
+                                   bottom_r;
 
-    obs_data_set_int(settings, "color1", active_top_color);
-    obs_data_set_int(settings, "color2", active_bottom_color);
+    obs_data_set_int(settings, "color1", top_color);
+    obs_data_set_int(settings, "color2", bottom_color);
     obs_data_set_int(settings, "opacity", 100);
 
     // Enable outline, disable drop shadow
