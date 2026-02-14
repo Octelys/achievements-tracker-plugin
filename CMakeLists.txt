@@ -341,7 +341,6 @@ target_sources(
     src/crypto/crypto.c
     src/drawing/color.c
     src/drawing/image.c
-    src/drawing/text.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c

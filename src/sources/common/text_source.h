@@ -2,7 +2,6 @@
 
 #include <obs-module.h>
 #include "common/types.h"
-#include "drawing/text.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -117,33 +117,21 @@ typedef struct source_size {
 } source_size_t;
 
 /**
- * @brief Text alignment options.
- */
-typedef enum text_align {
-    /** Align text to the left edge of the canvas. */
-    TEXT_ALIGN_LEFT  = 0,
-    /** Align text to the right edge of the canvas. */
-    TEXT_ALIGN_RIGHT = 1,
-} text_align_t;
-
-/**
  * @brief Common configuration for text-based sources.
  *
  * Contains all the shared configuration fields used across text sources.
  */
 typedef struct text_source_config {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     active_top_color;
-    uint32_t     active_bottom_color;
+    uint32_t    active_top_color;
+    uint32_t    active_bottom_color;
     /** Alternate color for locked achievements (0xRRGGBBAA format). */
-    uint32_t     inactive_top_color;
-    uint32_t     inactive_bottom_color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    inactive_top_color;
+    uint32_t    inactive_bottom_color;
 } text_source_config_t;
 
 /**
@@ -154,16 +142,14 @@ typedef struct text_source_config {
  *   caller.
  */
 typedef struct gamerscore_configuration {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Top gradient color in 0xRRGGBBAA format. */
-    uint32_t     top_color;
+    uint32_t    top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
-    uint32_t     bottom_color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    bottom_color;
 } gamerscore_configuration_t;
 
 /**
@@ -174,16 +160,14 @@ typedef struct gamerscore_configuration {
  *   caller.
  */
 typedef struct gamertag_configuration {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Top gradient color in 0xRRGGBBAA format. */
-    uint32_t     top_color;
+    uint32_t    top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
-    uint32_t     bottom_color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    bottom_color;
 } gamertag_configuration_t;
 
 /**
@@ -194,20 +178,18 @@ typedef struct gamertag_configuration {
  *   caller.
  */
 typedef struct achievement_name_configuration {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t     active_top_color;
+    uint32_t    active_top_color;
     /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t     active_bottom_color;
+    uint32_t    active_bottom_color;
     /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t     inactive_top_color;
+    uint32_t    inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t     inactive_bottom_color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    inactive_bottom_color;
 } achievement_name_configuration_t;
 
 /**
@@ -218,20 +200,18 @@ typedef struct achievement_name_configuration {
  *   caller.
  */
 typedef struct achievement_description_configuration {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t     active_top_color;
+    uint32_t    active_top_color;
     /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t     active_bottom_color;
+    uint32_t    active_bottom_color;
     /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t     inactive_top_color;
+    uint32_t    inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t     inactive_bottom_color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    inactive_bottom_color;
 } achievement_description_configuration_t;
 
 /**
@@ -242,14 +222,12 @@ typedef struct achievement_description_configuration {
  *   caller.
  */
 typedef struct achievements_unlocked_count_configuration {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    color;
 } achievements_unlocked_count_configuration_t;
 
 /**
@@ -260,14 +238,12 @@ typedef struct achievements_unlocked_count_configuration {
  *   caller.
  */
 typedef struct achievements_total_count_configuration {
-    const char  *font_face;
-    const char  *font_style;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    color;
 } achievements_total_count_configuration_t;
 
 /**

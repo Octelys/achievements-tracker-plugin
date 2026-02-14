@@ -25,6 +25,28 @@ static achievement_name_configuration_t *g_configuration;
 static bool                              g_is_achievement_unlocked = false;
 
 /**
+ * @brief Cached render configuration built from g_configuration.
+ *
+ * This is updated only when g_configuration changes to avoid reconstructing
+ * the config on every frame.
+ */
+static text_source_config_t g_render_config;
+
+/**
+ * @brief Update the cached render config from g_configuration.
+ *
+ * Should be called whenever g_configuration is modified.
+ */
+static void update_render_config(void) {
+    g_render_config.font_face             = g_configuration->font_face;
+    g_render_config.font_size             = g_configuration->font_size;
+    g_render_config.active_top_color      = g_configuration->active_top_color;
+    g_render_config.active_bottom_color   = g_configuration->active_bottom_color;
+    g_render_config.inactive_top_color    = g_configuration->inactive_top_color;
+    g_render_config.inactive_bottom_color = g_configuration->inactive_bottom_color;
+}
+
+/**
  * @brief Update and store the formatted achievement name string.
  *
  * Formats the achievement information as "XG - Achievement Name" where X is the
@@ -158,6 +180,8 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     text_source_update_properties(settings, (text_source_config_t *)g_configuration, &g_must_reload);
 
+    update_render_config();
+
     state_set_achievement_name_configuration(g_configuration);
 }
 
@@ -184,29 +208,15 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    /*
-     * Use alternate color for locked achievements.
-     * We create a temporary config with the appropriate color.
-     */
-    text_source_config_t render_config = {
-        .font_face             = g_configuration->font_face,
-        .font_size             = g_configuration->font_size,
-        .active_top_color      = g_configuration->active_top_color,
-        .active_bottom_color   = g_configuration->active_bottom_color,
-        .inactive_top_color    = g_configuration->inactive_top_color,
-        .inactive_bottom_color = g_configuration->inactive_bottom_color,
-        .align                 = g_configuration->align,
-    };
-
     bool use_active_color = g_is_achievement_unlocked;
     bool updated =
-        text_source_update_text(source, &g_must_reload, &render_config, g_achievement_name, use_active_color);
+        text_source_update_text(source, &g_must_reload, &g_render_config, g_achievement_name, use_active_color);
 
     if (!updated) {
         return;
     }
 
-    text_source_render(source, &render_config, effect);
+    text_source_render(source, &g_render_config, effect);
 }
 
 /**
@@ -223,22 +233,8 @@ static void on_source_video_tick(void *data, float seconds) {
         return;
     }
 
-    /*
-     * Use alternate color for locked achievements.
-     * This config must match the one used in on_source_video_render.
-     */
-    text_source_config_t render_config = {
-        .font_face             = g_configuration->font_face,
-        .font_size             = g_configuration->font_size,
-        .active_top_color      = g_configuration->active_top_color,
-        .active_bottom_color   = g_configuration->active_bottom_color,
-        .inactive_top_color    = g_configuration->inactive_top_color,
-        .inactive_bottom_color = g_configuration->inactive_bottom_color,
-        .align                 = g_configuration->align,
-    };
-
     /* Update fade transition animations */
-    text_source_tick(source, &render_config, seconds);
+    text_source_tick(source, &g_render_config, seconds);
 
     /* Update the shared achievement display cycle */
     achievement_cycle_tick(seconds);
@@ -322,6 +318,8 @@ void xbox_achievement_name_source_register(void) {
 
     g_configuration = state_get_achievement_name_configuration();
     state_set_achievement_name_configuration(g_configuration);
+
+    update_render_config();
 
     obs_register_source(xbox_source_get());
 

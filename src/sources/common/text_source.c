@@ -419,11 +419,6 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
             *must_reload = true;
         }
     }
-
-    if (obs_data_has_user_value(settings, "text_align")) {
-        config->align = (text_align_t)obs_data_get_int(settings, "text_align");
-        *must_reload  = true;
-    }
 }
 
 uint32_t text_source_get_width(text_source_t *base) {
