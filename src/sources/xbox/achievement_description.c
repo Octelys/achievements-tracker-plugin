@@ -35,7 +35,13 @@ static text_source_config_t g_render_config;
 /**
  * @brief Update the cached render config from g_configuration.
  *
- * Should be called whenever g_configuration is modified.
+ * Copies all rendering parameters from the global configuration to the cached
+ * render config. This optimization avoids reconstructing the config structure
+ * on every frame (60+ times per second). Should be called whenever g_configuration
+ * is modified, such as during initialization or when user settings change.
+ *
+ * The cached config is then used by on_source_video_render() and on_source_video_tick()
+ * for all rendering operations.
  */
 static void update_render_config(void) {
     g_render_config.font_face             = g_configuration->font_face;
@@ -151,9 +157,9 @@ static uint32_t source_get_height(void *data) {
  * @brief OBS callback invoked when source settings are updated.
  *
  * Processes changes to text color, size, font, and alignment from the OBS properties UI.
- * When settings change, updates the global configuration and triggers a text
- * context reload. The updated configuration is persisted to disk via the state
- * management system.
+ * When settings change, updates the global configuration, refreshes the cached render
+ * config, and triggers a text context reload. The updated configuration is persisted
+ * to disk via the state management system.
  *
  * @param data Source instance data (unused).
  * @param settings Updated OBS settings data.
@@ -174,12 +180,15 @@ static void on_source_update(void *data, obs_data_t *settings) {
  *
  * Lazily initializes or recreates the text rendering context when needed (on first
  * render or after configuration changes). Draws the achievement description string
- * using the configured font, size, and color.
+ * using the cached render configuration (g_render_config).
  *
  * The text context is recreated when:
  * - It hasn't been created yet (first render)
  * - Settings have changed (g_must_reload flag is set)
  * - Achievement description has been updated
+ *
+ * Performance: Uses cached g_render_config to avoid reconstructing the configuration
+ * struct on every frame.
  *
  * @param data   Source instance data containing width and height.
  * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
@@ -204,8 +213,14 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 /**
  * @brief OBS callback for animation tick.
  *
- * Updates fade transition animations and delegates achievement display cycle
- * management to the shared achievement_cycle module.
+ * Updates fade transition animations using the cached render configuration and
+ * delegates achievement display cycle management to the shared achievement_cycle module.
+ *
+ * Performance: Uses cached g_render_config to avoid reconstructing the configuration
+ * struct on every frame.
+ *
+ * @param data    Source instance data.
+ * @param seconds Time elapsed since last tick in seconds.
  */
 static void on_source_video_tick(void *data, float seconds) {
 

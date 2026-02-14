@@ -14,8 +14,21 @@
  */
 
 /** Default duration for each fade phase (in seconds). */
-#define TEXT_TRANSITION_DEFAULT_DURATION 2.0f
+#define TEXT_TRANSITION_DEFAULT_DURATION 1.0f
 
+/**
+ * @brief Set text colors with a specified opacity for fade transitions.
+ *
+ * Converts colors from RGBA format to OBS's ABGR format and applies the given
+ * opacity multiplier to the alpha channel. This is the core color-setting function
+ * used for both static display and fade animations.
+ *
+ * @param text_source Text source instance containing the active/inactive color selection state.
+ * @param settings    OBS data object to update with color1 and color2 values.
+ * @param config      Text source configuration containing active and inactive color definitions.
+ * @param opacity     Opacity multiplier in range [0.0, 1.0] applied to the alpha channel.
+ *                    Values outside this range are clamped automatically.
+ */
 static void set_color_with_opacity(text_source_t *text_source, obs_data_t *settings, const text_source_config_t *config,
                                    float opacity) {
 
@@ -41,6 +54,16 @@ static void set_color_with_opacity(text_source_t *text_source, obs_data_t *setti
     obs_data_set_int(settings, "color2", bottom_color);
 }
 
+/**
+ * @brief Set text colors at full opacity.
+ *
+ * Convenience wrapper around set_color_with_opacity() that applies colors at
+ * 100% opacity. Used when displaying text in its normal, non-transitioning state.
+ *
+ * @param text_source Text source instance containing the active/inactive color selection state.
+ * @param settings    OBS data object to update with color1 and color2 values.
+ * @param config      Text source configuration containing active and inactive color definitions.
+ */
 static void set_color(text_source_t *text_source, obs_data_t *settings, const text_source_config_t *config) {
     set_color_with_opacity(text_source, settings, config, 1.0f);
 }
