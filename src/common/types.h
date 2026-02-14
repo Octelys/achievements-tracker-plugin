@@ -198,9 +198,14 @@ typedef struct achievement_name_configuration {
     const char  *font_style;
     /** Font size in pixels (height passed to FreeType). */
     uint32_t     font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    uint32_t     alternate_color;
+    /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t     active_top_color;
+    /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t     active_bottom_color;
+    /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t     inactive_top_color;
+    /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t     inactive_bottom_color;
     /** Text alignment. */
     text_align_t align;
 } achievement_name_configuration_t;
@@ -217,9 +222,14 @@ typedef struct achievement_description_configuration {
     const char  *font_style;
     /** Font size in pixels (height passed to FreeType). */
     uint32_t     font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    uint32_t     alternate_color;
+    /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t     active_top_color;
+    /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t     active_bottom_color;
+    /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t     inactive_top_color;
+    /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t     inactive_bottom_color;
     /** Text alignment. */
     text_align_t align;
 } achievement_description_configuration_t;
