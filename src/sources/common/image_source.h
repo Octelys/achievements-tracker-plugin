@@ -49,7 +49,8 @@ typedef struct image_source_cache {
     char image_url[1024];
 
     /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
-    char image_path[512];
+    char  image_path[512];
+    char *id;
 
     /** GPU texture created from the downloaded image (owned by this cache). */
     gs_texture_t *image_texture;
@@ -84,10 +85,11 @@ void image_source_cache_init(image_source_cache_t *cache, const char *display_na
  * clears the cache and schedules a texture unload.
  *
  * @param cache     Image cache to update.
+ * @param id
  * @param image_url New image URL, or NULL to clear the image.
  * @return true if a new image was downloaded, false if URL unchanged or download failed.
  */
-bool image_source_download_if_changed(image_source_cache_t *cache, const char *image_url);
+bool image_source_download_if_changed(image_source_cache_t *cache, const char *id, const char *image_url);
 
 /**
  * @brief Force download an image from a URL (ignores URL change detection).

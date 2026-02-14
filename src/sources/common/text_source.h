@@ -41,6 +41,7 @@ typedef struct text_transition_state {
     text_transition_phase_t phase;
     /** Current opacity (0.0 to 1.0). */
     float                   opacity;
+    float                   last_opacity;
     /** Duration of each fade phase in seconds. */
     float                   duration;
 } text_transition_state_t;
@@ -59,6 +60,9 @@ typedef struct text_source {
     /** Internal OBS text source for rendering. */
     obs_source_t *private_obs_source;
     obs_data_t   *private_obs_source_settings;
+
+    /** Texture render for opacity effects. */
+    gs_texrender_t *texrender;
 
     /** Transition state for fade animations. */
     text_transition_state_t transition;
@@ -100,13 +104,13 @@ void text_source_destroy(text_source_t *text_source);
  * If no text source exists, creates it immediately and starts a fade-in.
  *
  * @param text_source        Text source base containing the OBS text source and transition state.
- * @param must_reload Pointer to the reload flag (will be cleared on reload).
+ * @param force_reload Pointer to the reload flag (will be cleared on reload).
  * @param config      Text source configuration (font, size, color, alignment).
  * @param text        Text string to render.
  * @return true if the text source is valid and ready to render, false otherwise.
  */
-bool text_source_reload(text_source_t *text_source, bool *must_reload, const text_source_config_t *config,
-                        const char *text);
+bool text_source_update_text(text_source_t *text_source, bool *force_reload, const text_source_config_t *config,
+                             const char *text);
 
 /**
  * @brief Render text source with opacity for fade animations.

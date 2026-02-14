@@ -39,7 +39,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
         char *gamerpic_url = (char *)xbox_fetch_gamerpic();
 
         if (gamerpic_url && gamerpic_url[0] != '\0') {
-            image_source_download_if_changed(&g_gamerpic, gamerpic_url);
+            image_source_download_if_changed(&g_gamerpic, "default", gamerpic_url);
         } else {
             image_source_clear(&g_gamerpic);
         }

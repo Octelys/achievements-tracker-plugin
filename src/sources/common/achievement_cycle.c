@@ -6,13 +6,13 @@
 #include "xbox/xbox_monitor.h"
 
 /** Duration to show the last unlocked achievement (seconds). */
-#define LAST_UNLOCKED_DISPLAY_DURATION 120.0f
+#define LAST_UNLOCKED_DISPLAY_DURATION 15.0f
 
 /** Duration to show each random locked achievement (seconds). */
-#define LOCKED_ACHIEVEMENT_DISPLAY_DURATION 45.0f
+#define LOCKED_ACHIEVEMENT_DISPLAY_DURATION 10.0f
 
 /** Total duration to cycle through locked achievements (seconds). */
-#define LOCKED_CYCLE_TOTAL_DURATION 120.0f
+#define LOCKED_CYCLE_TOTAL_DURATION 30.0f
 
 /** Maximum number of subscribers that can be registered. */
 #define MAX_SUBSCRIBERS 16

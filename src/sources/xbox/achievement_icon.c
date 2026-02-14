@@ -55,6 +55,7 @@ static icon_transition_state_t g_transition = {
  * @param achievement Achievement to display icon for. If NULL, clears the display.
  */
 static void update_achievement_icon(const achievement_t *achievement) {
+
     if (achievement && achievement->icon_url) {
         bool new_is_unlocked = achievement->unlocked_timestamp != 0;
 
@@ -75,7 +76,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
         } else {
             // No existing texture or first load - load immediately
             g_is_achievement_unlocked = new_is_unlocked;
-            image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
+            image_source_download_if_changed(&g_achievement_icon, achievement->id, achievement->icon_url);
 
             if (g_achievement_icon.image_texture) {
                 // Start fade-in
@@ -261,7 +262,7 @@ static void on_source_video_tick(void *data, float seconds) {
             /* Fade-out complete, load the pending icon */
             if (g_transition.pending_url) {
                 g_is_achievement_unlocked = g_transition.pending_is_unlocked;
-                image_source_download_if_changed(&g_achievement_icon, g_transition.pending_url);
+                image_source_download_if_changed(&g_achievement_icon, g_achievement_icon.id, g_transition.pending_url);
                 bfree(g_transition.pending_url);
                 g_transition.pending_url = NULL;
             }

@@ -180,10 +180,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_reload(source,
-                            &g_must_reload,
-                            (const text_source_config_t *)g_default_configuration,
-                            g_unlocked_count)) {
+    if (!text_source_update_text(source,
+                                 &g_must_reload,
+                                 (const text_source_config_t *)g_default_configuration,
+                                 g_unlocked_count)) {
         return;
     }
 
