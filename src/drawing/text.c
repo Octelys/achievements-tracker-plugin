@@ -153,14 +153,14 @@ text_context_t *text_context_create(const text_source_config_t *config, source_s
 
     text_context_t *out = NULL;
 
-    if (!config || !config->font_path || !text) {
+    if (!config || !config->font_face || !text) {
         obs_log(LOG_WARNING, "Unable to create the text context: invalid text parameters");
         return out;
     }
 
-    const char        *ttf_path = config->font_path;
+    const char        *ttf_path = config->font_face;
     const uint32_t     px_size  = config->font_size;
-    const uint32_t     color    = config->color;
+    const uint32_t     color    = config->active_top_color;
     const text_align_t align    = config->align;
     const uint32_t     width    = size.width;
     const uint32_t     height   = size.height;

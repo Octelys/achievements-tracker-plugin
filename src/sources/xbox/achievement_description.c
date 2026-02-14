@@ -3,7 +3,6 @@
 #include "sources/common/achievement_cycle.h"
 #include "sources/common/text_source.h"
 #include "common/achievement.h"
-#include "drawing/text.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -174,10 +173,10 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
      * We create a temporary config with the appropriate color.
      */
     text_source_config_t render_config = {
-        .font_path = g_configuration->font_path,
-        .font_size = g_configuration->font_size,
-        .color     = g_is_achievement_unlocked ? g_configuration->color : g_configuration->alternate_color,
-        .align     = g_configuration->align,
+        .font_face        = g_configuration->font_face,
+        .font_size        = g_configuration->font_size,
+        .active_top_color = g_is_achievement_unlocked ? g_configuration->color : g_configuration->alternate_color,
+        .align            = g_configuration->align,
     };
 
     if (!text_source_reload(source, &g_must_reload, &render_config, g_achievement_description)) {
@@ -206,10 +205,10 @@ static void on_source_video_tick(void *data, float seconds) {
      * This config must match the one used in on_source_video_render.
      */
     text_source_config_t render_config = {
-        .font_path = g_configuration->font_path,
-        .font_size = g_configuration->font_size,
-        .color     = g_is_achievement_unlocked ? g_configuration->color : g_configuration->alternate_color,
-        .align     = g_configuration->align,
+        .font_face        = g_configuration->font_face,
+        .font_size        = g_configuration->font_size,
+        .active_top_color = g_is_achievement_unlocked ? g_configuration->color : g_configuration->alternate_color,
+        .align            = g_configuration->align,
     };
 
     /* Update fade transition animations */
@@ -236,8 +235,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *p = obs_properties_create();
-    text_source_add_properties(p);
-    text_source_add_alternate_color_property(p);
+    text_source_add_properties(p, true);
 
     return p;
 }
@@ -294,23 +292,6 @@ static const struct obs_source_info *xbox_source_get(void) {
 void xbox_achievement_description_source_register(void) {
 
     g_configuration = state_get_achievement_description_configuration();
-
-    /* Force reset font if it looks like a path or is empty */
-    if (!g_configuration->font_path ||
-        strlen(g_configuration->font_path) == 0 ||
-        strchr(g_configuration->font_path, '/') != NULL ||
-        strstr(g_configuration->font_path, ".pdf") ||
-        strstr(g_configuration->font_path, ".png") ||
-        strstr(g_configuration->font_path, ".ttf") ||
-        strstr(g_configuration->font_path, ".otf") ||
-        strstr(g_configuration->font_path, "Downloads")) {
-
-        if (g_configuration->font_path) bfree((void*)g_configuration->font_path);
-        g_configuration->font_path = bstrdup("Arial");
-        obs_log(LOG_INFO, "[Achievement Description] Resetting font to 'Arial' to ensure visibility");
-    }
-
-    // Ensure config is saved
     state_set_achievement_description_configuration(g_configuration);
 
     obs_register_source(xbox_source_get());

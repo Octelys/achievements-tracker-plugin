@@ -138,8 +138,9 @@ void text_source_tick(text_source_base_t *base, const text_source_config_t *conf
  * - Text alignment dropdown (text_align): Left or Right alignment
  *
  * @param props Properties panel to add controls to.
+ * @param supports_inactive_color
  */
-void text_source_add_properties(obs_properties_t *props);
+void text_source_add_properties(obs_properties_t *props, bool supports_inactive_color);
 
 /**
  * @brief Add alternate color property for locked achievements.

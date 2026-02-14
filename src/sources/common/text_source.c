@@ -23,10 +23,10 @@ text_source_base_t *text_source_create(obs_source_t *source) {
         return NULL;
     }
 
-    base->source                = source;
-    base->text_freetype_source  = NULL;
-    base->current_text          = NULL;
-    base->pending_text          = NULL;
+    base->source               = source;
+    base->text_freetype_source = NULL;
+    base->current_text         = NULL;
+    base->pending_text         = NULL;
 
     // Initialize transition state
     base->transition.phase    = TEXT_TRANSITION_NONE;
@@ -67,12 +67,12 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
         return base && base->text_freetype_source != NULL;
     }
 
-    // If source already exists and we're not forcing a reload, keep it
+    // If the source already exists, and we're not forcing a reload, keep it
     if (!*must_reload && base->text_freetype_source) {
         return true;
     }
 
-    // Release existing text source if present
+    // Release existing text freetype source if present
     if (base->text_freetype_source) {
         obs_source_release(base->text_freetype_source);
         base->text_freetype_source = NULL;
@@ -89,33 +89,39 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
     // Set text content
     obs_data_set_string(settings, "text", text);
 
-    // Set font using font object for FreeType sources
-    if (config->font_path && strlen(config->font_path) > 0) {
+    // Set font using the font object for FreeType sources
+    if (config->font_face && strlen(config->font_face) > 0) {
         obs_data_t *font = obs_data_create();
-        obs_data_set_string(font, "face", config->font_path);
+        obs_data_set_string(font, "face", config->font_face);
         obs_data_set_int(font, "size", config->font_size);
-        obs_data_set_string(font, "style", "");
+        obs_data_set_string(font, "style", config->font_style);
         obs_data_set_int(font, "flags", 0);
         obs_data_set_obj(settings, "font", font);
         obs_data_release(font);
     }
 
     // Set color - convert from RGBA to ABGR for OBS
-    uint32_t rgba  = config->color;
-    uint8_t  r     = (rgba >> 24) & 0xFF;
-    uint8_t  g     = (rgba >> 16) & 0xFF;
-    uint8_t  b     = (rgba >> 8) & 0xFF;
-    uint8_t  a     = rgba & 0xFF;
-    uint32_t color = (a << 24) | (b << 16) | (g << 8) | r;
+    uint32_t active_top_rgba  = config->active_top_color;
+    uint8_t  active_top_r     = (active_top_rgba >> 24) & 0xFF;
+    uint8_t  active_top_g     = (active_top_rgba >> 16) & 0xFF;
+    uint8_t  active_top_b     = (active_top_rgba >> 8) & 0xFF;
+    uint8_t  active_top_a     = active_top_rgba & 0xFF;
+    uint32_t active_top_color = (active_top_a << 24) | (active_top_b << 16) | (active_top_g << 8) | active_top_r;
 
-    obs_data_set_int(settings, "color1", color);
-    obs_data_set_int(settings, "color2", color);
+    uint32_t active_bottom_rgba  = config->active_bottom_color;
+    uint8_t  active_bottom_r     = (active_bottom_rgba >> 24) & 0xFF;
+    uint8_t  active_bottom_g     = (active_bottom_rgba >> 16) & 0xFF;
+    uint8_t  active_bottom_b     = (active_bottom_rgba >> 8) & 0xFF;
+    uint8_t  active_bottom_a     = active_bottom_rgba & 0xFF;
+    uint32_t active_bottom_color = (active_bottom_a << 24) | (active_bottom_b << 16) | (active_bottom_g << 8) | active_bottom_r;
+
+    obs_data_set_int(settings, "color1", active_top_color);
+    obs_data_set_int(settings, "color2", active_bottom_color);
     obs_data_set_int(settings, "opacity", 100);
 
     // Enable outline, disable drop shadow
     obs_data_set_bool(settings, "outline", true);
     obs_data_set_bool(settings, "drop_shadow", false);
-
 
     // Try to create a text source - try FreeType v2 first (most common on macOS)
     base->text_freetype_source = obs_source_create_private("text_ft2_source_v2", "internal_text", settings);
@@ -140,11 +146,11 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
         return false;
     }
 
-
     // Store current text
     if (base->current_text) {
         bfree(base->current_text);
     }
+
     base->current_text = bstrdup(text);
 
     // Start with fade-in transition
@@ -216,33 +222,23 @@ void text_source_tick(text_source_base_t *base, const text_source_config_t *conf
     }
 }
 
-void text_source_add_properties(obs_properties_t *props) {
+void text_source_add_properties(obs_properties_t *props, bool supports_inactive_color) {
 
     if (!props) {
         return;
     }
 
-    // Font dropdown
-    obs_property_t *font_list =
-        obs_properties_add_list(props, "text_font", "Font", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+    obs_properties_add_font(props, "text_font", "Font");
 
-    size_t  font_count = 0;
-    font_t *fonts      = font_list_available(&font_count);
+    // (Active) Color picker
+    obs_properties_add_color(props, "text_active_top_color", "Active text color (Top)");
+    obs_properties_add_color(props, "text_active_bottom_color", "Active text color (Bottom)");
 
-    if (fonts) {
-        for (size_t i = 0; i < font_count; i++) {
-            if (fonts[i].name && fonts[i].path) {
-                obs_property_list_add_string(font_list, fonts[i].name, fonts[i].name);
-            }
-        }
-        font_list_free(fonts, font_count);
+    if (supports_inactive_color) {
+        // (Inactive) Color picker
+        obs_properties_add_color(props, "text_inactive_top_color", "Inactive text color (Top)");
+        obs_properties_add_color(props, "text_inactive_bottom_color", "Inactive text color (Bottom)");
     }
-
-    // Color picker
-    obs_properties_add_color(props, "text_color", "Text color");
-
-    // Size slider
-    obs_properties_add_int(props, "text_size", "Text size", 10, 164, 1);
 
     // Alignment dropdown
     obs_property_t *align_list =
@@ -251,31 +247,40 @@ void text_source_add_properties(obs_properties_t *props) {
     obs_property_list_add_int(align_list, "Right", TEXT_ALIGN_RIGHT);
 }
 
-void text_source_add_alternate_color_property(obs_properties_t *props) {
-
-    if (!props) {
-        return;
-    }
-
-    obs_properties_add_color(props, "text_alternate_color", "Locked achievement color");
-}
-
 void text_source_update_properties(obs_data_t *settings, text_source_config_t *config, bool *must_reload) {
 
     if (!settings || !must_reload || !config) {
         return;
     }
 
-    if (obs_data_has_user_value(settings, "text_color")) {
-        const uint32_t argb = (uint32_t)obs_data_get_int(settings, "text_color");
-        config->color       = color_argb_to_rgba(argb);
-        *must_reload        = true;
+    if (obs_data_has_user_value(settings, "text_active_top_color")) {
+        const uint32_t argb      = (uint32_t)obs_data_get_int(settings, "text_active_top_color");
+        config->active_top_color = color_argb_to_rgba(argb);
+        *must_reload             = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_active_bottom_color")) {
+        const uint32_t argb         = (uint32_t)obs_data_get_int(settings, "text_active_bottom_color");
+        config->active_bottom_color = color_argb_to_rgba(argb);
+        *must_reload                = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_inactive_top_color")) {
+        const uint32_t argb        = (uint32_t)obs_data_get_int(settings, "text_inactive_top_color");
+        config->inactive_top_color = color_argb_to_rgba(argb);
+        *must_reload               = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_inactive_bottom_color")) {
+        const uint32_t argb           = (uint32_t)obs_data_get_int(settings, "text_inactive_bottom_color");
+        config->inactive_bottom_color = color_argb_to_rgba(argb);
+        *must_reload                  = true;
     }
 
     if (obs_data_has_user_value(settings, "text_alternate_color")) {
-        const uint32_t argb     = (uint32_t)obs_data_get_int(settings, "text_alternate_color");
-        config->alternate_color = color_argb_to_rgba(argb);
-        *must_reload            = true;
+        const uint32_t argb        = (uint32_t)obs_data_get_int(settings, "text_alternate_color");
+        config->inactive_top_color = color_argb_to_rgba(argb);
+        *must_reload               = true;
     }
 
     if (obs_data_has_user_value(settings, "text_size")) {
@@ -284,8 +289,19 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
     }
 
     if (obs_data_has_user_value(settings, "text_font")) {
-        config->font_path = obs_data_get_string(settings, "text_font");
-        *must_reload      = true;
+        obs_data_t *font_obj = obs_data_get_obj(settings, "text_font");
+        if (font_obj) {
+            config->font_face  = obs_data_get_string(font_obj, "face");
+            config->font_size  = (uint32_t)obs_data_get_int(font_obj, "size");
+            config->font_style = obs_data_get_string(font_obj, "style");
+            obs_log(LOG_INFO,
+                    "[TextSource] Using font '%s' (%d) with style '%s'",
+                    config->font_face,
+                    config->font_size,
+                    config->font_style);
+            obs_data_release(font_obj);
+            *must_reload = true;
+        }
     }
 
     if (obs_data_has_user_value(settings, "text_align")) {
@@ -307,4 +323,3 @@ uint32_t text_source_get_height(text_source_base_t *base) {
     }
     return obs_source_get_height(base->text_freetype_source);
 }
-

@@ -17,7 +17,6 @@
 #include "oauth/xbox-live.h"
 #include "xbox/xbox_monitor.h"
 
-
 /** Current gamertag text to display. */
 static char g_gamertag[256];
 
@@ -72,11 +71,11 @@ static void on_source_destroy(void *data) {
 }
 
 static uint32_t source_get_width(void *data) {
-    return text_source_get_width((text_source_base_t *)data);
+    return text_source_get_width(data);
 }
 
 static uint32_t source_get_height(void *data) {
-    return text_source_get_height((text_source_base_t *)data);
+    return text_source_get_height(data);
 }
 
 static void on_source_update(void *data, obs_data_t *settings) {
@@ -103,7 +102,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *props = obs_properties_create();
-    text_source_add_properties(props);
+    text_source_add_properties(props, false);
     return props;
 }
 
@@ -134,21 +133,11 @@ static struct obs_source_info xbox_gamertag_source = {
 //  --------------------------------------------------------------------------------------------------------------------
 
 void xbox_gamertag_source_register(void) {
+
     g_configuration = state_get_gamertag_configuration();
-
-    // Reset the font if it's a file path instead of a font name
-    if (!g_configuration->font_path || strlen(g_configuration->font_path) == 0 ||
-        strchr(g_configuration->font_path, '/') != NULL || strstr(g_configuration->font_path, ".ttf") ||
-        strstr(g_configuration->font_path, ".otf")) {
-
-        if (g_configuration->font_path) {
-            bfree((void *)g_configuration->font_path);
-        }
-        g_configuration->font_path = bstrdup("Arial");
-    }
-
     state_set_gamertag_configuration(g_configuration);
 
     obs_register_source(&xbox_gamertag_source);
+
     xbox_subscribe_connected_changed(&on_connection_changed);
 }

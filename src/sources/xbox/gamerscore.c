@@ -22,7 +22,6 @@
  */
 
 #include "sources/common/text_source.h"
-#include "drawing/text.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -169,7 +168,9 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_reload(source, &g_must_reload, (const text_source_config_t *)g_default_configuration,
+    if (!text_source_reload(source,
+                            &g_must_reload,
+                            (const text_source_config_t *)g_default_configuration,
                             g_gamerscore)) {
         return;
     }
@@ -203,7 +204,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *p = obs_properties_create();
-    text_source_add_properties(p);
+    text_source_add_properties(p, false);
 
     return p;
 }
@@ -247,23 +248,6 @@ static const struct obs_source_info *xbox_source_get(void) {
 void xbox_gamerscore_source_register(void) {
 
     g_default_configuration = state_get_gamerscore_configuration();
-
-    /* Force reset font if it looks like a path or is empty */
-    if (!g_default_configuration->font_path ||
-        strlen(g_default_configuration->font_path) == 0 ||
-        strchr(g_default_configuration->font_path, '/') != NULL ||
-        strstr(g_default_configuration->font_path, ".pdf") || // Was pointing to bad paths often
-        strstr(g_default_configuration->font_path, ".png") ||
-        strstr(g_default_configuration->font_path, ".ttf") ||
-        strstr(g_default_configuration->font_path, ".otf") ||
-        strstr(g_default_configuration->font_path, "Downloads")) {
-
-        if (g_default_configuration->font_path) bfree((void*)g_default_configuration->font_path);
-        g_default_configuration->font_path = bstrdup("Arial");
-        obs_log(LOG_INFO, "[Gamerscore] Resetting font to 'Arial' to ensure visibility");
-    }
-
-    // Ensure config is saved
     state_set_gamerscore_configuration(g_default_configuration);
 
     obs_register_source(xbox_source_get());
