@@ -14,7 +14,7 @@
  */
 
 /** Default duration for each fade phase (in seconds). */
-#define TEXT_TRANSITION_DEFAULT_DURATION 1.0f
+#define TEXT_TRANSITION_DEFAULT_DURATION 0.35f
 
 /**
  * @brief Set text colors with a specified opacity for fade transitions.
