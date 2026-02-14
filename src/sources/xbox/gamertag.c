@@ -60,11 +60,11 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     UNUSED_PARAMETER(settings);
 
     update_gamertag();
-    return text_source_create(source);
+    return text_source_create(source, "Gamertag");
 }
 
 static void on_source_destroy(void *data) {
-    text_source_base_t *source = data;
+    text_source_t *source = data;
     if (source) {
         text_source_destroy(source);
     }
@@ -87,15 +87,15 @@ static void on_source_update(void *data, obs_data_t *settings) {
 }
 
 static void on_source_video_render(void *data, gs_effect_t *effect) {
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (text_source_reload(source, &g_must_reload, (const text_source_config_t *)g_configuration, g_gamertag)) {
-        text_source_render(source, effect);
+        text_source_render(source, (const text_source_config_t *)g_configuration, effect);
     }
 }
 
 static void on_source_video_tick(void *data, float seconds) {
-    text_source_tick((text_source_base_t *)data, (const text_source_config_t *)g_configuration, seconds);
+    text_source_tick((text_source_t *)data, (const text_source_config_t *)g_configuration, seconds);
 }
 
 static obs_properties_t *source_get_properties(void *data) {

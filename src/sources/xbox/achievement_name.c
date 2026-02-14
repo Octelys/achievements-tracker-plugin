@@ -91,7 +91,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    return text_source_create(source);
+    return text_source_create(source, "Achievement name");
 }
 
 /**
@@ -104,7 +104,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;
@@ -123,7 +123,7 @@ static void on_source_destroy(void *data) {
  * @return Text width in pixels, or 0 if no text is rendered.
  */
 static uint32_t source_get_width(void *data) {
-    text_source_base_t *s = data;
+    text_source_t *s = data;
     return text_source_get_width(s);
 }
 
@@ -137,7 +137,7 @@ static uint32_t source_get_width(void *data) {
  * @return Text height in pixels, or 0 if no text is rendered.
  */
 static uint32_t source_get_height(void *data) {
-    text_source_base_t *s = data;
+    text_source_t *s = data;
     return text_source_get_height(s);
 }
 
@@ -178,7 +178,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;
@@ -206,7 +206,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    text_source_render(source, effect);
+    text_source_render(source, &render_config, effect);
 }
 
 /**
@@ -217,7 +217,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  */
 static void on_source_video_tick(void *data, float seconds) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;

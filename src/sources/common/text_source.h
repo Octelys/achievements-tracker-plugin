@@ -50,12 +50,15 @@ typedef struct text_transition_state {
  *
  * Embed this structure in source-specific structs to inherit common fields.
  */
-typedef struct text_source_base {
+typedef struct text_source {
+    char *name;
+
     /** OBS source instance. */
-    obs_source_t *source;
+    obs_source_t *obs_source;
 
     /** Internal OBS text source for rendering. */
-    obs_source_t *text_freetype_source;
+    obs_source_t *private_obs_source;
+    obs_data_t   *private_obs_source_settings;
 
     /** Transition state for fade animations. */
     text_transition_state_t transition;
@@ -66,7 +69,7 @@ typedef struct text_source_base {
     /** Current text being displayed. */
     char *current_text;
 
-} text_source_base_t;
+} text_source_t;
 
 /**
  * @brief Create and initialize a text source base structure.
@@ -76,16 +79,16 @@ typedef struct text_source_base {
  * @param source OBS source instance.
  * @return Newly allocated text_source_base_t, or NULL on failure. Caller must free with bfree().
  */
-text_source_base_t *text_source_create(obs_source_t *source);
+text_source_t *text_source_create(obs_source_t *source, const char *name);
 
 /**
  * @brief Destroy a text source base structure.
  *
  * Releases the internal OBS text source and frees all allocated memory.
  *
- * @param base Text source base to destroy. Safe to call with NULL.
+ * @param text_source Text source base to destroy. Safe to call with NULL.
  */
-void text_source_destroy(text_source_base_t *base);
+void text_source_destroy(text_source_t *text_source);
 
 /**
  * @brief Reload text source if needed, with fade transition support.
@@ -96,13 +99,13 @@ void text_source_destroy(text_source_base_t *base);
  *
  * If no text source exists, creates it immediately and starts a fade-in.
  *
- * @param base        Text source base containing the OBS text source and transition state.
+ * @param text_source        Text source base containing the OBS text source and transition state.
  * @param must_reload Pointer to the reload flag (will be cleared on reload).
  * @param config      Text source configuration (font, size, color, alignment).
  * @param text        Text string to render.
  * @return true if the text source is valid and ready to render, false otherwise.
  */
-bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_source_config_t *config,
+bool text_source_reload(text_source_t *text_source, bool *must_reload, const text_source_config_t *config,
                         const char *text);
 
 /**
@@ -110,10 +113,10 @@ bool text_source_reload(text_source_base_t *base, bool *must_reload, const text_
  *
  * Renders the internal OBS text source with the current transition opacity.
  *
- * @param base   Text source base containing the OBS text source and transition state.
+ * @param text_source   Text source base containing the OBS text source and transition state.
  * @param effect Effect to use for rendering. Pass NULL to use the default effect.
  */
-void text_source_render(text_source_base_t *base, gs_effect_t *effect);
+void text_source_render(text_source_t *text_source, const text_source_config_t *config, gs_effect_t *effect);
 
 /**
  * @brief Update the transition animation state.
@@ -122,11 +125,11 @@ void text_source_render(text_source_base_t *base, gs_effect_t *effect);
  * When a fade-out completes and pending text exists, triggers a reload
  * and begins the fade-in phase.
  *
- * @param base        Text source base containing a transition state.
+ * @param text_source        Text source base containing a transition state.
  * @param config      Text source configuration.
  * @param seconds     Time has elapsed since the last tick.
  */
-void text_source_tick(text_source_base_t *base, const text_source_config_t *config, float seconds);
+void text_source_tick(text_source_t *text_source, const text_source_config_t *config, float seconds);
 
 /**
  * @brief Add common text properties to a properties panel.
@@ -173,7 +176,7 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
  * @param base Text source base containing the OBS text source.
  * @return Width in pixels, or 0 if no text source exists.
  */
-uint32_t text_source_get_width(text_source_base_t *base);
+uint32_t text_source_get_width(text_source_t *base);
 
 /**
  * @brief Get the height of the rendered text.
@@ -184,7 +187,7 @@ uint32_t text_source_get_width(text_source_base_t *base);
  * @param base Text source base containing the OBS text source.
  * @return Height in pixels, or 0 if no text source exists.
  */
-uint32_t text_source_get_height(text_source_base_t *base);
+uint32_t text_source_get_height(text_source_t *base);
 
 #ifdef __cplusplus
 }
