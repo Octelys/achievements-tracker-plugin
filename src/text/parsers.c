@@ -47,7 +47,7 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
 
     const char *property_value = get_node_string(json_root, achievement_index, property_name);
 
-    obs_log(LOG_INFO, "%s=%s", property_name, property_value);
+    obs_log(LOG_DEBUG, "%s=%s", property_name, property_value);
 
     if (!property_value || strlen(property_value) == 0) {
         return 0;
@@ -64,9 +64,11 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
         return 0;
     }
 
-    obs_log(LOG_INFO, "%s=%" PRId64, property_name, unix_timestamp);
+    obs_log(LOG_DEBUG, "%s=%" PRId64, property_name, unix_timestamp);
 
-    return unix_timestamp;
+    /* If the achievement is locked, the date returned is 0001-01-01, which in unix timestamp is definitely negative */
+    /* We assume a timestamp equal to 0 is a locked achievement */
+    return unix_timestamp > 0 ? unix_timestamp : 0;
 }
 
 static bool contains_node(const char *json_string, const char *node_key) {
@@ -155,7 +157,11 @@ game_t *parse_game(const char *json_string) {
 
         cJSON *game_title_value = cJSONUtils_GetPointer(json_root, game_title_key);
 
-        obs_log(LOG_DEBUG, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
+        if (game_title_value->valuestring[0] == '\0') {
+            continue;
+        }
+
+        obs_log(LOG_INFO, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
 
         char game_id_key[512];
         snprintf(game_id_key, sizeof(game_id_key), "/presenceDetails/%d/titleId", detail_index);

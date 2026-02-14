@@ -3,10 +3,10 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "common/achievement.h"
 #include "oauth/xbox-live.h"
+#include "sources/common/achievement_cycle.h"
 #include "sources/common/image_source.h"
-#include "xbox/xbox_client.h"
-#include "xbox/xbox_monitor.h"
 
 /**
  * @brief Global singleton achievement icon cache.
@@ -16,81 +16,97 @@
  */
 static image_source_cache_t g_achievement_icon;
 
+static bool g_is_achievement_unlocked = false;
+
+/** Default duration for each fade phase (in seconds). */
+#define ICON_TRANSITION_DEFAULT_DURATION 0.5f
+
+/**
+ * @brief Transition phase for icon fade animations.
+ */
+typedef enum icon_transition_phase {
+    ICON_TRANSITION_NONE = 0,
+    ICON_TRANSITION_FADE_OUT,
+    ICON_TRANSITION_FADE_IN,
+} icon_transition_phase_t;
+
+/**
+ * @brief Transition state for icon fade animations.
+ */
+typedef struct icon_transition_state {
+    icon_transition_phase_t phase;
+    float                   opacity;
+    float                   duration;
+    char                   *pending_url;
+    bool                    pending_is_unlocked;
+} icon_transition_state_t;
+
+static icon_transition_state_t g_transition = {
+    .phase               = ICON_TRANSITION_NONE,
+    .opacity             = 1.0f,
+    .duration            = ICON_TRANSITION_DEFAULT_DURATION,
+    .pending_url         = NULL,
+    .pending_is_unlocked = false,
+};
+
+/**
+ * @brief Update the achievement icon display.
+ *
+ * @param achievement Achievement to display icon for. If NULL, clears the display.
+ */
+static void update_achievement_icon(const achievement_t *achievement) {
+
+    if (achievement && achievement->icon_url) {
+        bool new_is_unlocked = achievement->unlocked_timestamp != 0;
+
+        // Check if the icon URL or unlock state changed
+        bool url_changed = (g_achievement_icon.image_url[0] == '\0') ||
+                           (strcmp(g_achievement_icon.image_url, achievement->icon_url) != 0);
+        bool state_changed = (g_is_achievement_unlocked != new_is_unlocked);
+
+        if ((url_changed || state_changed) && g_achievement_icon.image_texture) {
+            // Start a fade-out transition
+            if (g_transition.pending_url) {
+                bfree(g_transition.pending_url);
+            }
+            g_transition.pending_url         = bstrdup(achievement->icon_url);
+            g_transition.pending_is_unlocked = new_is_unlocked;
+            g_transition.phase               = ICON_TRANSITION_FADE_OUT;
+            g_transition.opacity             = 1.0f;
+        } else {
+            // No existing texture or first load - load immediately
+            g_is_achievement_unlocked = new_is_unlocked;
+            image_source_download_if_changed(&g_achievement_icon, achievement->id, achievement->icon_url);
+
+            if (g_achievement_icon.image_texture) {
+                // Start fade-in
+                g_transition.phase   = ICON_TRANSITION_FADE_IN;
+                g_transition.opacity = 0.0f;
+            }
+        }
+    } else {
+        image_source_clear(&g_achievement_icon);
+        g_is_achievement_unlocked = false;
+        g_transition.phase        = ICON_TRANSITION_NONE;
+        g_transition.opacity      = 1.0f;
+    }
+}
+
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Xbox monitor callback invoked when Xbox Live connection state changes.
+ * @brief Achievement cycle callback invoked when the displayed achievement changes.
  *
- * Retrieves the current game's most recent achievement and updates the icon display.
- * This ensures the achievement icon source reflects the latest data when the
- * connection is established or re-established.
+ * Updates the achievement icon display with the new achievement. This is called
+ * by the shared achievement cycle module whenever the display should change.
  *
- * @param is_connected Whether the Xbox account is currently connected.
- * @param error_message Optional error message if disconnected (unused).
+ * @param achievement Achievement to display. If NULL, clears the display.
  */
-static void on_connection_changed(bool is_connected, const char *error_message) {
+static void on_achievement_changed(const achievement_t *achievement) {
 
-    UNUSED_PARAMETER(error_message);
-
-    if (is_connected) {
-        obs_log(LOG_INFO, "Connected to Xbox Live - fetching achievement icon URL");
-
-        const achievement_t *achievement = get_current_game_achievements();
-
-        if (achievement && achievement->icon_url) {
-            image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
-        } else {
-            image_source_clear(&g_achievement_icon);
-        }
-    } else {
-        image_source_clear(&g_achievement_icon);
-    }
-}
-
-/**
- * @brief Event handler called when a new game starts being played.
- *
- * Fetches the cover-art URL for the given game and triggers a download.
- *
- * @param game Currently played game information.
- */
-static void on_xbox_game_played(const game_t *game) {
-
-    UNUSED_PARAMETER(game);
-
-    const achievement_t *achievement = get_current_game_achievements();
-
-    if (achievement && achievement->icon_url) {
-        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
-    } else {
-        image_source_clear(&g_achievement_icon);
-    }
-}
-
-/**
- * @brief Xbox monitor callback invoked when achievement progress is updated.
- *
- * Retrieves the current game's most recent achievement and updates the icon display
- * to show the newly unlocked achievement's icon. This callback ensures the source
- * always displays the latest achievement that was unlocked.
- *
- * @param gamerscore Updated gamerscore snapshot (unused).
- * @param progress   Achievement progress details (unused).
- */
-static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
-
-    UNUSED_PARAMETER(gamerscore);
-    UNUSED_PARAMETER(progress);
-
-    const achievement_t *achievement = get_current_game_achievements();
-
-    if (achievement && achievement->icon_url) {
-        image_source_download_if_changed(&g_achievement_icon, achievement->icon_url);
-    } else {
-        image_source_clear(&g_achievement_icon);
-    }
+    update_achievement_icon(achievement);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -192,7 +208,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 /**
  * @brief OBS callback to render the achievement icon image.
  *
- * Loads a new texture if required and draws it using draw_texture().
+ * Loads a new texture if required and draws it with opacity for fade animations.
  * The texture is lazily loaded from the downloaded icon file on the first
  * render after an achievement unlock.
  *
@@ -210,8 +226,67 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     /* Load image if needed (deferred load in graphics context) */
     image_source_reload_if_needed(&g_achievement_icon);
 
-    /* Render the image if we have a texture */
-    image_source_render(&g_achievement_icon, source->size, effect);
+    /* Get current opacity from transition state */
+    float opacity = g_transition.opacity;
+
+    if (g_is_achievement_unlocked) {
+        /* Render the image with opacity if we have a texture */
+        image_source_render_with_opacity(&g_achievement_icon, source->size, effect, opacity);
+    } else {
+        image_source_render_greyscale_with_opacity(&g_achievement_icon, source->size, effect, opacity);
+    }
+}
+
+/**
+ * @brief OBS callback for animation tick.
+ *
+ * Updates fade transition animations and delegates achievement display cycle
+ * management to the shared achievement_cycle module.
+ */
+static void on_source_video_tick(void *data, float seconds) {
+
+    UNUSED_PARAMETER(data);
+
+    /* Update fade transition animations */
+    float duration = g_transition.duration;
+    if (duration <= 0.0f) {
+        duration = ICON_TRANSITION_DEFAULT_DURATION;
+    }
+
+    switch (g_transition.phase) {
+    case ICON_TRANSITION_FADE_OUT:
+        g_transition.opacity -= seconds / duration;
+        if (g_transition.opacity <= 0.0f) {
+            g_transition.opacity = 0.0f;
+
+            /* Fade-out complete, load the pending icon */
+            if (g_transition.pending_url) {
+                g_is_achievement_unlocked = g_transition.pending_is_unlocked;
+                image_source_download_if_changed(&g_achievement_icon, g_achievement_icon.id, g_transition.pending_url);
+                bfree(g_transition.pending_url);
+                g_transition.pending_url = NULL;
+            }
+
+            /* Start fade-in */
+            g_transition.phase = ICON_TRANSITION_FADE_IN;
+        }
+        break;
+
+    case ICON_TRANSITION_FADE_IN:
+        g_transition.opacity += seconds / duration;
+        if (g_transition.opacity >= 1.0f) {
+            g_transition.opacity = 1.0f;
+            g_transition.phase   = ICON_TRANSITION_NONE;
+        }
+        break;
+
+    case ICON_TRANSITION_NONE:
+    default:
+        break;
+    }
+
+    /* Update the shared achievement display cycle */
+    achievement_cycle_tick(seconds);
 }
 
 /**
@@ -265,7 +340,7 @@ static struct obs_source_info xbox_achievement_icon_source_info = {
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
     .get_height     = source_get_height,
-    .video_tick     = NULL,
+    .video_tick     = on_source_video_tick,
 };
 
 /**
@@ -289,7 +364,5 @@ void xbox_achievement_icon_source_register(void) {
 
     obs_register_source(xbox_achievement_icon_source_get());
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
-    xbox_subscribe_game_played(&on_xbox_game_played);
-    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
+    achievement_cycle_subscribe(&on_achievement_changed);
 }

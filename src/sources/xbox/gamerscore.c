@@ -22,7 +22,6 @@
  */
 
 #include "sources/common/text_source.h"
-#include "drawing/text.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -34,9 +33,8 @@
 
 #define NO_FLIP 0
 
-static char            g_gamerscore[64];
-static bool            g_must_reload;
-static text_context_t *g_text_context;
+static char g_gamerscore[64];
+static bool g_must_reload;
 
 /**
  * @brief Configuration for rendering digits from the font sheet.
@@ -110,7 +108,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    return text_source_create(source, (source_size_t){600, 200});
+    return text_source_create(source, "Gamerscore");
 }
 
 /**
@@ -118,30 +116,25 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;
     }
 
-    if (g_text_context) {
-        text_context_destroy(g_text_context);
-        g_text_context = NULL;
-    }
-
-    bfree(source);
+    text_source_destroy(source);
 }
 
-/** @brief OBS callback returning the configured source width. */
+/** @brief OBS callback returning the natural text width. */
 static uint32_t source_get_width(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.width : 0;
+    text_source_t *s = data;
+    return text_source_get_width(s);
 }
 
-/** @brief OBS callback returning the configured source height. */
+/** @brief OBS callback returning the natural text height. */
 static uint32_t source_get_height(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.height : 0;
+    text_source_t *s = data;
+    return text_source_get_height(s);
 }
 
 /**
@@ -169,21 +162,37 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;
     }
 
-    if (!text_source_reload_if_needed(&g_text_context,
-                                      &g_must_reload,
-                                      (const text_source_config_t *)g_default_configuration,
-                                      source,
-                                      g_gamerscore)) {
+    if (!text_source_update_text(source,
+                                 &g_must_reload,
+                                 (const text_source_config_t *)g_default_configuration,
+                                 g_gamerscore,
+                                 true)) {
         return;
     }
 
-    text_source_render_unscaled(g_text_context, effect);
+    text_source_render(source, (const text_source_config_t *)g_default_configuration, effect);
+}
+
+/**
+ * @brief OBS callback for animation tick.
+ *
+ * Updates fade transition animations.
+ */
+static void on_source_video_tick(void *data, float seconds) {
+
+    text_source_t *source = data;
+
+    if (!source) {
+        return;
+    }
+
+    text_source_tick(source, (const text_source_config_t *)g_default_configuration, seconds);
 }
 
 /**
@@ -196,7 +205,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *p = obs_properties_create();
-    text_source_add_properties(p);
+    text_source_add_properties(p, false);
 
     return p;
 }
@@ -222,7 +231,7 @@ static struct obs_source_info xbox_gamerscore_source = {
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
     .get_height     = source_get_height,
-    .video_tick     = NULL,
+    .video_tick     = on_source_video_tick,
     .video_render   = on_source_video_render,
 };
 
@@ -239,14 +248,8 @@ static const struct obs_source_info *xbox_source_get(void) {
 
 void xbox_gamerscore_source_register(void) {
 
-    g_default_configuration = bzalloc(sizeof(gamerscore_configuration_t));
-
     g_default_configuration = state_get_gamerscore_configuration();
-
-    /* TODO A default font sheet path should be embedded with the plugin */
-    if (!g_default_configuration->font_path) {
-        g_default_configuration->font_path = "/Users/christophe/Downloads/font_sheet.png";
-    }
+    state_set_gamerscore_configuration(g_default_configuration);
 
     obs_register_source(xbox_source_get());
 

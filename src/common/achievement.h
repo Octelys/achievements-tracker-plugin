@@ -31,7 +31,7 @@ typedef struct media_asset {
  * - The list is singly-linked via @c next.
  */
 typedef struct reward {
-    /** Reward value (format depends on upstream service). */
+    /** Reward value (the format depends on upstream service). */
     const char    *value;
     /** Next node in the list, or NULL. */
     struct reward *next;
@@ -40,7 +40,7 @@ typedef struct reward {
 /**
  * @brief Linked-list node describing an achievement and its metadata.
  *
- * This type is used as a singly-linked list (@c next). Most fields are strings
+ * This type is used as a singly linked list (@c next). Most fields are strings
  * coming from the service. When an @c achievement_t is produced by
  * @ref copy_achievement, all strings and nested lists are deep-copied.
  *
@@ -153,6 +153,33 @@ void free_achievement(achievement_t **achievement);
  * @return Number of nodes in the list. Returns 0 if @p achievements is NULL.
  */
 int count_achievements(const achievement_t *achievements);
+
+/**
+ * @brief Find the most recently unlocked achievement.
+ *
+ * Iterates through the achievements list and returns the one with the highest
+ * unlocked_timestamp (most recent unlock).
+ *
+ * @param achievements Head of the achievements linked list.
+ * @return Pointer to the most recently unlocked achievement, or NULL if none are unlocked.
+ */
+const achievement_t *find_latest_unlocked_achievement(const achievement_t *achievements);
+
+/**
+ * @brief Count the number of locked achievements.
+ *
+ * @param achievements Head of the achievements linked list.
+ * @return Number of locked achievements (unlocked_timestamp == 0).
+ */
+int count_locked_achievements(const achievement_t *achievements);
+
+/**
+ * @brief Get a random locked achievement.
+ *
+ * @param achievements Head of the achievements linked list.
+ * @return Pointer to a random locked achievement, or NULL if none are locked.
+ */
+const achievement_t *get_random_locked_achievement(const achievement_t *achievements);
 
 void sort_achievements(achievement_t **achievements);
 

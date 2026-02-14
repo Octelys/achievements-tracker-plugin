@@ -1,21 +1,19 @@
 #include "sources/xbox/achievement_name.h"
 
+#include "sources/common/achievement_cycle.h"
 #include "sources/common/text_source.h"
-#include "drawing/text.h"
+#include "common/achievement.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
 #include "io/state.h"
-#include "oauth/xbox-live.h"
-#include "xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
 
-static char            g_achievement_name[512];
-static bool            g_must_reload;
-static text_context_t *g_text_context;
+static char g_achievement_name[512];
+static bool g_must_reload;
 
 /**
  * @brief Configuration for rendering the achievement name text.
@@ -24,6 +22,35 @@ static text_context_t *g_text_context;
  * xbox_achievement_name_source_register(). Contains font path, size, and color settings.
  */
 static achievement_name_configuration_t *g_configuration;
+static bool                              g_is_achievement_unlocked = false;
+
+/**
+ * @brief Cached render configuration built from g_configuration.
+ *
+ * This is updated only when g_configuration changes to avoid reconstructing
+ * the config on every frame.
+ */
+static text_source_config_t g_render_config;
+
+/**
+ * @brief Update the cached render config from g_configuration.
+ *
+ * Copies all rendering parameters from the global configuration to the cached
+ * render config. This optimization avoids reconstructing the config structure
+ * on every frame (60+ times per second). Should be called whenever g_configuration
+ * is modified, such as during initialization or when user settings change.
+ *
+ * The cached config is then used by on_source_video_render() and on_source_video_tick()
+ * for all rendering operations.
+ */
+static void update_render_config(void) {
+    g_render_config.font_face             = g_configuration->font_face;
+    g_render_config.font_size             = g_configuration->font_size;
+    g_render_config.active_top_color      = g_configuration->active_top_color;
+    g_render_config.active_bottom_color   = g_configuration->active_bottom_color;
+    g_render_config.inactive_top_color    = g_configuration->inactive_top_color;
+    g_render_config.inactive_bottom_color = g_configuration->inactive_bottom_color;
+}
 
 /**
  * @brief Update and store the formatted achievement name string.
@@ -40,62 +67,36 @@ static void update_achievement_name(const achievement_t *achievement) {
         return;
     }
 
-    snprintf(g_achievement_name, sizeof(g_achievement_name), "%sG - %s", achievement->rewards->value, achievement->name);
+    bool was_unlocked         = g_is_achievement_unlocked;
+    g_is_achievement_unlocked = achievement->unlocked_timestamp != 0;
+
+    /* Force reload if the unlock state changed (color will be different) */
+    if (was_unlocked != g_is_achievement_unlocked) {
+        g_must_reload = true;
+    }
+
+    if (achievement->rewards && achievement->rewards->value) {
+        snprintf(g_achievement_name,
+                 sizeof(g_achievement_name),
+                 "%sG - %s",
+                 achievement->rewards->value,
+                 achievement->name);
+    } else {
+        snprintf(g_achievement_name, sizeof(g_achievement_name), "%s", achievement->name);
+    }
+
     g_must_reload = true;
 }
 
 /**
- * @brief Xbox monitor callback invoked when Xbox Live connection state changes.
+ * @brief Achievement cycle callback invoked when the displayed achievement changes.
  *
- * Retrieves the current game's most recent achievement and updates the display.
- * This ensures the achievement name source reflects the latest data when the
- * connection is established or re-established.
+ * Updates the achievement name display with the new achievement. This is called
+ * by the shared achievement cycle module whenever the display should change.
  *
- * @param is_connected Whether the Xbox account is currently connected (unused).
- * @param error_message Optional error message if disconnected (unused).
+ * @param achievement Achievement to display. If NULL, this function returns early.
  */
-static void on_connection_changed(bool is_connected, const char *error_message) {
-
-    UNUSED_PARAMETER(is_connected);
-    UNUSED_PARAMETER(error_message);
-
-    const achievement_t *achievement = get_current_game_achievements();
-
-    update_achievement_name(achievement);
-}
-
-/**
- * @brief Event handler called when a new game starts being played.
- *
- * Fetches the cover-art URL for the given game and triggers a download.
- *
- * @param game Currently played game information.
- */
-static void on_xbox_game_played(const game_t *game) {
-
-    UNUSED_PARAMETER(game);
-
-    const achievement_t *achievement = get_current_game_achievements();
-
-    update_achievement_name(achievement);
-}
-
-/**
- * @brief Xbox monitor callback invoked when achievement progress is updated.
- *
- * Retrieves the current game's most recent achievement and updates the display
- * to show the newly unlocked achievement. This callback ensures the source always
- * displays the latest achievement that was unlocked.
- *
- * @param gamerscore Updated gamerscore snapshot (unused).
- * @param progress   Achievement progress details (unused).
- */
-static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
-
-    UNUSED_PARAMETER(gamerscore);
-    UNUSED_PARAMETER(progress);
-
-    const achievement_t *achievement = get_current_game_achievements();
+static void on_achievement_changed(const achievement_t *achievement) {
 
     update_achievement_name(achievement);
 }
@@ -118,7 +119,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    return text_source_create(source, (source_size_t){600, 200});
+    return text_source_create(source, "Achievement name");
 }
 
 /**
@@ -131,55 +132,50 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;
     }
 
-    if (g_text_context) {
-        text_context_destroy(g_text_context);
-        g_text_context = NULL;
-    }
-
-    bfree(source);
+    text_source_destroy(source);
 }
 
 /**
- * @brief OBS callback returning the source canvas width.
+ * @brief OBS callback returning the natural text width.
  *
- * Returns a fixed canvas width that provides stable dimensions for OBS transforms.
- * The text texture may be smaller and is drawn at actual size within this canvas.
+ * Queries the actual rendered text width from the FreeType source.
+ * This allows OBS to scale the source properly without distortion.
  *
  * @param data Source instance data.
- * @return Canvas width in pixels.
+ * @return Text width in pixels, or 0 if no text is rendered.
  */
 static uint32_t source_get_width(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.width : 0;
+    text_source_t *s = data;
+    return text_source_get_width(s);
 }
 
 /**
- * @brief OBS callback returning the source canvas height.
+ * @brief OBS callback returning the natural text height.
  *
- * Returns a fixed canvas height that provides stable dimensions for OBS transforms.
- * The text texture may be smaller and is drawn at actual size within this canvas.
+ * Queries the actual rendered text height from the FreeType source.
+ * This allows OBS to scale the source properly without distortion.
  *
  * @param data Source instance data.
- * @return Canvas height in pixels.
+ * @return Text height in pixels, or 0 if no text is rendered.
  */
 static uint32_t source_get_height(void *data) {
-    const text_source_base_t *s = data;
-    return s ? s->size.height : 0;
+    text_source_t *s = data;
+    return text_source_get_height(s);
 }
 
 /**
  * @brief OBS callback invoked when source settings are updated.
  *
- * Processes changes to text color, size, font, and alignment from the OBS properties UI.
- * When settings change, updates the global configuration and triggers a text
- * context reload. The updated configuration is persisted to disk via the state
- * management system.
+ * Processes change to text color, size, font, and alignment from the OBS properties UI.
+ * When settings change, updates the global configuration, refreshes the cached render
+ * config, and triggers a text context reload. The updated configuration is persisted
+ * to disk via the state management system.
  *
  * @param data Source instance data (unused).
  * @param settings Updated OBS settings data containing text_color, text_size, text_font, and text_align.
@@ -190,6 +186,8 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     text_source_update_properties(settings, (text_source_config_t *)g_configuration, &g_must_reload);
 
+    update_render_config();
+
     state_set_achievement_name_configuration(g_configuration);
 }
 
@@ -198,33 +196,63 @@ static void on_source_update(void *data, obs_data_t *settings) {
  *
  * Lazily initializes or recreates the text rendering context when needed (on first
  * render or after configuration changes). Draws the formatted achievement name string
- * using the configured font, size, and color.
+ * using the cached render configuration (g_render_config).
  *
  * The text context is recreated when:
  * - It hasn't been created yet (first render)
  * - Settings have changed (g_must_reload flag is set)
  * - Achievement name has been updated
  *
+ * Performance: Uses cached g_render_config to avoid reconstructing the configuration
+ * struct on every frame.
+ *
  * @param data   Source instance data containing width and height.
  * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    text_source_base_t *source = data;
+    text_source_t *source = data;
 
     if (!source) {
         return;
     }
 
-    if (!text_source_reload_if_needed(&g_text_context,
-                                      &g_must_reload,
-                                      (const text_source_config_t *)g_configuration,
-                                      source,
-                                      g_achievement_name)) {
+    bool use_active_color = g_is_achievement_unlocked;
+    bool updated =
+        text_source_update_text(source, &g_must_reload, &g_render_config, g_achievement_name, use_active_color);
+
+    if (!updated) {
         return;
     }
 
-    text_source_render_unscaled(g_text_context, effect);
+    text_source_render(source, &g_render_config, effect);
+}
+
+/**
+ * @brief OBS callback for animation tick.
+ *
+ * Updates fade transition animations using the cached render configuration and
+ * delegates achievement display cycle management to the shared achievement_cycle module.
+ *
+ * Performance: Uses cached g_render_config to avoid reconstructing the configuration
+ * struct on every frame.
+ *
+ * @param data    Source instance data.
+ * @param seconds Time elapsed since last tick in seconds.
+ */
+static void on_source_video_tick(void *data, float seconds) {
+
+    text_source_t *source = data;
+
+    if (!source) {
+        return;
+    }
+
+    /* Update fade transition animations */
+    text_source_tick(source, &g_render_config, seconds);
+
+    /* Update the shared achievement display cycle */
+    achievement_cycle_tick(seconds);
 }
 
 /**
@@ -232,7 +260,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  *
  * Creates a properties panel with the following controls:
  * - Font dropdown: Lists all available system fonts
- * - Text color picker: RGBA color selector for the text
+ * - Text color picker: RGBA color selector for unlocked achievements
+ * - Locked achievement color picker: RGBA color selector for locked achievements
  * - Text size slider: Integer value from 10 to 164 pixels
  * - Text alignment dropdown: Left or Right alignment
  *
@@ -246,7 +275,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *p = obs_properties_create();
-    text_source_add_properties(p);
+    text_source_add_properties(p, true);
 
     return p;
 }
@@ -281,7 +310,7 @@ static struct obs_source_info xbox_achievement_name_source = {
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
     .get_height     = source_get_height,
-    .video_tick     = NULL,
+    .video_tick     = on_source_video_tick,
     .video_render   = on_source_video_render,
 };
 
@@ -302,18 +331,12 @@ static const struct obs_source_info *xbox_source_get(void) {
 
 void xbox_achievement_name_source_register(void) {
 
-    g_configuration = bzalloc(sizeof(gamerscore_configuration_t));
-
     g_configuration = state_get_achievement_name_configuration();
+    state_set_achievement_name_configuration(g_configuration);
 
-    /* TODO A default font sheet path should be embedded with the plugin */
-    if (!g_configuration->font_path) {
-        g_configuration->font_path = "/Users/christophe/Downloads/font_sheet.png";
-    }
+    update_render_config();
 
     obs_register_source(xbox_source_get());
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
-    xbox_subscribe_game_played(&on_xbox_game_played);
-    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
+    achievement_cycle_subscribe(&on_achievement_changed);
 }

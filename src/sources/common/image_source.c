@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include <diagnostics/log.h>
 #include <net/http/http.h>
@@ -27,9 +28,10 @@ void image_source_cache_init(image_source_cache_t *cache, const char *display_na
 }
 
 /**
- * @brief Internal helper to download an image from URL to temp file.
+ * @brief Internal helper to download an image from URL to a temp file.
  *
  * @param cache     Image cache to update.
+ * @param id
  * @param image_url URL to download from.
  * @return true on success, false on failure.
  */
@@ -39,46 +41,53 @@ static bool download_image_to_temp_file(image_source_cache_t *cache, const char 
         return false;
     }
 
-    obs_log(LOG_INFO, "Downloading %s image from URL: %s", cache->display_name, image_url);
-
-    /* Download the image in memory */
-    uint8_t *data = NULL;
-    size_t   size = 0;
-
-    if (!http_download(image_url, &data, &size)) {
-        obs_log(LOG_WARNING, "Unable to download %s image from URL: %s", cache->display_name, image_url);
-        return false;
-    }
-
-    obs_log(LOG_INFO, "Downloaded %zu bytes for %s image", size, cache->display_name);
-
-    /* Write the bytes to a temp file */
     const char *tmpdir = getenv("TMPDIR");
     snprintf(cache->image_path,
              sizeof(cache->image_path),
-             "%s/obs_plugin_temp_%s.png",
+             "%s/achievement_tracker_%s_%s.png",
              tmpdir ? tmpdir : "/tmp",
-             cache->temp_file_suffix);
+             cache->temp_file_suffix,
+             cache->id);
 
-    FILE *temp_file = fopen(cache->image_path, "wb");
+    struct stat st;
+    if (stat(cache->image_path, &st) != 0) {
 
-    if (!temp_file) {
-        obs_log(LOG_ERROR, "Failed to create temp file for %s image", cache->display_name);
+        uint8_t *data = NULL;
+        size_t   size = 0;
+
+        obs_log(LOG_INFO, "Downloading %s image from URL: %s", cache->display_name, image_url);
+
+        /* Download the image in memory */
+        if (!http_download(image_url, &data, &size)) {
+            obs_log(LOG_WARNING, "Unable to download %s image from URL: %s", cache->display_name, image_url);
+            return false;
+        }
+
+        obs_log(LOG_INFO, "Downloaded %zu bytes for %s image", size, cache->display_name);
+
+        /* Write the bytes to a temp file */
+        FILE *temp_file = fopen(cache->image_path, "wb");
+
+        if (!temp_file) {
+            obs_log(LOG_ERROR, "Failed to create temp file for %s image", cache->display_name);
+            bfree(data);
+            return false;
+        }
+
+        fwrite(data, 1, size, temp_file);
+        fclose(temp_file);
         bfree(data);
-        return false;
+    } else {
+        obs_log(LOG_INFO, "Using cached %s image for %s", cache->image_path, cache->id);
     }
 
-    fwrite(data, 1, size, temp_file);
-    fclose(temp_file);
-    bfree(data);
-
-    /* Schedule reload on next render */
+    /* Schedule reload on the next render */
     cache->must_reload = true;
 
     return true;
 }
 
-bool image_source_download_if_changed(image_source_cache_t *cache, const char *image_url) {
+bool image_source_download_if_changed(image_source_cache_t *cache, const char *id, const char *image_url) {
 
     if (!cache) {
         return false;
@@ -98,6 +107,7 @@ bool image_source_download_if_changed(image_source_cache_t *cache, const char *i
 
     /* Store the new URL */
     snprintf(cache->image_url, sizeof(cache->image_url), "%s", image_url);
+    cache->id = bstrdup(id);
 
     return download_image_to_temp_file(cache, image_url);
 }
@@ -172,6 +182,35 @@ void image_source_render(image_source_cache_t *cache, source_size_t size, gs_eff
     }
 
     draw_texture(cache->image_texture, size.width, size.height, effect);
+}
+
+void image_source_render_greyscale(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect) {
+
+    if (!cache || !cache->image_texture) {
+        return;
+    }
+
+    draw_texture_greyscale(cache->image_texture, size.width, size.height, effect);
+}
+
+void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                      float opacity) {
+
+    if (!cache || !cache->image_texture) {
+        return;
+    }
+
+    draw_texture_with_opacity(cache->image_texture, size.width, size.height, effect, opacity);
+}
+
+void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                                float opacity) {
+
+    if (!cache || !cache->image_texture) {
+        return;
+    }
+
+    draw_texture_greyscale_with_opacity(cache->image_texture, size.width, size.height, effect, opacity);
 }
 
 void image_source_destroy(image_source_cache_t *cache) {

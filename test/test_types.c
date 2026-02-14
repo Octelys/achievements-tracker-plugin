@@ -959,6 +959,372 @@ static void count_achievements__two_achievements__2_returned(void) {
     TEST_ASSERT_EQUAL_INT(total, 2);
 }
 
+//  Tests count_locked_achievements
+
+static void count_locked_achievements__achievement_is_null__0_returned(void) {
+    //  Arrange.
+    achievement_t *achievement = NULL;
+
+    //  Act.
+    int total = count_locked_achievements(achievement);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(0, total);
+}
+
+static void count_locked_achievements__one_locked_achievement__1_returned(void) {
+    //  Arrange.
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->unlocked_timestamp = 0; // Locked
+    achievement->next               = NULL;
+
+    //  Act.
+    int total = count_locked_achievements(achievement);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(1, total);
+}
+
+static void count_locked_achievements__one_unlocked_achievement__0_returned(void) {
+    //  Arrange.
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->unlocked_timestamp = 1234567890; // Unlocked
+    achievement->next               = NULL;
+
+    //  Act.
+    int total = count_locked_achievements(achievement);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(0, total);
+}
+
+static void count_locked_achievements__two_locked_achievements__2_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 0; // Locked
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 0; // Locked
+    achievement1->next               = achievement2;
+
+    //  Act.
+    int total = count_locked_achievements(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(2, total);
+}
+
+static void count_locked_achievements__two_unlocked_achievements__0_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567890; // Unlocked
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 1234567800; // Unlocked
+    achievement1->next               = achievement2;
+
+    //  Act.
+    int total = count_locked_achievements(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(0, total);
+}
+
+static void count_locked_achievements__mixed_achievements__locked_count_returned(void) {
+    //  Arrange.
+    achievement_t *achievement3      = bzalloc(sizeof(achievement_t));
+    achievement3->id                 = bstrdup("achievement-id-3");
+    achievement3->name               = bstrdup("Achievement Name 3");
+    achievement3->unlocked_timestamp = 0; // Locked
+    achievement3->next               = NULL;
+
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567890; // Unlocked
+    achievement2->next               = achievement3;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 0; // Locked
+    achievement1->next               = achievement2;
+
+    //  Act.
+    int total = count_locked_achievements(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_EQUAL_INT(2, total);
+}
+
+//  Tests find_latest_unlocked_achievement
+
+static void find_latest_unlocked_achievement__achievement_is_null__null_returned(void) {
+    //  Arrange.
+    achievement_t *achievement = NULL;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement);
+
+    //  Assert.
+    TEST_ASSERT_NULL(result);
+}
+
+static void find_latest_unlocked_achievement__one_locked_achievement__null_returned(void) {
+    //  Arrange.
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->unlocked_timestamp = 0; // Locked
+    achievement->next               = NULL;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement);
+
+    //  Assert.
+    TEST_ASSERT_NULL(result);
+}
+
+static void find_latest_unlocked_achievement__one_unlocked_achievement__achievement_returned(void) {
+    //  Arrange.
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->unlocked_timestamp = 1234567890; // Unlocked
+    achievement->next               = NULL;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(result);
+    TEST_ASSERT_EQUAL_STRING("achievement-id", result->id);
+}
+
+static void find_latest_unlocked_achievement__two_unlocked_achievements__latest_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567900; // Unlocked later
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 1234567800; // Unlocked earlier
+    achievement1->next               = achievement2;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(result);
+    TEST_ASSERT_EQUAL_STRING("achievement-id-2", result->id);
+}
+
+static void find_latest_unlocked_achievement__latest_is_first_in_list__first_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567800; // Unlocked earlier
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 1234567900; // Unlocked later
+    achievement1->next               = achievement2;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(result);
+    TEST_ASSERT_EQUAL_STRING("achievement-id-1", result->id);
+}
+
+static void find_latest_unlocked_achievement__all_locked__null_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 0; // Locked
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 0; // Locked
+    achievement1->next               = achievement2;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_NULL(result);
+}
+
+static void find_latest_unlocked_achievement__mixed_achievements__latest_unlocked_returned(void) {
+    //  Arrange.
+    achievement_t *achievement3      = bzalloc(sizeof(achievement_t));
+    achievement3->id                 = bstrdup("achievement-id-3");
+    achievement3->name               = bstrdup("Achievement Name 3");
+    achievement3->unlocked_timestamp = 0; // Locked
+    achievement3->next               = NULL;
+
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567900; // Unlocked (latest)
+    achievement2->next               = achievement3;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 1234567800; // Unlocked (earlier)
+    achievement1->next               = achievement2;
+
+    //  Act.
+    const achievement_t *result = find_latest_unlocked_achievement(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(result);
+    TEST_ASSERT_EQUAL_STRING("achievement-id-2", result->id);
+}
+
+//  Tests get_random_locked_achievement
+
+static void get_random_locked_achievement__achievement_is_null__null_returned(void) {
+    //  Arrange.
+    achievement_t *achievement = NULL;
+
+    //  Act.
+    const achievement_t *result = get_random_locked_achievement(achievement);
+
+    //  Assert.
+    TEST_ASSERT_NULL(result);
+}
+
+static void get_random_locked_achievement__one_locked_achievement__achievement_returned(void) {
+    //  Arrange.
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->unlocked_timestamp = 0; // Locked
+    achievement->next               = NULL;
+
+    //  Act.
+    const achievement_t *result = get_random_locked_achievement(achievement);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(result);
+    TEST_ASSERT_EQUAL_STRING("achievement-id", result->id);
+}
+
+static void get_random_locked_achievement__one_unlocked_achievement__null_returned(void) {
+    //  Arrange.
+    achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+    achievement->id                 = bstrdup("achievement-id");
+    achievement->name               = bstrdup("Achievement Name");
+    achievement->unlocked_timestamp = 1234567890; // Unlocked
+    achievement->next               = NULL;
+
+    //  Act.
+    const achievement_t *result = get_random_locked_achievement(achievement);
+
+    //  Assert.
+    TEST_ASSERT_NULL(result);
+}
+
+static void get_random_locked_achievement__all_unlocked__null_returned(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567900; // Unlocked
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 1234567800; // Unlocked
+    achievement1->next               = achievement2;
+
+    //  Act.
+    const achievement_t *result = get_random_locked_achievement(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_NULL(result);
+}
+
+static void get_random_locked_achievement__mixed_achievements__locked_returned(void) {
+    //  Arrange.
+    achievement_t *achievement3      = bzalloc(sizeof(achievement_t));
+    achievement3->id                 = bstrdup("achievement-id-3");
+    achievement3->name               = bstrdup("Achievement Name 3");
+    achievement3->unlocked_timestamp = 0; // Locked
+    achievement3->next               = NULL;
+
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("achievement-id-2");
+    achievement2->name               = bstrdup("Achievement Name 2");
+    achievement2->unlocked_timestamp = 1234567890; // Unlocked
+    achievement2->next               = achievement3;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("achievement-id-1");
+    achievement1->name               = bstrdup("Achievement Name 1");
+    achievement1->unlocked_timestamp = 0; // Locked
+    achievement1->next               = achievement2;
+
+    //  Act.
+    const achievement_t *result = get_random_locked_achievement(achievement1);
+
+    //  Assert.
+    TEST_ASSERT_NOT_NULL(result);
+    // Result should be one of the locked achievements (id-1 or id-3)
+    TEST_ASSERT_TRUE(strcmp(result->id, "achievement-id-1") == 0 || strcmp(result->id, "achievement-id-3") == 0);
+    TEST_ASSERT_EQUAL_INT64(0, result->unlocked_timestamp);
+}
+
+static void get_random_locked_achievement__multiple_calls__returns_locked_achievement(void) {
+    //  Arrange.
+    achievement_t *achievement2      = bzalloc(sizeof(achievement_t));
+    achievement2->id                 = bstrdup("locked-2");
+    achievement2->name               = bstrdup("Locked Achievement 2");
+    achievement2->unlocked_timestamp = 0; // Locked
+    achievement2->next               = NULL;
+
+    achievement_t *achievement1      = bzalloc(sizeof(achievement_t));
+    achievement1->id                 = bstrdup("locked-1");
+    achievement1->name               = bstrdup("Locked Achievement 1");
+    achievement1->unlocked_timestamp = 0; // Locked
+    achievement1->next               = achievement2;
+
+    //  Act & Assert - call multiple times, each should return a locked achievement
+    for (int i = 0; i < 10; i++) {
+        const achievement_t *result = get_random_locked_achievement(achievement1);
+        TEST_ASSERT_NOT_NULL(result);
+        TEST_ASSERT_EQUAL_INT64(0, result->unlocked_timestamp);
+    }
+}
+
 //  Tests achievement_progress.c
 
 static void free_achievement_progress__achievement_progress_is_null__null_achievement_progress_returned(void) {
@@ -1098,6 +1464,28 @@ int main(void) {
     RUN_TEST(count_achievements__achievement_is_null__0_returned);
     RUN_TEST(count_achievements__one_achievement__1_returned);
     RUN_TEST(count_achievements__two_achievements__2_returned);
+
+    RUN_TEST(count_locked_achievements__achievement_is_null__0_returned);
+    RUN_TEST(count_locked_achievements__one_locked_achievement__1_returned);
+    RUN_TEST(count_locked_achievements__one_unlocked_achievement__0_returned);
+    RUN_TEST(count_locked_achievements__two_locked_achievements__2_returned);
+    RUN_TEST(count_locked_achievements__two_unlocked_achievements__0_returned);
+    RUN_TEST(count_locked_achievements__mixed_achievements__locked_count_returned);
+
+    RUN_TEST(find_latest_unlocked_achievement__achievement_is_null__null_returned);
+    RUN_TEST(find_latest_unlocked_achievement__one_locked_achievement__null_returned);
+    RUN_TEST(find_latest_unlocked_achievement__one_unlocked_achievement__achievement_returned);
+    RUN_TEST(find_latest_unlocked_achievement__two_unlocked_achievements__latest_returned);
+    RUN_TEST(find_latest_unlocked_achievement__latest_is_first_in_list__first_returned);
+    RUN_TEST(find_latest_unlocked_achievement__all_locked__null_returned);
+    RUN_TEST(find_latest_unlocked_achievement__mixed_achievements__latest_unlocked_returned);
+
+    RUN_TEST(get_random_locked_achievement__achievement_is_null__null_returned);
+    RUN_TEST(get_random_locked_achievement__one_locked_achievement__achievement_returned);
+    RUN_TEST(get_random_locked_achievement__one_unlocked_achievement__null_returned);
+    RUN_TEST(get_random_locked_achievement__all_unlocked__null_returned);
+    RUN_TEST(get_random_locked_achievement__mixed_achievements__locked_returned);
+    RUN_TEST(get_random_locked_achievement__multiple_calls__returns_locked_achievement);
 
     //  Tests game.c
     RUN_TEST(free_game__game_is_null__null_game_returned);

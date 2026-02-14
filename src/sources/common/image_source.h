@@ -49,7 +49,8 @@ typedef struct image_source_cache {
     char image_url[1024];
 
     /** Temporary file path used as an intermediate for gs_texture_create_from_file(). */
-    char image_path[512];
+    char  image_path[512];
+    char *id;
 
     /** GPU texture created from the downloaded image (owned by this cache). */
     gs_texture_t *image_texture;
@@ -84,10 +85,11 @@ void image_source_cache_init(image_source_cache_t *cache, const char *display_na
  * clears the cache and schedules a texture unload.
  *
  * @param cache     Image cache to update.
+ * @param id
  * @param image_url New image URL, or NULL to clear the image.
  * @return true if a new image was downloaded, false if URL unchanged or download failed.
  */
-bool image_source_download_if_changed(image_source_cache_t *cache, const char *image_url);
+bool image_source_download_if_changed(image_source_cache_t *cache, const char *id, const char *image_url);
 
 /**
  * @brief Force download an image from a URL (ignores URL change detection).
@@ -134,6 +136,47 @@ void image_source_reload_if_needed(image_source_cache_t *cache);
  * @param effect Effect to use for rendering.
  */
 void image_source_render(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect);
+
+/**
+ * @brief Render the cached texture with opacity.
+ *
+ * Draws the texture at the specified dimensions with the given opacity.
+ * Does nothing if no texture is loaded.
+ *
+ * @param cache   Image cache containing the texture to render.
+ * @param size    Dimensions to render at in pixels.
+ * @param effect  Effect to use for rendering.
+ * @param opacity Opacity value (0.0 = fully transparent, 1.0 = fully opaque).
+ */
+void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                      float opacity);
+
+/**
+ * @brief Render the cached texture in greyscale.
+ *
+ * Draws the texture at the specified dimensions using a greyscale effect.
+ * Uses luminance coefficients for perceptually accurate conversion.
+ * Does nothing if no texture is loaded.
+ *
+ * @param cache Image cache containing the texture to render.
+ * @param size  Dimensions to render at in pixels.
+ * @param effect Effect to use for rendering.
+ */
+void image_source_render_greyscale(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect);
+
+/**
+ * @brief Render the cached texture in greyscale with opacity.
+ *
+ * Draws the texture at the specified dimensions using a greyscale effect
+ * with the given opacity. Does nothing if no texture is loaded.
+ *
+ * @param cache   Image cache containing the texture to render.
+ * @param size    Dimensions to render at in pixels.
+ * @param effect  Effect to use for rendering.
+ * @param opacity Opacity value (0.0 = fully transparent, 1.0 = fully opaque).
+ */
+void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+                                                float opacity);
 
 /**
  * @brief Destroy the texture and free graphics resources.

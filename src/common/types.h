@@ -3,9 +3,14 @@
 #include <openssl/evp.h>
 #include <stdint.h>
 
-// Umbrella header: the includes below intentionally re-export common public types
-// used across the plugin. Some may look unused within this file, but are kept so
-// consumers can include a single header.
+/**
+ * @file types.h
+ * @brief Common type definitions and utilities for the achievements tracker plugin.
+ *
+ * This umbrella header re-exports common types used throughout the plugin.
+ * The includes below may appear unused within this file but are intentionally
+ * kept so that consumers can include a single header for all common types.
+ */
 #include "common/memory.h"
 #include "common/achievement.h"
 #include "common/achievement_progress.h"
@@ -22,31 +27,30 @@ extern "C" {
 #endif
 
 /**
- * @brief Frees a cJSON object.
+ * @brief Frees a cJSON object safely.
  *
  * Convenience macro around @c cJSON_Delete().
  *
- * Notes:
- * - Safe to pass NULL.
- * - Does not set the caller pointer to NULL.
+ * @note Safe to pass NULL.
+ * @note Does not set the pointer to NULL after freeing.
  *
- * @param p Pointer to a cJSON object.
+ * @param p Pointer to a cJSON object to be freed.
  */
 #define FREE_JSON(p) \
     if (p)            \
     cJSON_Delete(p);
 
 /**
- * @brief Assigns ownership of an allocated pointer to an output parameter or frees it.
+ * @brief Transfers ownership of an allocated pointer to an output parameter or frees it.
  *
- * If @p dst is non-NULL, assigns @p src into @c *dst. Otherwise frees @p src
+ * If @p dst is non-NULL, assigns @p src to @c *dst. Otherwise, frees @p src
  * using @ref FREE.
  *
- * Typical use: return a freshly allocated object either via an out-parameter or
- * by cleaning it up when the caller isn't interested.
+ * This is typically used to return a freshly allocated object either via an
+ * out-parameter or to clean it up when the caller isn't interested.
  *
- * @param src Pointer to pass to the caller or free.
- * @param dst Address of the destination pointer, or NULL.
+ * @param src Pointer to transfer to the caller or free.
+ * @param dst Address of the destination pointer, or NULL to trigger cleanup.
  */
 #define COPY_OR_FREE(src, dst) \
     if (dst)                  \
@@ -58,9 +62,9 @@ extern "C" {
 #include <windows.h>
 
 /**
- * @brief Sleeps for a number of milliseconds.
+ * @brief Sleeps for the specified number of milliseconds.
  *
- * Cross-platform helper used by this plugin.
+ * Cross-platform sleep helper that wraps the platform-specific sleep API.
  *
  * @param ms Duration in milliseconds.
  */
@@ -71,16 +75,16 @@ static void sleep_ms(unsigned int ms) {
 /**
  * @brief Case-insensitive string comparison.
  *
- * Alias to Windows' @c _stricmp to provide POSIX-compatible @c strcasecmp.
+ * Provides POSIX-compatible @c strcasecmp on Windows by aliasing to @c _stricmp.
  */
 #define strcasecmp _stricmp
 #else
 #include <unistd.h>
 
 /**
- * @brief Sleeps for a number of milliseconds.
+ * @brief Sleeps for the specified number of milliseconds.
  *
- * Cross-platform helper used by this plugin.
+ * Cross-platform sleep helper that wraps the platform-specific sleep API.
  *
  * @param ms Duration in milliseconds.
  */
@@ -92,8 +96,8 @@ static void sleep_ms(unsigned int ms) {
 /**
  * @brief Result type for Xbox Live authentication.
  *
- * This is returned by authentication helpers to provide a stable ABI and a
- * single place for error details.
+ * This structure is returned by authentication helpers to provide a stable ABI
+ * and a single place for error details.
  */
 typedef struct xbox_live_authenticate_result {
     /** Human-readable error message when authentication fails, otherwise NULL. */
@@ -113,29 +117,21 @@ typedef struct source_size {
 } source_size_t;
 
 /**
- * @brief Text alignment options.
- */
-typedef enum text_align {
-    /** Align text to the left edge of the canvas. */
-    TEXT_ALIGN_LEFT  = 0,
-    /** Align text to the right edge of the canvas. */
-    TEXT_ALIGN_RIGHT = 1,
-} text_align_t;
-
-/**
  * @brief Common configuration for text-based sources.
  *
  * Contains all the shared configuration fields used across text sources.
  */
 typedef struct text_source_config {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    active_top_color;
+    uint32_t    active_bottom_color;
+    /** Alternate color for locked achievements (0xRRGGBBAA format). */
+    uint32_t    inactive_top_color;
+    uint32_t    inactive_bottom_color;
 } text_source_config_t;
 
 /**
@@ -146,14 +142,14 @@ typedef struct text_source_config {
  *   caller.
  */
 typedef struct gamerscore_configuration {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    font_size;
+    /** Top gradient color in 0xRRGGBBAA format. */
+    uint32_t    top_color;
+    /** Bottom gradient color in 0xRRGGBBAA format. */
+    uint32_t    bottom_color;
 } gamerscore_configuration_t;
 
 /**
@@ -164,14 +160,14 @@ typedef struct gamerscore_configuration {
  *   caller.
  */
 typedef struct gamertag_configuration {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    font_size;
+    /** Top gradient color in 0xRRGGBBAA format. */
+    uint32_t    top_color;
+    /** Bottom gradient color in 0xRRGGBBAA format. */
+    uint32_t    bottom_color;
 } gamertag_configuration_t;
 
 /**
@@ -182,14 +178,18 @@ typedef struct gamertag_configuration {
  *   caller.
  */
 typedef struct achievement_name_configuration {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    font_size;
+    /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t    active_top_color;
+    /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t    active_bottom_color;
+    /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t    inactive_top_color;
+    /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t    inactive_bottom_color;
 } achievement_name_configuration_t;
 
 /**
@@ -200,14 +200,18 @@ typedef struct achievement_name_configuration {
  *   caller.
  */
 typedef struct achievement_description_configuration {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    font_size;
+    /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t    active_top_color;
+    /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
+    uint32_t    active_bottom_color;
+    /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t    inactive_top_color;
+    /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
+    uint32_t    inactive_bottom_color;
 } achievement_description_configuration_t;
 
 /**
@@ -218,14 +222,12 @@ typedef struct achievement_description_configuration {
  *   caller.
  */
 typedef struct achievements_unlocked_count_configuration {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    color;
 } achievements_unlocked_count_configuration_t;
 
 /**
@@ -236,14 +238,12 @@ typedef struct achievements_unlocked_count_configuration {
  *   caller.
  */
 typedef struct achievements_total_count_configuration {
-    /** Font file path to load (e.g., "/Library/Fonts/SF-Pro.ttf"). */
-    const char  *font_path;
+    const char *font_face;
+    const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t     font_size;
+    uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t     color;
-    /** Text alignment. */
-    text_align_t align;
+    uint32_t    color;
 } achievements_total_count_configuration_t;
 
 /**

@@ -325,7 +325,6 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
-    src/system/font.c
     src/sources/xbox/account.c
     src/sources/xbox/gamerpic.c
     src/sources/xbox/game_cover.c
@@ -338,10 +337,10 @@ target_sources(
     src/sources/xbox/achievements_total_count.c
     src/sources/common/text_source.c
     src/sources/common/image_source.c
+    src/sources/common/achievement_cycle.c
     src/crypto/crypto.c
     src/drawing/color.c
     src/drawing/image.c
-    src/drawing/text.c
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
