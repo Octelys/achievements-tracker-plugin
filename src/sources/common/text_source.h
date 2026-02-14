@@ -69,9 +69,11 @@ typedef struct text_source {
 
     /** Pending text to display after fade-out completes. */
     char *pending_text;
+    bool  pending_use_active_color;
 
     /** Current text being displayed. */
     char *current_text;
+    bool  use_active_color;
 
 } text_source_t;
 
@@ -107,10 +109,11 @@ void text_source_destroy(text_source_t *text_source);
  * @param force_reload Pointer to the reload flag (will be cleared on reload).
  * @param config      Text source configuration (font, size, color, alignment).
  * @param text        Text string to render.
+ * @param use_active_color
  * @return true if the text source is valid and ready to render, false otherwise.
  */
 bool text_source_update_text(text_source_t *text_source, bool *force_reload, const text_source_config_t *config,
-                             const char *text);
+                             const char *text, bool use_active_color);
 
 /**
  * @brief Render text source with opacity for fade animations.

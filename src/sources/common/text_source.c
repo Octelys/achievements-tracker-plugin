@@ -16,10 +16,13 @@
 /** Default duration for each fade phase (in seconds). */
 #define TEXT_TRANSITION_DEFAULT_DURATION 2.0f
 
-static void set_color_with_opacity(obs_data_t *settings, const text_source_config_t *config, float opacity) {
+static void set_color_with_opacity(text_source_t *text_source, obs_data_t *settings, const text_source_config_t *config,
+                                   float opacity) {
+
+    uint32_t top_rgba    = text_source->use_active_color ? config->active_top_color : config->inactive_top_color;
+    uint32_t bottom_rgba = text_source->use_active_color ? config->active_bottom_color : config->inactive_bottom_color;
 
     // Set color - convert from RGBA to ABGR for OBS
-    uint32_t top_rgba       = config->active_top_color;
     uint8_t  top_r          = (top_rgba >> 24) & 0xFF;
     uint8_t  top_g          = (top_rgba >> 16) & 0xFF;
     uint8_t  top_b          = (top_rgba >> 8) & 0xFF;
@@ -27,7 +30,6 @@ static void set_color_with_opacity(obs_data_t *settings, const text_source_confi
     uint8_t  top_a          = (uint8_t)(original_top_a * fmaxf(0.0f, fminf(1.0f, opacity)));
     uint32_t top_color      = (top_a << 24) | (top_b << 16) | (top_g << 8) | top_r;
 
-    uint32_t bottom_rgba       = config->active_bottom_color;
     uint8_t  bottom_r          = (bottom_rgba >> 24) & 0xFF;
     uint8_t  bottom_g          = (bottom_rgba >> 16) & 0xFF;
     uint8_t  bottom_b          = (bottom_rgba >> 8) & 0xFF;
@@ -39,8 +41,8 @@ static void set_color_with_opacity(obs_data_t *settings, const text_source_confi
     obs_data_set_int(settings, "color2", bottom_color);
 }
 
-static void set_color(obs_data_t *settings, const text_source_config_t *config) {
-    set_color_with_opacity(settings, config, 1.0f);
+static void set_color(text_source_t *text_source, obs_data_t *settings, const text_source_config_t *config) {
+    set_color_with_opacity(text_source, settings, config, 1.0f);
 }
 
 static void set_font(text_source_t *text_source, obs_data_t *settings, const text_source_config_t *config) {
@@ -75,12 +77,12 @@ static void complete_transition(text_source_t *text_source, const text_source_co
     text_source->transition.opacity = 1.0f;
 
     obs_data_t *settings = obs_source_get_settings(text_source->private_obs_source);
-    set_color_with_opacity(settings, config, text_source->transition.opacity);
+    set_color_with_opacity(text_source, settings, config, text_source->transition.opacity);
     obs_source_update(text_source->private_obs_source, settings);
     obs_data_release(settings);
 }
 
-static void initiate_fade_in_transition(text_source_t *text_source, const char *text) {
+static void initiate_fade_in_transition(text_source_t *text_source, const char *text, bool use_active_color) {
 
     obs_log(LOG_INFO, "[%s] Initiating fade-in transition to show '%s'", text_source->name, text);
 
@@ -89,7 +91,8 @@ static void initiate_fade_in_transition(text_source_t *text_source, const char *
     }
 
     //  Sets the text to show now that the fade out is complete.
-    text_source->current_text = bstrdup(text);
+    text_source->current_text     = bstrdup(text);
+    text_source->use_active_color = use_active_color;
 
     //  Initiates the fade-out transition
     text_source->transition.phase   = TEXT_TRANSITION_FADE_IN;
@@ -101,7 +104,7 @@ static void initiate_fade_in_transition(text_source_t *text_source, const char *
     obs_data_release(settings);
 }
 
-static void initiate_fade_out_transition(text_source_t *text_source, const char *text) {
+static void initiate_fade_out_transition(text_source_t *text_source, const char *text, bool use_active_color) {
 
     obs_log(LOG_INFO,
             "[%s] Initiating fade-out transition from text '%s' to '%s'",
@@ -111,7 +114,8 @@ static void initiate_fade_out_transition(text_source_t *text_source, const char 
 
     //  Sets the text to show once the fade out is complete.
     bfree(text_source->pending_text);
-    text_source->pending_text = bstrdup(text);
+    text_source->pending_text             = bstrdup(text);
+    text_source->pending_use_active_color = use_active_color;
 
     //  Initiates the fade-out transition
     text_source->transition.phase   = TEXT_TRANSITION_FADE_OUT;
@@ -135,7 +139,7 @@ static obs_data_t *create_private_obs_source_settings(text_source_t *text_source
         set_font(text_source, settings, config);
     }
 
-    set_color(settings, config);
+    set_color(text_source, settings, config);
 
     // Enable outline, disable drop shadow
     obs_data_set_bool(settings, "outline", false);
@@ -245,7 +249,7 @@ void text_source_destroy(text_source_t *text_source) {
 }
 
 bool text_source_update_text(text_source_t *text_source, bool *force_reload, const text_source_config_t *config,
-                             const char *text) {
+                             const char *text, bool use_active_color) {
 
     if (!text_source || !force_reload || !config || !text) {
         return text_source && text_source->private_obs_source != NULL;
@@ -262,16 +266,16 @@ bool text_source_update_text(text_source_t *text_source, bool *force_reload, con
     }
 
     if (!text_source->current_text) {
-        initiate_fade_in_transition(text_source, text);
+        initiate_fade_in_transition(text_source, text, use_active_color);
     } else if (text_source->current_text && strcmp(text_source->current_text, text) != 0) {
-        initiate_fade_out_transition(text_source, text);
+        initiate_fade_out_transition(text_source, text, use_active_color);
         goto completed;
     }
 
     //  Update the private OBS source settings.
     obs_data_t *settings = obs_source_get_settings(text_source->private_obs_source);
     set_font(text_source, settings, config);
-    set_color(settings, config);
+    set_color(text_source, settings, config);
 
     obs_source_update(text_source->private_obs_source, settings);
 
@@ -293,7 +297,7 @@ void text_source_render(text_source_t *text_source, const text_source_config_t *
 
     if (text_source->transition.last_opacity != text_source->transition.opacity) {
         obs_data_t *settings = obs_source_get_settings(text_source->private_obs_source);
-        set_color_with_opacity(settings, config, text_source->transition.opacity);
+        set_color_with_opacity(text_source, settings, config, text_source->transition.opacity);
         obs_source_update(text_source->private_obs_source, settings);
         obs_data_release(settings);
     }
@@ -329,7 +333,7 @@ void text_source_tick(text_source_t *text_source, const text_source_config_t *co
         text_source->transition.opacity = fmaxf(0.0f, text_source->transition.opacity - seconds / duration);
 
         if (text_source->transition.opacity <= 0.0f) {
-            initiate_fade_in_transition(text_source, text_source->pending_text);
+            initiate_fade_in_transition(text_source, text_source->pending_text, text_source->pending_use_active_color);
         }
         break;
     case TEXT_TRANSITION_NONE:

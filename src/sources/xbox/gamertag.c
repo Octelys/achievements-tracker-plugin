@@ -89,7 +89,11 @@ static void on_source_update(void *data, obs_data_t *settings) {
 static void on_source_video_render(void *data, gs_effect_t *effect) {
     text_source_t *source = data;
 
-    if (text_source_update_text(source, &g_must_reload, (const text_source_config_t *)g_configuration, g_gamertag)) {
+    if (text_source_update_text(source,
+                                &g_must_reload,
+                                (const text_source_config_t *)g_configuration,
+                                g_gamertag,
+                                true)) {
         text_source_render(source, (const text_source_config_t *)g_configuration, effect);
     }
 }

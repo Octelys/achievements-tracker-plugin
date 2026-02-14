@@ -175,16 +175,16 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     text_source_config_t render_config = {
         .font_face             = g_configuration->font_face,
         .font_size             = g_configuration->font_size,
-        .active_top_color      = g_is_achievement_unlocked ? g_configuration->active_top_color
-                                                           : g_configuration->inactive_top_color,
-        .active_bottom_color   = g_is_achievement_unlocked ? g_configuration->active_bottom_color
-                                                           : g_configuration->inactive_bottom_color,
+        .active_top_color      = g_configuration->active_top_color,
+        .active_bottom_color   = g_configuration->active_bottom_color,
         .inactive_top_color    = g_configuration->inactive_top_color,
         .inactive_bottom_color = g_configuration->inactive_bottom_color,
         .align                 = g_configuration->align,
     };
 
-    if (!text_source_update_text(source, &g_must_reload, &render_config, g_achievement_description)) {
+    bool use_active_color = g_is_achievement_unlocked;
+
+    if (!text_source_update_text(source, &g_must_reload, &render_config, g_achievement_description, use_active_color)) {
         return;
     }
 

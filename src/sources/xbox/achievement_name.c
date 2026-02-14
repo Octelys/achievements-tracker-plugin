@@ -198,9 +198,11 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         .align                 = g_configuration->align,
     };
 
-    bool texture_loaded = text_source_update_text(source, &g_must_reload, &render_config, g_achievement_name);
+    bool use_active_color = g_is_achievement_unlocked;
+    bool updated =
+        text_source_update_text(source, &g_must_reload, &render_config, g_achievement_name, use_active_color);
 
-    if (!texture_loaded) {
+    if (!updated) {
         return;
     }
 
