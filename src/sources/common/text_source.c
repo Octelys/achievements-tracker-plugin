@@ -272,7 +272,6 @@ bool text_source_update_text(text_source_t *text_source, bool *force_reload, con
     obs_data_t *settings = obs_source_get_settings(text_source->private_obs_source);
     set_font(text_source, settings, config);
     set_color(settings, config);
-    set_text(text_source, settings);
 
     obs_source_update(text_source->private_obs_source, settings);
 
