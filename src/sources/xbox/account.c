@@ -27,6 +27,8 @@ static void start_monitoring_if_needed(void) {
     }
 
     xbox_monitoring_start();
+
+    free_memory((void **)&identity);
 }
 
 /**
@@ -37,8 +39,9 @@ static void start_monitoring_if_needed(void) {
 static void refresh_properties_on_main(void *data) {
     obs_source_t *source = data;
 
-    if (source)
+    if (source) {
         obs_source_update_properties(source);
+    }
 }
 
 /**
@@ -115,7 +118,7 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
 /**
  * @brief Callback invoked when the monitor detects a game is being played.
  *
- * Currently logs the game name/id.
+ * Currently, logs the game name/id.
  */
 static void on_xbox_game_played(const game_t *game) {
     char text[4096];
@@ -204,7 +207,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     /* Gets or refreshes the token */
-    const xbox_identity_t *xbox_identity = xbox_live_get_identity();
+    xbox_identity_t *xbox_identity = xbox_live_get_identity();
 
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
@@ -235,6 +238,8 @@ static obs_properties_t *source_get_properties(void *data) {
     obs_properties_add_text(p, "disconnected_status_info", "You are not connected.", OBS_TEXT_INFO);
     obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
     //}
+
+    free_memory((void **)&xbox_identity);
 
     return p;
 }

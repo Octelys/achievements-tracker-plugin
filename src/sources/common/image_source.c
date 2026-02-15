@@ -12,136 +12,92 @@
 #include "drawing/image.h"
 
 /**
- * @file image_source.c
- * @brief Implementation of common functionality for image-based OBS sources.
- */
-
-void image_source_cache_init(image_source_cache_t *cache, const char *display_name, const char *temp_file_suffix) {
-
-    if (!cache) {
-        return;
-    }
-
-    memset(cache, 0, sizeof(*cache));
-    cache->display_name     = display_name;
-    cache->temp_file_suffix = temp_file_suffix;
-}
-
-/**
  * @brief Internal helper to download an image from URL to a temp file.
  *
- * @param cache     Image cache to update.
- * @param id
- * @param image_url URL to download from.
+ * @param image     Image cache to update.
  * @return true on success, false on failure.
  */
-static bool download_image_to_temp_file(image_source_cache_t *cache, const char *image_url) {
+static bool download_to_cache(image_t *image) {
 
-    if (!cache || !image_url || image_url[0] == '\0') {
+    if (!image || image->url[0] == '\0') {
         return false;
     }
 
     const char *tmpdir = getenv("TMPDIR");
-    snprintf(cache->image_path,
-             sizeof(cache->image_path),
-             "%s/achievement_tracker_%s_%s.png",
-             tmpdir ? tmpdir : "/tmp",
-             cache->temp_file_suffix,
-             cache->id);
+    snprintf(image->cache_path,
+             sizeof(image->cache_path),
+             "%sobs_achievement_tracker_%s_%s.png",
+             tmpdir ? tmpdir : "/tmp/",
+             image->type,
+             image->id);
+
+    obs_log(LOG_INFO, "Looking for image in cache: '%s'", image->cache_path);
 
     struct stat st;
-    if (stat(cache->image_path, &st) != 0) {
+    if (stat(image->cache_path, &st) != 0) {
 
         uint8_t *data = NULL;
         size_t   size = 0;
 
-        obs_log(LOG_INFO, "Downloading %s image from URL: %s", cache->display_name, image_url);
+        obs_log(LOG_INFO, "Downloading '%s' image from URL: %s", image->display_name, image->url);
 
         /* Download the image in memory */
-        if (!http_download(image_url, &data, &size)) {
-            obs_log(LOG_WARNING, "Unable to download %s image from URL: %s", cache->display_name, image_url);
+        if (!http_download(image->url, &data, &size)) {
+            obs_log(LOG_WARNING, "Unable to download %s image from URL: %s", image->display_name, image->url);
             return false;
         }
 
-        obs_log(LOG_INFO, "Downloaded %zu bytes for %s image", size, cache->display_name);
+        obs_log(LOG_INFO, "Downloaded %zu bytes for %s image", size, image->display_name);
 
         /* Write the bytes to a temp file */
-        FILE *temp_file = fopen(cache->image_path, "wb");
+        FILE *cache_file = fopen(image->cache_path, "wb");
 
-        if (!temp_file) {
-            obs_log(LOG_ERROR, "Failed to create temp file for %s image", cache->display_name);
+        if (!cache_file) {
+            obs_log(LOG_ERROR, "Failed to create temp file for %s image", image->display_name);
             bfree(data);
             return false;
         }
 
-        fwrite(data, 1, size, temp_file);
-        fclose(temp_file);
+        size_t written = fwrite(data, sizeof(uint8_t), size, cache_file);
+        fflush(cache_file);
+        fclose(cache_file);
         bfree(data);
+
+        obs_log(LOG_INFO, "Image saved in cache '%s'", image->cache_path, written);
+
     } else {
-        obs_log(LOG_INFO, "Using cached %s image for %s", cache->image_path, cache->id);
+        obs_log(LOG_INFO, "Using cached image '%s': '%s'", image->id, image->cache_path);
     }
 
     /* Schedule reload on the next render */
-    cache->must_reload = true;
+    image->must_reload = true;
 
     return true;
 }
 
-bool image_source_download_if_changed(image_source_cache_t *cache, const char *id, const char *image_url) {
+void image_source_download(image_t *image) {
 
-    if (!cache) {
-        return false;
-    }
-
-    /* If URL is NULL or empty, clear the cache */
-    if (!image_url || image_url[0] == '\0') {
-        image_source_clear(cache);
-        return false;
-    }
-
-    /* Check if URL has changed */
-    if (strcasecmp(image_url, cache->image_url) == 0) {
-        /* URL hasn't changed, no need to download */
-        return false;
-    }
-
-    /* Store the new URL */
-    snprintf(cache->image_url, sizeof(cache->image_url), "%s", image_url);
-    cache->id = bstrdup(id);
-
-    return download_image_to_temp_file(cache, image_url);
-}
-
-void image_source_download(image_source_cache_t *cache, const char *image_url) {
-
-    if (!cache) {
+    if (!image) {
         return;
     }
 
-    if (!image_url || image_url[0] == '\0') {
-        image_source_clear(cache);
+    download_to_cache(image);
+}
+
+void image_source_clear(image_t *image) {
+
+    if (!image) {
         return;
     }
 
-    /* Store the URL and download */
-    snprintf(cache->image_url, sizeof(cache->image_url), "%s", image_url);
-    download_image_to_temp_file(cache, image_url);
+    image->url[0]        = '\0';
+    image->cache_path[0] = '\0';
+    image->must_reload   = true;
 }
 
-void image_source_clear(image_source_cache_t *cache) {
+void image_source_reload_if_needed(image_t *image) {
 
-    if (!cache) {
-        return;
-    }
-
-    cache->image_url[0]  = '\0';
-    cache->image_path[0] = '\0';
-    cache->must_reload   = true;
-}
-
-void image_source_reload_if_needed(image_source_cache_t *cache) {
-
-    if (!cache || !cache->must_reload) {
+    if (!image || !image->must_reload) {
         return;
     }
 
@@ -149,80 +105,74 @@ void image_source_reload_if_needed(image_source_cache_t *cache) {
     obs_enter_graphics();
 
     /* Free existing texture */
-    if (cache->image_texture) {
-        gs_texture_destroy(cache->image_texture);
-        cache->image_texture = NULL;
+    if (image->texture) {
+        gs_texture_destroy(image->texture);
+        image->texture = NULL;
     }
 
     /* Create new texture if we have a path */
-    if (cache->image_path[0] != '\0') {
-        cache->image_texture = gs_texture_create_from_file(cache->image_path);
+    if (image->cache_path[0] != '\0') {
+        image->texture = gs_texture_create_from_file(image->cache_path);
     }
 
     obs_leave_graphics();
 
-    cache->must_reload = false;
+    image->must_reload = false;
 
-    /* Clean up temp file */
-    if (cache->image_path[0] != '\0') {
-        remove(cache->image_path);
-    }
-
-    if (cache->image_texture) {
-        obs_log(LOG_INFO, "New %s texture has been successfully loaded", cache->display_name);
-    } else if (cache->image_path[0] != '\0') {
-        obs_log(LOG_WARNING, "Failed to create %s texture from the downloaded file", cache->display_name);
+    if (image->texture) {
+        obs_log(LOG_INFO, "New %s texture has been successfully loaded", image->display_name);
+    } else if (image->cache_path[0] != '\0') {
+        obs_log(LOG_WARNING, "Failed to create %s texture from the downloaded file", image->display_name);
     }
 }
 
-void image_source_render(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect) {
+void image_source_render(image_t *image, source_size_t size, gs_effect_t *effect) {
 
-    if (!cache || !cache->image_texture) {
+    if (!image || !image->texture) {
         return;
     }
 
-    draw_texture(cache->image_texture, size.width, size.height, effect);
+    draw_texture(image->texture, size.width, size.height, effect);
 }
 
-void image_source_render_greyscale(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect) {
+void image_source_render_greyscale(image_t *image, source_size_t size, gs_effect_t *effect) {
 
-    if (!cache || !cache->image_texture) {
+    if (!image || !image->texture) {
         return;
     }
 
-    draw_texture_greyscale(cache->image_texture, size.width, size.height, effect);
+    draw_texture_greyscale(image->texture, size.width, size.height, effect);
 }
 
-void image_source_render_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
-                                      float opacity) {
+void image_source_render_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity) {
 
-    if (!cache || !cache->image_texture) {
+    if (!image || !image->texture) {
         return;
     }
 
-    draw_texture_with_opacity(cache->image_texture, size.width, size.height, effect, opacity);
+    draw_texture_with_opacity(image->texture, size.width, size.height, effect, opacity);
 }
 
-void image_source_render_greyscale_with_opacity(image_source_cache_t *cache, source_size_t size, gs_effect_t *effect,
+void image_source_render_greyscale_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect,
                                                 float opacity) {
 
-    if (!cache || !cache->image_texture) {
+    if (!image || !image->texture) {
         return;
     }
 
-    draw_texture_greyscale_with_opacity(cache->image_texture, size.width, size.height, effect, opacity);
+    draw_texture_greyscale_with_opacity(image->texture, size.width, size.height, effect, opacity);
 }
 
-void image_source_destroy(image_source_cache_t *cache) {
+void image_source_destroy(image_t *image) {
 
-    if (!cache) {
+    if (!image) {
         return;
     }
 
-    if (cache->image_texture) {
+    if (image->texture) {
         obs_enter_graphics();
-        gs_texture_destroy(cache->image_texture);
+        gs_texture_destroy(image->texture);
         obs_leave_graphics();
-        cache->image_texture = NULL;
+        image->texture = NULL;
     }
 }

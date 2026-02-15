@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cJSON.h"
+
 #include <obs-module.h>
 
 #ifdef __cplusplus
@@ -39,6 +41,23 @@ static void free_memory(void **ptr) {
     }
 
     bfree(*ptr);
+    *ptr = NULL;
+}
+
+/**
+ * @brief Frees an allocation and sets the caller's pointer to NULL.
+ *
+ * Safe to call with NULL or with @c *ptr == NULL.
+ *
+ * @param[in,out] ptr Address of the pointer to free.
+ */
+static void free_json_memory(void **ptr) {
+
+    if (!ptr || !*ptr) {
+        return;
+    }
+
+    cJSON_Delete(*ptr);
     *ptr = NULL;
 }
 

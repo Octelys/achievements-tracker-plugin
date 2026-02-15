@@ -21,7 +21,6 @@
 #include <diagnostics/log.h>
 #include <inttypes.h>
 
-#include "io/state.h"
 #include "oauth/xbox-live.h"
 #include "sources/common/image_source.h"
 #include "xbox/xbox_client.h"
@@ -33,7 +32,7 @@
  * This source is implemented as a singleton that stores the current cover art in
  * a global cache.
  */
-static image_source_cache_t g_game_cover;
+static image_t g_game_cover;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
@@ -50,8 +49,13 @@ static void on_xbox_game_played(const game_t *game) {
 
     obs_log(LOG_INFO, "Playing game %s (%s)", game->title, game->id);
 
-    const char *game_cover_url = xbox_get_game_cover(game);
-    image_source_download(&g_game_cover, game_cover_url);
+    char *game_cover_url = xbox_get_game_cover(game);
+    snprintf(g_game_cover.url, sizeof(g_game_cover.url), "%s", game_cover_url);
+    snprintf(g_game_cover.id, sizeof(g_game_cover.id), "%s", game->id);
+
+    image_source_download(&g_game_cover);
+
+    free_memory((void **)&game_cover_url);
 }
 
 /**
@@ -79,13 +83,13 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
 /** @brief OBS callback returning the source width. */
 static uint32_t source_get_width(void *data) {
-    const image_source_data_t *s = data;
+    const image_source_t *s = data;
     return s->size.width;
 }
 
 /** @brief OBS callback returning the source height. */
 static uint32_t source_get_height(void *data) {
-    const image_source_data_t *s = data;
+    const image_source_t *s = data;
     return s->size.height;
 }
 
@@ -108,10 +112,10 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    image_source_data_t *s = bzalloc(sizeof(*s));
-    s->source              = source;
-    s->size.width          = 800;
-    s->size.height         = 200;
+    image_source_t *s = bzalloc(sizeof(*s));
+    s->source         = source;
+    s->size.width     = 800;
+    s->size.height    = 200;
 
     return s;
 }
@@ -123,7 +127,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    image_source_data_t *source = data;
+    image_source_t *source = data;
 
     if (!source) {
         return;
@@ -152,7 +156,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    image_source_data_t *source = data;
+    image_source_t *source = data;
 
     if (!source) {
         return;
@@ -241,7 +245,9 @@ static const struct obs_source_info *xbox_game_cover_source_get(void) {
 
 void xbox_game_cover_source_register(void) {
 
-    image_source_cache_init(&g_game_cover, "Game Cover", "game_cover");
+    snprintf(g_game_cover.display_name, sizeof(g_game_cover.display_name), "Game Cover");
+    snprintf(g_game_cover.id, sizeof(g_game_cover.id), "");
+    snprintf(g_game_cover.type, sizeof(g_game_cover.type), "game_cover");
 
     obs_register_source(xbox_game_cover_source_get());
 
