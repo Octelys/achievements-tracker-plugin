@@ -13,11 +13,11 @@ extern "C" {
  */
 
 /**
- * @brief Register the "Xbox Achievements Total Count" source with OBS.
+ * @brief Register the "Xbox Achievements Count" source with OBS.
  *
  * Call once during plugin/module initialization.
  */
-void xbox_achievements_total_count_source_register(void);
+void xbox_achievements_count_source_register(void);
 
 #ifdef __cplusplus
 }

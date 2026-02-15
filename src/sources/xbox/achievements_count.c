@@ -1,16 +1,16 @@
-#include "sources/xbox/achievements_unlocked_count.h"
+#include "sources/xbox/achievements_count.h"
 
 /**
- * @file achievements_unlocked_count.c
- * @brief OBS source that renders the number of unlocked achievements for the current game.
+ * @file achievements_total_count.c
+ * @brief OBS source that renders the total number of achievements for the current game.
  *
- * This source displays the count of unlocked achievements for the currently played
- * Xbox game. The count is updated when achievements are unlocked or when the game changes.
+ * This source displays the total count of achievements available for the currently
+ * played Xbox game. The count is updated when the game changes.
  *
  * Data flow:
- *  - The Xbox monitor notifies this module when connection state changes,
- *    game changes, or achievement progress updates.
- *  - The module counts unlocked achievements and stores the result in a global.
+ *  - The Xbox monitor notifies this module when connection state changes or
+ *    when the game changes.
+ *  - The module counts total achievements and stores the result in a global.
  *  - During rendering, the count is formatted to text and rendered.
  *
  * Threading notes:
@@ -32,45 +32,30 @@
 
 #define NO_FLIP 0
 
-static char g_unlocked_count[64];
+static char g_total_count[64];
 static bool g_must_reload;
 
 /**
- * @brief Configuration for the unlocked count display.
+ * @brief Configuration for the total count display.
  *
  * Stored as a module-global pointer and initialized during
- * xbox_achievements_unlocked_count_source_register().
+ * xbox_achievements_total_count_source_register().
  */
-static achievements_unlocked_count_configuration_t *g_default_configuration;
+static achievements_count_configuration_t *g_configuration;
 
 /**
- * @brief Count unlocked achievements from an achievement list.
- *
- * @param achievements Head of the achievements list.
- * @return Number of unlocked achievements (those with unlocked_timestamp > 0).
+ * @brief Recompute and store the total achievements count.
  */
-static int count_unlocked_achievements(const achievement_t *achievements) {
-    int count = 0;
-    for (const achievement_t *a = achievements; a != NULL; a = a->next) {
-        if (a->unlocked_timestamp > 0) {
-            count++;
-        }
-    }
-    return count;
-}
-
-/**
- * @brief Recompute and store the unlocked achievements count.
- */
-static void update_unlocked_count(void) {
+static void update_count(void) {
     const achievement_t *achievements = get_current_game_achievements();
 
     int unlocked = count_unlocked_achievements(achievements);
+    int total    = count_achievements(achievements);
 
-    snprintf(g_unlocked_count, sizeof(g_unlocked_count), "%d", unlocked);
+    snprintf(g_total_count, sizeof(g_total_count), "%d / %d", unlocked, total);
     g_must_reload = true;
 
-    obs_log(LOG_INFO, "Unlocked achievements count: %d", unlocked);
+    obs_log(LOG_INFO, "%d achievements unlocked out of %d", unlocked, total);
 }
 
 /**
@@ -83,11 +68,22 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     UNUSED_PARAMETER(error_message);
 
     if (is_connected) {
-        update_unlocked_count();
+        update_count();
     } else {
-        snprintf(g_unlocked_count, sizeof(g_unlocked_count), "0");
-        g_must_reload = true;
+        g_total_count[0] = '\0';
+        g_must_reload    = true;
     }
+}
+
+/**
+ * @brief Xbox monitor callback invoked when a new game is played.
+ *
+ * @param game Current game information.
+ */
+static void on_game_played(const game_t *game) {
+    UNUSED_PARAMETER(game);
+
+    update_count();
 }
 
 /**
@@ -100,18 +96,7 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
     UNUSED_PARAMETER(gamerscore);
     UNUSED_PARAMETER(progress);
 
-    update_unlocked_count();
-}
-
-/**
- * @brief Xbox monitor callback invoked when a new game is played.
- *
- * @param game Current game information.
- */
-static void on_game_played(const game_t *game) {
-    UNUSED_PARAMETER(game);
-
-    update_unlocked_count();
+    update_count();
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -128,7 +113,7 @@ static void on_game_played(const game_t *game) {
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     UNUSED_PARAMETER(settings);
 
-    return text_source_create(source, "Achievement unlocked count");
+    return text_source_create(source, "Achievement total count");
 }
 
 /**
@@ -162,13 +147,13 @@ static uint32_t source_get_height(void *data) {
 static void on_source_update(void *data, obs_data_t *settings) {
     UNUSED_PARAMETER(data);
 
-    text_source_update_properties(settings, (text_source_config_t *)g_default_configuration, &g_must_reload);
+    text_source_update_properties(settings, (text_source_config_t *)g_configuration, &g_must_reload);
 
-    state_set_achievements_unlocked_count_configuration(g_default_configuration);
+    state_set_achievements_count_configuration(g_configuration);
 }
 
 /**
- * @brief OBS callback to render the unlocked count.
+ * @brief OBS callback to render the total count.
  *
  * @param data   Source instance data.
  * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
@@ -182,13 +167,13 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 
     if (!text_source_update_text(source,
                                  &g_must_reload,
-                                 (const text_source_config_t *)g_default_configuration,
-                                 g_unlocked_count,
+                                 (const text_source_config_t *)g_configuration,
+                                 g_total_count,
                                  true)) {
         return;
     }
 
-    text_source_render(source, (const text_source_config_t *)g_default_configuration, effect);
+    text_source_render(source, (const text_source_config_t *)g_configuration, effect);
 }
 
 /**
@@ -198,13 +183,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  */
 static void on_source_video_tick(void *data, float seconds) {
 
-    text_source_t *source = data;
-
-    if (!source) {
-        return;
-    }
-
-    text_source_tick(source, (const text_source_config_t *)g_default_configuration, seconds);
+    text_source_tick(data, (const text_source_config_t *)g_configuration, seconds);
 }
 
 /**
@@ -214,7 +193,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *p = obs_properties_create();
-    text_source_add_properties(p, true);
+    text_source_add_properties(p, false);
 
     return p;
 }
@@ -223,14 +202,14 @@ static obs_properties_t *source_get_properties(void *data) {
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Achievements Unlocked Count";
+    return "Xbox Achievements Count";
 }
 
 /**
- * @brief obs_source_info describing the Xbox Achievements Unlocked Count source.
+ * @brief obs_source_info describing the Xbox Achievements Total Count source.
  */
-static struct obs_source_info xbox_achievements_unlocked_count_source = {
-    .id             = "xbox_achievements_unlocked_count_source",
+static struct obs_source_info xbox_achievements_count_source = {
+    .id             = "xbox_achievements_count_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = source_get_name,
@@ -248,17 +227,17 @@ static struct obs_source_info xbox_achievements_unlocked_count_source = {
  * @brief Get the obs_source_info for registration.
  */
 static const struct obs_source_info *xbox_source_get(void) {
-    return &xbox_achievements_unlocked_count_source;
+    return &xbox_achievements_count_source;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-void xbox_achievements_unlocked_count_source_register(void) {
+void xbox_achievements_count_source_register(void) {
 
-    g_default_configuration = state_get_achievements_unlocked_count_configuration();
-    state_set_achievements_unlocked_count_configuration(g_default_configuration);
+    g_configuration = state_get_achievements_count_configuration();
+    state_set_achievements_count_configuration(g_configuration);
 
     obs_register_source(xbox_source_get());
 

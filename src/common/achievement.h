@@ -174,6 +174,14 @@ const achievement_t *find_latest_unlocked_achievement(const achievement_t *achie
 int count_locked_achievements(const achievement_t *achievements);
 
 /**
+ * @brief Count the number of unlocked achievements.
+ *
+ * @param achievements Head of the achievements linked list.
+ * @return Number of unlocked achievements (unlocked_timestamp != 0).
+ */
+int count_unlocked_achievements(const achievement_t *achievements);
+
+/**
  * @brief Get a random locked achievement.
  *
  * @param achievements Head of the achievements linked list.

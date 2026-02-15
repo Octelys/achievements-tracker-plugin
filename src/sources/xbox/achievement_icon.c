@@ -75,12 +75,11 @@ static void update_achievement_icon(const achievement_t *achievement) {
     // Check if the icon URL or unlock state changed
     bool is_new_unlocked_achievement = achievement->unlocked_timestamp != 0;
     bool has_url_changed             = strcmp(g_achievement_icon->url, achievement->icon_url) != 0;
+    bool has_state_changed           = g_is_achievement_unlocked != is_new_unlocked_achievement;
 
-    if (!has_url_changed || g_transition.phase == ICON_TRANSITION_NONE) {
+    if (!has_url_changed && g_transition.phase == ICON_TRANSITION_NONE) {
         return;
     }
-
-    bool has_state_changed = g_is_achievement_unlocked != is_new_unlocked_achievement;
 
     //  Immediately download the icon since we are NOT on a rendering thread
     //  The rendering loop is tied to the cache_url value.
@@ -175,7 +174,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    image_source_t *s = bzalloc(sizeof(*s));
+    image_source_t *s = bzalloc(sizeof(image_source_t));
     s->source         = source;
     s->size.width     = 200;
     s->size.height    = 200;
@@ -364,19 +363,19 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//      Public functions
+//      Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 void xbox_achievement_icon_source_register(void) {
 
-    g_achievement_icon = bzalloc(sizeof(image_t));
-    snprintf(g_achievement_icon->display_name, sizeof(g_achievement_icon->display_name), "Achievement Icon");
+    g_achievement_icon        = bzalloc(sizeof(image_t));
     g_achievement_icon->id[0] = '\0';
+    snprintf(g_achievement_icon->display_name, sizeof(g_achievement_icon->display_name), "Achievement Icon");
     snprintf(g_achievement_icon->type, sizeof(g_achievement_icon->type), "achievement_icon");
 
-    g_next_achievement_icon = bzalloc(sizeof(image_t));
-    snprintf(g_next_achievement_icon->display_name, sizeof(g_next_achievement_icon->display_name), "Achievement Icon");
+    g_next_achievement_icon        = bzalloc(sizeof(image_t));
     g_next_achievement_icon->id[0] = '\0';
+    snprintf(g_next_achievement_icon->display_name, sizeof(g_next_achievement_icon->display_name), "Achievement Icon");
     snprintf(g_next_achievement_icon->type, sizeof(g_next_achievement_icon->type), "achievement_icon");
 
     obs_register_source(xbox_achievement_icon_source_get());

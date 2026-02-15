@@ -30,6 +30,7 @@ static gamertag_configuration_t *g_configuration;
  * @brief Update the gamertag display from Xbox identity.
  */
 static void update_gamertag(void) {
+
     xbox_identity_t *identity = xbox_live_get_identity();
 
     if (!identity || !identity->gamertag) {
@@ -39,6 +40,8 @@ static void update_gamertag(void) {
     }
 
     g_must_reload = true;
+
+    free_memory((void **)&identity);
 }
 
 /**
@@ -60,6 +63,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     UNUSED_PARAMETER(settings);
 
     update_gamertag();
+
     return text_source_create(source, "Gamertag");
 }
 
@@ -99,7 +103,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 static void on_source_video_tick(void *data, float seconds) {
-    text_source_tick((text_source_t *)data, (const text_source_config_t *)g_configuration, seconds);
+    text_source_tick(data, (const text_source_config_t *)g_configuration, seconds);
 }
 
 static obs_properties_t *source_get_properties(void *data) {

@@ -215,36 +215,21 @@ typedef struct achievement_description_configuration {
 } achievement_description_configuration_t;
 
 /**
- * @brief Configuration used by the achievements unlocked count overlay/renderer.
+ * @brief Configuration used by the achievements count overlay/renderer.
  *
  * Ownership:
  * - Strings are treated as borrowed pointers unless otherwise documented by the
  *   caller.
  */
-typedef struct achievements_unlocked_count_configuration {
+typedef struct achievements_count_configuration {
     const char *font_face;
     const char *font_style;
     /** Font size in pixels (height passed to FreeType). */
     uint32_t    font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    color;
-} achievements_unlocked_count_configuration_t;
-
-/**
- * @brief Configuration used by the achievements total count overlay/renderer.
- *
- * Ownership:
- * - Strings are treated as borrowed pointers unless otherwise documented by the
- *   caller.
- */
-typedef struct achievements_total_count_configuration {
-    const char *font_face;
-    const char *font_style;
-    /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
-    /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    color;
-} achievements_total_count_configuration_t;
+    uint32_t    top_color;
+    uint32_t    bottom_color;
+} achievements_count_configuration_t;
 
 /**
  * @brief Dummy type to ensure OpenSSL public types are available to consumers.
