@@ -84,7 +84,7 @@ void draw_texture_greyscale(gs_texture_t *texture, const uint32_t width, const u
                                   "float4 PSGreyscale(VertInOut vert_in) : TARGET\n"
                                   "{\n"
                                   "    float4 rgba = image.Sample(def_sampler, vert_in.uv);\n"
-                                  "    float luma = rgba.r * 0.299 + rgba.g * 0.587 + rgba.b * 0.114;\n"
+                                  "    float luma = rgba.r * 0.42 + rgba.g * 0.45 + rgba.b * 0.13;\n"
                                   "    return float4(luma, luma, luma, rgba.a);\n"
                                   "}\n"
                                   "\n"

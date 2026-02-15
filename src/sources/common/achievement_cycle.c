@@ -137,7 +137,7 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//  Public functions
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 void achievement_cycle_init(void) {

@@ -17,6 +17,7 @@ void image_source_download(image_t *image) {
         return;
     }
 
+    /* Defines the cache file */
     const char *tmpdir = getenv("TMPDIR");
     snprintf(image->cache_path,
              sizeof(image->cache_path),
@@ -25,7 +26,7 @@ void image_source_download(image_t *image) {
              image->type,
              image->id);
 
-    obs_log(LOG_INFO, "Looking for image in cache: '%s'", image->cache_path);
+    obs_log(LOG_DEBUG, "Looking for image in cache: '%s'", image->cache_path);
 
     struct stat st;
     if (stat(image->cache_path, &st) != 0) {
@@ -33,21 +34,21 @@ void image_source_download(image_t *image) {
         uint8_t *data = NULL;
         size_t   size = 0;
 
-        obs_log(LOG_INFO, "Downloading '%s' image from URL: %s", image->display_name, image->url);
+        obs_log(LOG_DEBUG, "[%s] Downloading image from URL '%s'", image->display_name, image->url);
 
         /* Download the image in memory */
         if (!http_download(image->url, &data, &size)) {
-            obs_log(LOG_WARNING, "Unable to download %s image from URL: %s", image->display_name, image->url);
+            obs_log(LOG_WARNING, "[%s] Unable to download the image from URL '%s'", image->display_name, image->url);
             return;
         }
 
-        obs_log(LOG_INFO, "Downloaded %zu bytes for %s image", size, image->display_name);
+        obs_log(LOG_DEBUG, "[%s] Downloaded %zu bytes for '%s' image", image->display_name, size);
 
-        /* Write the bytes to a temp file */
+        /* Write the bytes to the cache file */
         FILE *cache_file = fopen(image->cache_path, "wb");
 
         if (!cache_file) {
-            obs_log(LOG_ERROR, "Failed to create temp file for %s image", image->display_name);
+            obs_log(LOG_ERROR, "[%s] Failed to create cache file for the image", image->display_name);
             free_memory((void **)&data);
             return;
         }
@@ -58,10 +59,10 @@ void image_source_download(image_t *image) {
 
         free_memory((void **)&data);
 
-        obs_log(LOG_INFO, "Image saved in cache '%s'", image->cache_path, written);
+        obs_log(LOG_DEBUG, "[%s] Image saved in cache '%s' (%zu bytes written))", image->display_name, image->cache_path, written);
 
     } else {
-        obs_log(LOG_INFO, "Using cached image '%s': '%s'", image->id, image->cache_path);
+        obs_log(LOG_DEBUG, "[%s] Using cached image from file '%s'", image->display_name, image->cache_path);
     }
 
     /* Schedule reload on the next render */
@@ -104,13 +105,13 @@ void image_source_reload_if_needed(image_t *image) {
     image->must_reload = false;
 
     if (image->texture) {
-        obs_log(LOG_INFO, "New %s texture has been successfully loaded", image->display_name);
+        obs_log(LOG_INFO, "[%s] New texture has been successfully loaded from cache file '%s'", image->display_name, image->cache_path);
     } else if (image->cache_path[0] != '\0') {
-        obs_log(LOG_WARNING, "Failed to create %s texture from the downloaded file", image->display_name);
+        obs_log(LOG_WARNING, "[%s] Failed to create texture from the cache file '%s'", image->display_name, image->cache_path);
     }
 }
 
-void image_source_render(image_t *image, source_size_t size, gs_effect_t *effect) {
+void image_source_render_active(image_t *image, source_size_t size, gs_effect_t *effect) {
 
     if (!image || !image->texture) {
         return;
@@ -119,7 +120,7 @@ void image_source_render(image_t *image, source_size_t size, gs_effect_t *effect
     draw_texture(image->texture, size.width, size.height, effect);
 }
 
-void image_source_render_greyscale(image_t *image, source_size_t size, gs_effect_t *effect) {
+void image_source_render_inactive(image_t *image, source_size_t size, gs_effect_t *effect) {
 
     if (!image || !image->texture) {
         return;
@@ -128,7 +129,7 @@ void image_source_render_greyscale(image_t *image, source_size_t size, gs_effect
     draw_texture_greyscale(image->texture, size.width, size.height, effect);
 }
 
-void image_source_render_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity) {
+void image_source_render_active_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity) {
 
     if (!image || !image->texture) {
         return;
@@ -137,8 +138,7 @@ void image_source_render_with_opacity(image_t *image, source_size_t size, gs_eff
     draw_texture_with_opacity(image->texture, size.width, size.height, effect, opacity);
 }
 
-void image_source_render_greyscale_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect,
-                                                float opacity) {
+void image_source_render_inactive_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity) {
 
     if (!image || !image->texture) {
         return;

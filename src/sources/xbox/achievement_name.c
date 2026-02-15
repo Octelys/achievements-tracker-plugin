@@ -1,3 +1,26 @@
+/**
+ * @file achievement_name.c
+ * @brief OBS source for displaying Xbox achievement names.
+ *
+ * This module implements an OBS video source that renders the current achievement's
+ * name and gamerscore as text (e.g., "50G - Master Explorer"). The source automatically
+ * updates when the achievement cycle selects a new achievement to display.
+ *
+ * Key features:
+ * - Automatic text updates via achievement_cycle subscription
+ * - Configurable font, size, and colors (separate for locked/unlocked states)
+ * - Fade transitions when the displayed achievement changes
+ * - Persistent configuration via state management
+ *
+ * Architecture:
+ * - Global configuration (g_configuration) stores user preferences
+ * - Cached render config (g_render_config) avoids per-frame reconstruction
+ * - Achievement cycle module manages which achievement to display
+ *
+ * @see achievement_cycle.h for the shared achievement rotation logic
+ * @see text_source.h for the common text rendering infrastructure
+ */
+
 #include "sources/xbox/achievement_name.h"
 
 #include "sources/common/achievement_cycle.h"
@@ -12,36 +35,67 @@
 
 #define NO_FLIP 0
 
+/**
+ * @brief Buffer holding the formatted achievement name string.
+ *
+ * Contains the display text in the format "XG - Achievement Name" where X is the
+ * gamerscore value. Updated by update_achievement_name() when achievements change.
+ */
 static char g_achievement_name[512];
+
+/**
+ * @brief Flag indicating the text context needs to be recreated.
+ *
+ * Set to true when:
+ * - Achievement name changes
+ * - Achievement unlock state changes (affects color)
+ * - User modifies source settings (font, size, colors)
+ *
+ * Cleared by text_source_update_text() after the context is recreated.
+ */
 static bool g_must_reload;
 
 /**
- * @brief Configuration for rendering the achievement name text.
+ * @brief User configuration for achievement name rendering.
  *
- * Stored as a module-global pointer and initialized during
- * xbox_achievement_name_source_register(). Contains font path, size, and color settings.
+ * Module-global pointer initialized during xbox_achievement_name_source_register().
+ * Contains font face, font size, and color settings for both locked and unlocked
+ * achievement states. This configuration is loaded from persistent storage and
+ * updated when the user modifies source properties in OBS.
+ *
+ * @note The pointer is owned by the state management system; do not free directly.
  */
 static achievement_name_configuration_t *g_configuration;
-static bool                              g_is_achievement_unlocked = false;
 
 /**
- * @brief Cached render configuration built from g_configuration.
+ * @brief Tracks whether the currently displayed achievement is unlocked.
  *
- * This is updated only when g_configuration changes to avoid reconstructing
- * the config on every frame.
+ * Used to determine which color scheme (active vs inactive) to apply when rendering.
+ * When this state changes, g_must_reload is set to trigger a text context refresh
+ * with the appropriate colors.
+ */
+static bool g_is_achievement_unlocked = false;
+
+/**
+ * @brief Cached render configuration derived from g_configuration.
+ *
+ * Updated by update_render_config() whenever g_configuration changes. This avoids
+ * reconstructing the configuration structure on every frame (60+ fps), improving
+ * performance. Used by on_source_video_render() and on_source_video_tick().
  */
 static text_source_config_t g_render_config;
 
 /**
- * @brief Update the cached render config from g_configuration.
+ * @brief Synchronize the cached render config with the global configuration.
  *
- * Copies all rendering parameters from the global configuration to the cached
- * render config. This optimization avoids reconstructing the config structure
- * on every frame (60+ times per second). Should be called whenever g_configuration
- * is modified, such as during initialization or when user settings change.
+ * Copies all rendering parameters from g_configuration to g_render_config. This
+ * optimization prevents reconstructing the configuration structure on every frame
+ * (60+ fps). Must be called whenever g_configuration is modified:
+ * - During source initialization
+ * - When user settings change via the OBS properties UI
  *
- * The cached config is then used by on_source_video_render() and on_source_video_tick()
- * for all rendering operations.
+ * @pre g_configuration must be non-NULL and fully initialized.
+ * @post g_render_config reflects the current g_configuration values.
  */
 static void update_render_config(void) {
     g_render_config.font_face             = g_configuration->font_face;
@@ -53,13 +107,21 @@ static void update_render_config(void) {
 }
 
 /**
- * @brief Update and store the formatted achievement name string.
+ * @brief Format and store the achievement name string for display.
  *
- * Formats the achievement information as "XG - Achievement Name" where X is the
- * gamerscore value from the first reward. Sets the global reload flag to trigger
- * a text context refresh on the next render.
+ * Constructs the display text in one of these formats:
+ * - "XG - Achievement Name" (if gamerscore reward is present)
+ * - "Achievement Name" (if no gamerscore reward)
  *
- * @param achievement Achievement data to format. If NULL, this function returns early.
+ * Also tracks the unlock state to apply the correct color scheme:
+ * - Unlocked achievements use active colors
+ * - Locked achievements use inactive colors
+ *
+ * @param achievement Achievement data to format. If NULL, returns immediately.
+ *
+ * @post g_achievement_name contains the formatted string.
+ * @post g_is_achievement_unlocked reflects the achievement's unlock state.
+ * @post g_must_reload is set to true, triggering a text context refresh.
  */
 static void update_achievement_name(const achievement_t *achievement) {
 
@@ -70,7 +132,7 @@ static void update_achievement_name(const achievement_t *achievement) {
     bool was_unlocked         = g_is_achievement_unlocked;
     g_is_achievement_unlocked = achievement->unlocked_timestamp != 0;
 
-    /* Force reload if the unlock state changed (color will be different) */
+    /* Force reload if the unlocked state changed (color will be different) */
     if (was_unlocked != g_is_achievement_unlocked) {
         g_must_reload = true;
     }
@@ -89,12 +151,15 @@ static void update_achievement_name(const achievement_t *achievement) {
 }
 
 /**
- * @brief Achievement cycle callback invoked when the displayed achievement changes.
+ * @brief Callback invoked by the achievement cycle when the display should update.
  *
- * Updates the achievement name display with the new achievement. This is called
- * by the shared achievement cycle module whenever the display should change.
+ * Registered via achievement_cycle_subscribe() during source initialization.
+ * Called whenever the shared achievement rotation selects a new achievement
+ * to display across all subscribed sources.
  *
- * @param achievement Achievement to display. If NULL, this function returns early.
+ * @param achievement New achievement to display. If NULL, returns immediately.
+ *
+ * @see achievement_cycle_subscribe()
  */
 static void on_achievement_changed(const achievement_t *achievement) {
 
@@ -102,7 +167,7 @@ static void on_achievement_changed(const achievement_t *achievement) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//	Source callbacks
+//  OBS Source Callbacks
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
@@ -326,7 +391,7 @@ static const struct obs_source_info *xbox_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//	Public functions
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 void xbox_achievement_name_source_register(void) {

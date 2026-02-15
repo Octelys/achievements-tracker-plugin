@@ -149,7 +149,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     image_source_reload_if_needed(&g_gamerpic);
 
     /* Render the image if we have a texture */
-    image_source_render(&g_gamerpic, source->size, effect);
+    image_source_render_active(&g_gamerpic, source->size, effect);
 }
 
 /**

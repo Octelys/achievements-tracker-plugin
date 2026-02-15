@@ -17,14 +17,17 @@ extern "C" {
  * This module provides a reusable framework for OBS sources that display downloaded
  * images, such as gamerpics, game covers, and achievement icons. It centralizes:
  *
- * - **URL-based image downloading** to temporary files
+ * - **URL-based image downloading** to temporary cache files
  * - **Deferred texture loading** on the graphics thread
  * - **Change detection** to avoid redundant downloads
  * - **Multiple rendering modes** (normal, opacity, greyscale)
  * - **Resource cleanup** and lifecycle management
  *
  * By consolidating this functionality, we eliminate duplication across multiple
- * image source implementations.
+ * image source implementations (gamerpic, game_cover, achievement_icon).
+ *
+ * @see image_t for the per-image runtime cache structure
+ * @see image_source_t for the base source structure
  */
 
 /**
@@ -90,36 +93,66 @@ typedef struct image {
 } image_t;
 
 /**
+ * @brief Download an image from its URL to the local cache.
  *
+ * Initiates a download of the image specified by the `url` field to a temporary
+ * cache file. The download runs on a background thread to avoid blocking the
+ * graphics thread. Upon completion, sets `must_reload` to true so the texture
+ * will be created on the next render tick.
+ *
+ * **Change Detection:** If the URL matches the previously downloaded URL, no
+ * download is performed (early return).
+ *
+ * **Thread Safety:** Safe to call from any thread. The actual texture creation
+ * happens later on the graphics thread via image_source_reload_if_needed().
+ *
+ * @param image Image cache containing the URL to download. Must not be NULL.
+ *              The `url` field must be set before calling.
+ *
+ * @post On success, `cache_path` contains the path to the downloaded file and
+ *       `must_reload` is set to true.
+ *
+ * @see image_source_reload_if_needed() for texture creation from the cached file
  */
 void image_source_download(image_t *image);
 
 /**
  * @brief Clear the image cache and schedule texture unload.
  *
- * Clears the cached URL, path, and ID fields, and sets must_reload to true so the
- * texture will be freed on the next render. Does not immediately destroy the texture;
- * that happens in image_source_reload_if_needed() on the graphics thread.
+ * Clears the cached URL, path, and ID fields, and sets `must_reload` to true so
+ * the texture will be freed on the next render. Does not immediately destroy the
+ * texture; that happens in image_source_reload_if_needed() on the graphics thread.
  *
- * Safe to call at any time, even if no image is currently loaded.
+ * **Thread Safety:** Safe to call from any thread.
  *
  * @param image Image cache to clear. Must not be NULL.
+ *
+ * @post `url`, `cache_path`, and `id` fields are cleared (empty strings).
+ * @post `must_reload` is set to true.
+ *
+ * @see image_source_reload_if_needed() for the actual texture destruction
  */
 void image_source_clear(image_t *image);
 
 /**
- * @brief Load the downloaded image into a texture if needed.
+ * @brief Load the downloaded image into a GPU texture if needed.
  *
- * Checks the must_reload flag. If true, enters the graphics context, destroys any
- * existing texture, creates a new texture from image_path, and cleans up the
- * temporary file. The must_reload flag is cleared after processing.
+ * Checks the `must_reload` flag. If true, enters the graphics context, destroys
+ * any existing texture, creates a new texture from `cache_path`, and cleans up
+ * the temporary file. The `must_reload` flag is cleared after processing.
  *
- * **Must be called from the graphics thread** (e.g., video_render callback) where
- * obs_enter_graphics/obs_leave_graphics is allowed.
+ * If `cache_path` is empty (image was cleared via image_source_clear()), only
+ * destroys the existing texture without creating a new one.
  *
- * If image_path is empty (image was cleared), only destroys the existing texture.
+ * @pre Must be called from the graphics thread (e.g., video_render callback).
  *
  * @param image Image cache containing the texture to reload. Must not be NULL.
+ *
+ * @post `must_reload` is set to false.
+ * @post If `cache_path` was non-empty, `texture` points to the newly created texture.
+ * @post The temporary cache file is deleted after successful texture creation.
+ *
+ * @see image_source_download() for the function that sets `must_reload`
  */
 void image_source_reload_if_needed(image_t *image);
 
@@ -127,45 +160,47 @@ void image_source_reload_if_needed(image_t *image);
  * @brief Render the cached texture at full opacity.
  *
  * Draws the texture at the specified dimensions using the provided effect.
- * Does nothing if no texture is loaded (image_texture is NULL).
+ * Does nothing if no texture is loaded (`texture` is NULL).
  *
- * **Must be called from the graphics thread** (e.g., video_render callback).
+ * @pre Must be called from the graphics thread (e.g., video_render callback).
  *
  * @param image  Image cache containing the texture to render. Must not be NULL.
  * @param size   Dimensions to render at in pixels (width and height).
  * @param effect Effect to use for rendering. If NULL, uses OBS default effect.
+ *
+ * @see image_source_render_active_with_opacity() for rendering with custom opacity
  */
-void image_source_render(image_t *image, source_size_t size, gs_effect_t *effect);
+void image_source_render_active(image_t *image, source_size_t size, gs_effect_t *effect);
 
 /**
  * @brief Render the cached texture with adjustable opacity.
  *
  * Draws the texture at the specified dimensions with the given opacity level.
- * Does nothing if no texture is loaded (image_texture is NULL).
+ * Does nothing if no texture is loaded (`texture` is NULL).
  *
- * **Must be called from the graphics thread** (e.g., video_render callback).
+ * @pre Must be called from the graphics thread (e.g., video_render callback).
  *
  * @param image   Image cache containing the texture to render. Must not be NULL.
  * @param size    Dimensions to render at in pixels (width and height).
  * @param effect  Effect to use for rendering. If NULL, uses OBS default effect.
  * @param opacity Opacity level in range [0.0, 1.0] (0.0 = fully transparent, 1.0 = fully opaque).
  */
-void image_source_render_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity);
+void image_source_render_active_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity);
 
 /**
  * @brief Render the cached texture in greyscale.
  *
  * Draws the texture at the specified dimensions using a greyscale shader effect.
  * Uses perceptually accurate luminance coefficients (Rec. 709) for color-to-grey conversion.
- * Does nothing if no texture is loaded (image_texture is NULL).
+ * Does nothing if no texture is loaded (`texture` is NULL).
  *
- * **Must be called from the graphics thread** (e.g., video_render callback).
+ * @pre Must be called from the graphics thread (e.g., video_render callback).
  *
  * @param image  Image cache containing the texture to render. Must not be NULL.
  * @param size   Dimensions to render at in pixels (width and height).
  * @param effect Effect to use for rendering. If NULL, uses OBS default effect.
  */
-void image_source_render_greyscale(image_t *image, source_size_t size, gs_effect_t *effect);
+void image_source_render_inactive(image_t *image, source_size_t size, gs_effect_t *effect);
 
 /**
  * @brief Render the cached texture in greyscale with adjustable opacity.
@@ -173,16 +208,16 @@ void image_source_render_greyscale(image_t *image, source_size_t size, gs_effect
  * Draws the texture at the specified dimensions using a greyscale shader effect
  * with the given opacity level. Uses perceptually accurate luminance coefficients
  * (Rec. 709) for color-to-grey conversion. Does nothing if no texture is loaded
- * (image_texture is NULL).
+ * (`texture` is NULL).
  *
- * **Must be called from the graphics thread** (e.g., video_render callback).
+ * @pre Must be called from the graphics thread (e.g., video_render callback).
  *
  * @param image   Image cache containing the texture to render. Must not be NULL.
  * @param size    Dimensions to render at in pixels (width and height).
  * @param effect  Effect to use for rendering. If NULL, uses OBS default effect.
  * @param opacity Opacity level in range [0.0, 1.0] (0.0 = fully transparent, 1.0 = fully opaque).
  */
-void image_source_render_greyscale_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity);
+void image_source_render_inactive_with_opacity(image_t *image, source_size_t size, gs_effect_t *effect, float opacity);
 
 /**
  * @brief Destroy the texture and free graphics resources.
@@ -194,6 +229,8 @@ void image_source_render_greyscale_with_opacity(image_t *image, source_size_t si
  * **Thread Safety:** Handles graphics context internally, safe to call from any thread.
  *
  * @param image Image cache to destroy. Must not be NULL.
+ *
+ * @post `texture` is set to NULL.
  */
 void image_source_destroy(image_t *image);
 

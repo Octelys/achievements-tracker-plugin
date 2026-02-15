@@ -240,9 +240,9 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 
     if (g_is_achievement_unlocked) {
         /* Render the image with opacity if we have a texture */
-        image_source_render_with_opacity(g_achievement_icon, source->size, effect, opacity);
+        image_source_render_active_with_opacity(g_achievement_icon, source->size, effect, opacity);
     } else {
-        image_source_render_greyscale_with_opacity(g_achievement_icon, source->size, effect, opacity);
+        image_source_render_inactive_with_opacity(g_achievement_icon, source->size, effect, opacity);
     }
 }
 
