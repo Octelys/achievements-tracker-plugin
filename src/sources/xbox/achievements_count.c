@@ -86,6 +86,19 @@ static void on_game_played(const game_t *game) {
     update_count();
 }
 
+/**
+ * @brief Xbox monitor callback invoked when achievements progress.
+ *
+ * @param gamerscore Updated gamerscore snapshot (unused).
+ * @param progress   Achievement progress details (unused).
+ */
+static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
+    UNUSED_PARAMETER(gamerscore);
+    UNUSED_PARAMETER(progress);
+
+    update_count();
+}
+
 //  --------------------------------------------------------------------------------------------------------------------
 //	Source callbacks
 //  --------------------------------------------------------------------------------------------------------------------
@@ -229,5 +242,6 @@ void xbox_achievements_count_source_register(void) {
     obs_register_source(xbox_source_get());
 
     xbox_subscribe_connected_changed(&on_connection_changed);
+    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
     xbox_subscribe_game_played(&on_game_played);
 }
