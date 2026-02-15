@@ -35,23 +35,31 @@ static void set_color_with_opacity(text_source_t *text_source, obs_data_t *setti
     uint32_t top_rgba    = text_source->use_active_color ? config->active_top_color : config->inactive_top_color;
     uint32_t bottom_rgba = text_source->use_active_color ? config->active_bottom_color : config->inactive_bottom_color;
 
+    float capped_opacity = fmaxf(0.0f, fminf(1.0f, opacity));
+
     // Set color - convert from RGBA to ABGR for OBS
     uint8_t  top_r          = (top_rgba >> 24) & 0xFF;
     uint8_t  top_g          = (top_rgba >> 16) & 0xFF;
     uint8_t  top_b          = (top_rgba >> 8) & 0xFF;
     uint8_t  original_top_a = top_rgba & 0xFF;
-    uint8_t  top_a          = (uint8_t)(original_top_a * fmaxf(0.0f, fminf(1.0f, opacity)));
+    uint8_t  top_a          = (uint8_t)(original_top_a * capped_opacity);
     uint32_t top_color      = (top_a << 24) | (top_b << 16) | (top_g << 8) | top_r;
 
     uint8_t  bottom_r          = (bottom_rgba >> 24) & 0xFF;
     uint8_t  bottom_g          = (bottom_rgba >> 16) & 0xFF;
     uint8_t  bottom_b          = (bottom_rgba >> 8) & 0xFF;
     uint8_t  original_bottom_a = bottom_rgba & 0xFF;
-    uint8_t  bottom_a          = (uint8_t)(original_bottom_a * fmaxf(0.0f, fminf(1.0f, opacity)));
+    uint8_t  bottom_a          = (uint8_t)(original_bottom_a * capped_opacity);
     uint32_t bottom_color      = (bottom_a << 24) | (bottom_b << 16) | (bottom_g << 8) | bottom_r;
 
     obs_data_set_int(settings, "color1", top_color);
     obs_data_set_int(settings, "color2", bottom_color);
+
+    bool use_outline = capped_opacity == 1.0f ? true : false;
+
+    // Enable outline, disable drop shadow
+    obs_data_set_bool(settings, "outline", use_outline);
+    obs_data_set_bool(settings, "drop_shadow", use_outline);
 }
 
 /**
@@ -77,7 +85,7 @@ static void set_font(text_source_t *text_source, obs_data_t *settings, const tex
     obs_data_set_obj(settings, "font", font);
     obs_data_release(font);
 
-    obs_log(LOG_INFO,
+    obs_log(LOG_DEBUG,
             "[%s] Private OBS text source settings is using font '%s' ('%s')",
             text_source->name,
             config->font_face,
@@ -86,7 +94,7 @@ static void set_font(text_source_t *text_source, obs_data_t *settings, const tex
 
 static void set_text(text_source_t *text_source, obs_data_t *settings) {
     obs_data_set_string(settings, "text", text_source->current_text);
-    obs_log(LOG_INFO,
+    obs_log(LOG_DEBUG,
             "[%s] Private OBS text source settings is using text '%s'",
             text_source->name,
             text_source->current_text);
@@ -94,7 +102,7 @@ static void set_text(text_source_t *text_source, obs_data_t *settings) {
 
 static void complete_transition(text_source_t *text_source, const text_source_config_t *config) {
 
-    obs_log(LOG_INFO, "[%s] Transition completed to show text '%s'", text_source->name, text_source->current_text);
+    obs_log(LOG_DEBUG, "[%s] Transition completed to show text '%s'", text_source->name, text_source->current_text);
 
     text_source->transition.phase   = TEXT_TRANSITION_NONE;
     text_source->transition.opacity = 1.0f;
@@ -107,7 +115,7 @@ static void complete_transition(text_source_t *text_source, const text_source_co
 
 static void initiate_fade_in_transition(text_source_t *text_source, const char *text, bool use_active_color) {
 
-    obs_log(LOG_INFO, "[%s] Initiating fade-in transition to show '%s'", text_source->name, text);
+    obs_log(LOG_DEBUG, "[%s] Initiating fade-in transition to show '%s'", text_source->name, text);
 
     if (text_source->current_text) {
         bfree(text_source->current_text);
@@ -129,7 +137,7 @@ static void initiate_fade_in_transition(text_source_t *text_source, const char *
 
 static void initiate_fade_out_transition(text_source_t *text_source, const char *text, bool use_active_color) {
 
-    obs_log(LOG_INFO,
+    obs_log(LOG_DEBUG,
             "[%s] Initiating fade-out transition from text '%s' to '%s'",
             text_source->name,
             text_source->current_text,
@@ -177,7 +185,7 @@ static bool ensure_private_obs_source(text_source_t *text_source, const text_sou
         return true;
     }
 
-    obs_log(LOG_INFO, "[%s] Creating a private OBS text source settings", text_source->name);
+    obs_log(LOG_DEBUG, "[%s] Creating a private OBS text source settings", text_source->name);
 
     text_source->private_obs_source_settings = create_private_obs_source_settings(text_source, config);
 
@@ -205,7 +213,7 @@ static bool ensure_private_obs_source(text_source_t *text_source, const text_sou
     }
 
     if (text_source->private_obs_source) {
-        obs_log(LOG_INFO, "[%s] Private OBS text source has been created", text_source->name);
+        obs_log(LOG_DEBUG, "[%s] Private OBS text source has been created", text_source->name);
     }
 
     return text_source->private_obs_source != NULL;
@@ -302,7 +310,7 @@ bool text_source_update_text(text_source_t *text_source, bool *force_reload, con
 
     obs_source_update(text_source->private_obs_source, settings);
 
-    obs_log(LOG_INFO, "[%s] Private OBS text source settings have been updated", text_source->name);
+    obs_log(LOG_DEBUG, "[%s] Private OBS text source settings have been updated", text_source->name);
 
 completed:
     *force_reload = false;
@@ -382,14 +390,6 @@ void text_source_add_properties(obs_properties_t *props, bool supports_inactive_
         obs_properties_add_color(props, "text_inactive_top_color", "Inactive text color (Top)");
         obs_properties_add_color(props, "text_inactive_bottom_color", "Inactive text color (Bottom)");
     }
-
-    /*
-    // Alignment dropdown
-    obs_property_t *align_list =
-        obs_properties_add_list(props, "text_align", "Text alignment", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-    obs_property_list_add_int(align_list, "Left", TEXT_ALIGN_LEFT);
-    obs_property_list_add_int(align_list, "Right", TEXT_ALIGN_RIGHT);
-    */
 }
 
 void text_source_update_properties(obs_data_t *settings, text_source_config_t *config, bool *must_reload) {
@@ -433,7 +433,7 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
             config->font_face  = obs_data_get_string(font_obj, "face");
             config->font_size  = (uint32_t)obs_data_get_int(font_obj, "size");
             config->font_style = obs_data_get_string(font_obj, "style");
-            obs_log(LOG_INFO,
+            obs_log(LOG_DEBUG,
                     "[TextSource] Using font '%s' (%d) with style '%s'",
                     config->font_face,
                     config->font_size,

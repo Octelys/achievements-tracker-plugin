@@ -911,6 +911,7 @@ void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t ca
 }
 
 void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callback) {
+
     if (!callback) {
         return;
     }

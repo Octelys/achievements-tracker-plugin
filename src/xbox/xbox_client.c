@@ -95,19 +95,20 @@ static bool str_replace(char *s, const char *needle, const char *replacement) {
 
 char *xbox_get_game_cover(const game_t *game) {
 
-    char *display_image_url = NULL;
+    char            *display_image_url = NULL;
+    xbox_identity_t *identity          = NULL;
+    char            *titlehub_response = NULL;
+    cJSON           *titlehub_json     = NULL;
 
     if (!game) {
-        return display_image_url;
+        goto cleanup;
     }
 
-    /*
-     * Retrieves the user's xbox identity
-     */
-    xbox_identity_t *identity = xbox_live_get_identity();
+    /* Retrieves the user's xbox identity */
+    identity = xbox_live_get_identity();
 
     if (!identity) {
-        return display_image_url;
+        goto cleanup;
     }
 
     char display_request[4096];
@@ -130,33 +131,33 @@ char *xbox_get_game_cover(const game_t *game) {
     /*
      * Sends the request
      */
-    long  http_code = 0;
-    char *response  = http_get(display_request, headers, NULL, &http_code);
+    long http_code    = 0;
+    titlehub_response = http_get(display_request, headers, NULL, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
         obs_log(LOG_ERROR, "Failed to fetch title image: received status code %d", http_code);
         goto cleanup;
     }
 
-    if (!response) {
+    if (!titlehub_response) {
         obs_log(LOG_ERROR, "Failed to fetch title image: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Response: %s", response);
+    obs_log(LOG_DEBUG, "Response: %s", titlehub_response);
 
     /*
      *  Process the response by trying to get the poster image URL.
-     *  Otherwise falls back on the display name.
+     *  Otherwise, it falls back on the display name.
      */
-    cJSON *presence_json = cJSON_Parse(response);
+    titlehub_json = cJSON_Parse(titlehub_response);
 
     for (int image_index = 0;; image_index++) {
 
         char image_type_key[128];
         snprintf(image_type_key, sizeof(image_type_key), XBOX_GAME_COVER_TYPE, image_index);
 
-        cJSON *image_type_value = cJSONUtils_GetPointer(presence_json, image_type_key);
+        cJSON *image_type_value = cJSONUtils_GetPointer(titlehub_json, image_type_key);
 
         if (!image_type_value) {
             break;
@@ -170,7 +171,7 @@ char *xbox_get_game_cover(const game_t *game) {
         char image_url_key[128];
         snprintf(image_url_key, sizeof(image_url_key), XBOX_GAME_COVER_URL, image_index);
 
-        cJSON *image_url_value = cJSONUtils_GetPointer(presence_json, image_url_key);
+        cJSON *image_url_value = cJSONUtils_GetPointer(titlehub_json, image_url_key);
 
         if (!image_url_value || strlen(image_url_value->valuestring) == 0) {
             continue;
@@ -186,7 +187,7 @@ char *xbox_get_game_cover(const game_t *game) {
         obs_log(LOG_INFO, "No Xbox game poster image found: falling back on the display image");
 
         /* No poster image found. Let's see if we can get the display image at least */
-        cJSON *display_image = cJSONUtils_GetPointer(presence_json, XBOX_GAME_COVER_DISPLAY_IMAGE);
+        cJSON *display_image = cJSONUtils_GetPointer(titlehub_json, XBOX_GAME_COVER_DISPLAY_IMAGE);
 
         if (!display_image) {
             obs_log(LOG_ERROR, "Failed to fetch title image: displayName property not found");
@@ -198,7 +199,9 @@ char *xbox_get_game_cover(const game_t *game) {
     }
 
 cleanup:
-    FREE(response);
+    free_memory((void **)&identity);
+    free_memory((void **)&titlehub_response);
+    free_json_memory((void **)&titlehub_json);
 
     return display_image_url;
 }
@@ -209,19 +212,17 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
         return false;
     }
 
-    /*
-     * Retrieves the user's xbox identity
-     */
+    /* Retrieves the user's xbox identity */
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
         return false;
     }
 
-    bool  result          = false;
-    char *json            = NULL;
-    char *gamerscore_text = NULL;
-    char *end             = NULL;
+    bool  result                    = false;
+    char *profile_settings_response = NULL;
+    char *gamerscore_text           = NULL;
+    char *end                       = NULL;
 
     /*
      * Creates the request
@@ -249,15 +250,15 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     /*
      * Sends the request
      */
-    long http_code = 0;
-    json           = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
+    long http_code            = 0;
+    profile_settings_response = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
         obs_log(LOG_ERROR, "Failed to fetch gamerscore: received status code %d", http_code);
         goto cleanup;
     }
 
-    if (!json) {
+    if (!profile_settings_response) {
         obs_log(LOG_ERROR, "Failed to fetch gamerscore: received no response");
         goto cleanup;
     }
@@ -265,7 +266,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     /*
      * Extracts the gamerscore from the response
      */
-    gamerscore_text = json_read_string(json, "value");
+    gamerscore_text = json_read_string(profile_settings_response, "value");
 
     if (!gamerscore_text) {
         obs_log(LOG_ERROR, "Failed to fetch gamerscore: unable to read the value");
@@ -281,14 +282,14 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     }
 
 cleanup:
-    /*FREE(json);*/
-    /*FREE(gamerscore_text);*/
-    /*FREE(end);*/
+    free_memory((void **)&identity);
+    free_memory((void **)&profile_settings_response);
+    free_memory((void **)&gamerscore_text);
 
     return result;
 }
 
-const char *xbox_fetch_gamerpic() {
+char *xbox_fetch_gamerpic() {
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
@@ -296,8 +297,9 @@ const char *xbox_fetch_gamerpic() {
         return NULL;
     }
 
-    char *response_json = NULL;
-    char *gamerpic_url  = NULL;
+    char  *profile_response      = NULL;
+    cJSON *profile_settings_json = NULL;
+    char  *gamerpic_url          = NULL;
 
     /* Creates the request */
     char json_body[4096];
@@ -321,30 +323,30 @@ const char *xbox_fetch_gamerpic() {
     obs_log(LOG_DEBUG, "Profile settings request headers: %s", headers);
 
     /* Sends the request */
-    long http_code = 0;
-    response_json  = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
+    long http_code   = 0;
+    profile_response = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
         obs_log(LOG_ERROR, "Failed to fetch the user's Gamerpic: received status code %ld", http_code);
         goto cleanup;
     }
 
-    if (!response_json) {
+    if (!profile_response) {
         obs_log(LOG_ERROR, "Failed to fetch the user's Gamerpic: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Profile settings response: %s", response_json);
+    obs_log(LOG_DEBUG, "Profile settings response: %s", profile_response);
 
-    cJSON *root = cJSON_Parse(response_json);
+    profile_settings_json = cJSON_Parse(profile_response);
 
-    if (!root) {
+    if (!profile_settings_json) {
         obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic: unable to parse the JSON response");
         goto cleanup;
     }
 
     /* Retrieves the value at the specified key: we assume it is at the first item (for now) */
-    cJSON *user_gamerpic_url = cJSONUtils_GetPointer(root, "/profileUsers/0/settings/0/value");
+    cJSON *user_gamerpic_url = cJSONUtils_GetPointer(profile_settings_json, "/profileUsers/0/settings/0/value");
 
     if (!user_gamerpic_url || !user_gamerpic_url->valuestring || user_gamerpic_url->valuestring[0] == '\0') {
         obs_log(LOG_INFO, "Failed to fetch the user's gamerpic: no value found.");
@@ -360,7 +362,9 @@ const char *xbox_fetch_gamerpic() {
     obs_log(LOG_INFO, "User gamerpic URL is '%s'", gamerpic_url);
 
 cleanup:
-    free_memory((void **)&response_json);
+    free_json_memory((void **)&profile_settings_json);
+    free_memory((void **)&identity);
+    free_memory((void **)&profile_response);
 
     return gamerpic_url;
 }

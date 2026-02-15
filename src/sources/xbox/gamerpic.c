@@ -15,7 +15,7 @@
  * This source is implemented as a singleton that stores the current user gamerpic
  * in a global cache.
  */
-static image_source_cache_t g_gamerpic;
+static image_t g_gamerpic;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
@@ -33,21 +33,31 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
     UNUSED_PARAMETER(error_message);
 
-    if (is_connected) {
-        obs_log(LOG_INFO, "Connected to Xbox Live - fetching gamerpic URL");
-
-        char *gamerpic_url = (char *)xbox_fetch_gamerpic();
-
-        if (gamerpic_url && gamerpic_url[0] != '\0') {
-            image_source_download_if_changed(&g_gamerpic, "default", gamerpic_url);
-        } else {
-            image_source_clear(&g_gamerpic);
-        }
-
-        free_memory((void **)&gamerpic_url);
-    } else {
+    if (!is_connected) {
+        obs_log(LOG_INFO, "[Gamerpic] Not connected - clearing");
         image_source_clear(&g_gamerpic);
+        return;
     }
+
+    obs_log(LOG_INFO, "[Gamerpic] Connected to Xbox Live - fetching Gamerpic URL %s", g_gamerpic.type);
+
+    char *gamerpic_url = xbox_fetch_gamerpic();
+
+    if (!gamerpic_url || gamerpic_url[0] == '\0') {
+        obs_log(LOG_INFO, "[Gamerpic] No Gamerpic URL - clearing");
+        image_source_clear(&g_gamerpic);
+        goto cleanup;
+    }
+
+    if (strcasecmp(gamerpic_url, g_gamerpic.url) != 0) {
+        obs_log(LOG_INFO, "[Gamerpic] Gamerpic URL changed - downloading");
+        snprintf(g_gamerpic.url, sizeof(g_gamerpic.url), "%s", gamerpic_url);
+        snprintf(g_gamerpic.id, sizeof(g_gamerpic.id), "%s", "default");
+        image_source_download(&g_gamerpic);
+    }
+
+cleanup:
+    free_memory((void **)&gamerpic_url);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -56,13 +66,13 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
 /** @brief OBS callback returning the source width. */
 static uint32_t source_get_width(void *data) {
-    const image_source_data_t *s = data;
+    const image_source_t *s = data;
     return s->size.width;
 }
 
 /** @brief OBS callback returning the source height. */
 static uint32_t source_get_height(void *data) {
-    const image_source_data_t *s = data;
+    const image_source_t *s = data;
     return s->size.height;
 }
 
@@ -85,10 +95,10 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    image_source_data_t *s = bzalloc(sizeof(*s));
-    s->source              = source;
-    s->size.width          = 800;
-    s->size.height         = 200;
+    image_source_t *s = bzalloc(sizeof(*s));
+    s->source         = source;
+    s->size.width     = 800;
+    s->size.height    = 200;
 
     return s;
 }
@@ -100,7 +110,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    image_source_data_t *source = data;
+    image_source_t *source = data;
 
     if (!source) {
         return;
@@ -129,7 +139,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
-    image_source_data_t *source = data;
+    image_source_t *source = data;
 
     if (!source) {
         return;
@@ -139,7 +149,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     image_source_reload_if_needed(&g_gamerpic);
 
     /* Render the image if we have a texture */
-    image_source_render(&g_gamerpic, source->size, effect);
+    image_source_render_active(&g_gamerpic, source->size, effect);
 }
 
 /**
@@ -202,7 +212,9 @@ static const struct obs_source_info *xbox_gamerpic_source_get(void) {
 
 void xbox_gamerpic_source_register(void) {
 
-    image_source_cache_init(&g_gamerpic, "Gamerpic", "gamerpic");
+    snprintf(g_gamerpic.display_name, sizeof(g_gamerpic.display_name), "Gamerpic");
+    snprintf(g_gamerpic.id, sizeof(g_gamerpic.id), "default");
+    snprintf(g_gamerpic.type, sizeof(g_gamerpic.type), "gamerpic");
 
     obs_register_source(xbox_gamerpic_source_get());
 

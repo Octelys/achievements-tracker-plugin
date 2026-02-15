@@ -64,7 +64,7 @@ char *xbox_get_game_cover(const game_t *game);
  *         error. The caller owns the returned string and must free it with
  *         @ref bfree.
  */
-const char *xbox_fetch_gamerpic();
+char *xbox_fetch_gamerpic();
 
 #ifdef __cplusplus
 }
