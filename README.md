@@ -5,9 +5,13 @@ A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement
 ## Features
 
 - **Xbox Live Authentication**: Secure OAuth 2.0 authentication flow with Microsoft accounts
-- **Real-time Achievement Tracking**: Monitor achievement unlocks as they happen (Soon)
-- **Gamer Score Display**: Show total gamer score and progress
-- **Customizable Text Source**: Configurable font, color, and size (Soon)
+- **Real-time Achievement Tracking**: Monitor achievement unlocks as they happen
+- **Profile Display**: Show gamertag, gamerpic, and gamerscore
+- **Game Information**: Display currently active game cover art
+- **Achievement Details**: Show achievement name, description, icon, and count
+- **Customizable Text Sources**: Configurable font, color, and size for all text-based sources
+- **Customizable Image Sources**: Adjustable dimensions for image-based sources
+- **Automatic Updates**: Real-time synchronization with Xbox Live services
 - **Cross-platform**: Supports Windows, macOS, and Linux
 
 ---
@@ -35,15 +39,32 @@ A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement
 
 ### Usage
 
-Once configured, the source will automatically display:
-- Using the **Xbox Cover** source, the cover of the game currently active on your Xbox One console will be shown
-- Using the **Xbox Gamerscore** source: your current gamerscore will be shown
-- Using the **Xbox Achievements Unlocked Count** source: the number of achievements you've unlocked for the current game
-- Using the **Xbox Achievements Total Count** source: the total number of achievements available for the current game
+Once configured, the plugin provides the following OBS sources:
 
-The plugin subscribes Xbox Live to get real-time updates of:
-- The currently active game
+#### Account & Profile Sources
+
+- **Xbox Account**: Authentication source for signing into Xbox Live. Add this first to authenticate with your Microsoft account.
+- **Xbox Gamertag**: Displays your Xbox gamertag as customizable text.
+- **Xbox Gamerpic**: Shows your Xbox profile picture (avatar).
+- **Xbox Gamerscore**: Displays your total gamerscore as customizable text.
+
+#### Game Sources
+
+- **Xbox Game Cover**: Shows the cover art/box art of the currently active game on your Xbox console.
+
+#### Achievement Sources
+
+- **Xbox Achievement (Name)**: Displays the name and gamerscore value of the current achievement (e.g., "50G - Master Explorer").
+- **Xbox Achievement (Description)**: Shows the description text of the current achievement.
+- **Xbox Achievement (Icon)**: Displays the achievement icon/badge image.
+- **Xbox Achievements Count**: Shows the total number of achievements for the current game (e.g., "50 achievements").
+
+#### Real-time Updates
+
+The plugin automatically subscribes to Xbox Live for real-time updates:
+- Currently active game changes
 - Achievement unlock events
+- Profile information updates
 
 ---
 
@@ -89,6 +110,7 @@ achievements-tracker-plugin/
 │   │   └── xbox-live.c/h               # Xbox Live OAuth & XSTS token flows
 │   ├── sources/                        # OBS source implementations
 │   │   ├── common/                     # Shared source utilities
+│   │   │   ├── achievement_cycle.c/h   # Achievement display rotation logic
 │   │   │   ├── image_source.c/h        # Common image source functionality
 │   │   │   └── text_source.c/h         # Common text source functionality
 │   │   └── xbox/                       # Xbox-specific sources
@@ -96,8 +118,7 @@ achievements-tracker-plugin/
 │   │       ├── achievement_description.c/h  # Achievement description text source
 │   │       ├── achievement_icon.c/h    # Achievement icon image source
 │   │       ├── achievement_name.c/h    # Achievement name text source
-│   │       ├── achievements_total_count.c/h  # Total achievements count text source
-│   │       ├── achievements_unlocked_count.c/h  # Unlocked achievements count text source
+│   │       ├── achievements_count.c/h  # Achievements count text source
 │   │       ├── game_cover.c/h          # Xbox Game Cover image source
 │   │       ├── gamerpic.c/h            # Xbox Gamerpic image source
 │   │       ├── gamerscore.c/h          # Xbox Gamerscore text source
