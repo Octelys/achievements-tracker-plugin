@@ -59,7 +59,11 @@ void image_source_download(image_t *image) {
 
         free_memory((void **)&data);
 
-        obs_log(LOG_DEBUG, "[%s] Image saved in cache '%s' (%zu bytes written))", image->display_name, image->cache_path, written);
+        obs_log(LOG_DEBUG,
+                "[%s] Image saved in cache '%s' (%zu bytes written))",
+                image->display_name,
+                image->cache_path,
+                written);
 
     } else {
         obs_log(LOG_DEBUG, "[%s] Using cached image from file '%s'", image->display_name, image->cache_path);
@@ -105,9 +109,15 @@ void image_source_reload_if_needed(image_t *image) {
     image->must_reload = false;
 
     if (image->texture) {
-        obs_log(LOG_INFO, "[%s] New texture has been successfully loaded from cache file '%s'", image->display_name, image->cache_path);
+        obs_log(LOG_INFO,
+                "[%s] New texture has been successfully loaded from cache file '%s'",
+                image->display_name,
+                image->cache_path);
     } else if (image->cache_path[0] != '\0') {
-        obs_log(LOG_WARNING, "[%s] Failed to create texture from the cache file '%s'", image->display_name, image->cache_path);
+        obs_log(LOG_WARNING,
+                "[%s] Failed to create texture from the cache file '%s'",
+                image->display_name,
+                image->cache_path);
     }
 }
 
