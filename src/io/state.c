@@ -56,15 +56,11 @@
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_FACE "source_achievement_description_font_face"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_STYLE "source_achievement_description_font_style"
 
-#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_COLOR "source_achievements_unlocked_count_color"
-#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_SIZE "source_achievements_unlocked_count_size"
-#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT_FACE "source_achievements_unlocked_count_font_face"
-#define ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT_STYLE "source_achievements_unlocked_count_font_style"
-
-#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_COLOR "source_achievements_total_count_color"
-#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_SIZE "source_achievements_total_count_size"
-#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT_FACE "source_achievements_total_count_font_face"
-#define ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT_STYLE "source_achievements_total_count_font_style"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_TOP_COLOR "source_achievements_count_top_color"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_BOTTOM_COLOR "source_achievements_count_bottom_color"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE "source_achievements_count_size"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE "source_achievements_count_font_face"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE "source_achievements_count_font_style"
 
 /**
  * @brief Global in-memory persisted state.
@@ -515,66 +511,36 @@ achievement_description_configuration_t *state_get_achievement_description_confi
     return configuration;
 }
 
-void state_set_achievements_unlocked_count_configuration(
-    const achievements_unlocked_count_configuration_t *configuration) {
+void state_set_achievements_count_configuration(const achievements_count_configuration_t *configuration) {
 
     if (!configuration) {
         return;
     }
 
-    obs_data_set_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_COLOR, configuration->color);
-    obs_data_set_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_SIZE, configuration->font_size);
-    obs_data_set_string(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT_FACE, configuration->font_face);
-    obs_data_set_string(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TOP_COLOR, configuration->top_color);
+    obs_data_set_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_BOTTOM_COLOR, configuration->bottom_color);
+    obs_data_set_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE, configuration->font_size);
+    obs_data_set_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE, configuration->font_face);
+    obs_data_set_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE, configuration->font_style);
 
     save_state(g_state);
 }
 
-achievements_unlocked_count_configuration_t *state_get_achievements_unlocked_count_configuration() {
+achievements_count_configuration_t *state_get_achievements_count_configuration() {
 
-    uint32_t    color      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_COLOR);
-    uint32_t    size       = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_SIZE);
-    const char *font_face  = obs_data_get_string(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT_FACE);
-    const char *font_style = obs_data_get_string(g_state, ACHIEVEMENTS_UNLOCKED_COUNT_CONFIGURATION_FONT_STYLE);
+    uint32_t    top_color    = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TOP_COLOR);
+    uint32_t    bottom_color = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_BOTTOM_COLOR);
+    uint32_t    size         = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE);
+    const char *font_face    = obs_data_get_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE);
+    const char *font_style   = obs_data_get_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE);
 
-    achievements_unlocked_count_configuration_t *configuration =
-        bzalloc(sizeof(achievements_unlocked_count_configuration_t));
+    achievements_count_configuration_t *configuration = bzalloc(sizeof(achievements_count_configuration_t));
 
-    configuration->color      = color == 0 ? 0xFFFFFFFF : color;
-    configuration->font_size  = size == 0 ? 48 : size;
-    configuration->font_face  = bstrdup(font_face);
-    configuration->font_style = bstrdup(font_style);
-
-    return configuration;
-}
-
-void state_set_achievements_total_count_configuration(const achievements_total_count_configuration_t *configuration) {
-
-    if (!configuration) {
-        return;
-    }
-
-    obs_data_set_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_COLOR, configuration->color);
-    obs_data_set_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_SIZE, configuration->font_size);
-    obs_data_set_string(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT_FACE, configuration->font_face);
-    obs_data_set_string(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT_STYLE, configuration->font_style);
-
-    save_state(g_state);
-}
-
-achievements_total_count_configuration_t *state_get_achievements_total_count_configuration() {
-
-    uint32_t    color      = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_COLOR);
-    uint32_t    size       = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_SIZE);
-    const char *font_face  = obs_data_get_string(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT_FACE);
-    const char *font_style = obs_data_get_string(g_state, ACHIEVEMENTS_TOTAL_COUNT_CONFIGURATION_FONT_STYLE);
-
-    achievements_total_count_configuration_t *configuration = bzalloc(sizeof(achievements_total_count_configuration_t));
-
-    configuration->color      = color == 0 ? 0xFFFFFFFF : color;
-    configuration->font_size  = size == 0 ? 48 : size;
-    configuration->font_face  = bstrdup(font_face);
-    configuration->font_style = bstrdup(font_style);
+    configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
+    configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    configuration->font_size    = size == 0 ? 48 : size;
+    configuration->font_face    = bstrdup(font_face);
+    configuration->font_style   = bstrdup(font_style);
 
     return configuration;
 }

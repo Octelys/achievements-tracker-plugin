@@ -208,18 +208,30 @@ const achievement_t *find_latest_unlocked_achievement(const achievement_t *achie
 }
 
 int count_locked_achievements(const achievement_t *achievements) {
+
     int count = 0;
 
     for (const achievement_t *a = achievements; a != NULL; a = a->next) {
-
-        obs_log(LOG_INFO, "Achievements #%s %s | %" PRId64, a->id, a->progress_state, a->unlocked_timestamp);
-
         if (a->unlocked_timestamp == 0) {
             count++;
         }
     }
 
     obs_log(LOG_INFO, "Found %d locked achievements", count);
+
+    return count;
+}
+
+int count_unlocked_achievements(const achievement_t *achievements) {
+    int count = 0;
+
+    for (const achievement_t *a = achievements; a != NULL; a = a->next) {
+        if (a->unlocked_timestamp > 0) {
+            count++;
+        }
+    }
+
+    obs_log(LOG_INFO, "Found %d unlocked achievements", count);
 
     return count;
 }
