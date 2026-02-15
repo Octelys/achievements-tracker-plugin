@@ -33,8 +33,6 @@
 #include <cJSON.h>
 #include <cJSON_Utils.h>
 
-#include <execinfo.h>
-
 #define XBOX_PRESENCE_ENDPOINT             "https://userpresence.xboxlive.com/users/xuid(%s)"
 #define XBOX_PROFILE_SETTINGS_ENDPOINT     "https://profile.xboxlive.com/users/batch/profile/settings"
 #define XBOX_PROFILE_CONTRACT_VERSION      "2"
