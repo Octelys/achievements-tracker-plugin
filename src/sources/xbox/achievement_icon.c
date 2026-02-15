@@ -366,12 +366,12 @@ void xbox_achievement_icon_source_register(void) {
 
     g_achievement_icon = bzalloc(sizeof(image_t));
     snprintf(g_achievement_icon->display_name, sizeof(g_achievement_icon->display_name), "Achievement Icon");
-    snprintf(g_achievement_icon->id, sizeof(g_achievement_icon->id), "");
+    g_achievement_icon->id[0] = '\0';
     snprintf(g_achievement_icon->type, sizeof(g_achievement_icon->type), "achievement_icon");
 
     g_next_achievement_icon = bzalloc(sizeof(image_t));
     snprintf(g_next_achievement_icon->display_name, sizeof(g_next_achievement_icon->display_name), "Achievement Icon");
-    snprintf(g_next_achievement_icon->id, sizeof(g_next_achievement_icon->id), "");
+    g_next_achievement_icon->id[0] = '\0';
     snprintf(g_next_achievement_icon->type, sizeof(g_next_achievement_icon->type), "achievement_icon");
 
     obs_register_source(xbox_achievement_icon_source_get());
