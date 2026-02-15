@@ -11,16 +11,10 @@
 
 #include "drawing/image.h"
 
-/**
- * @brief Internal helper to download an image from URL to a temp file.
- *
- * @param image     Image cache to update.
- * @return true on success, false on failure.
- */
-static bool download_to_cache(image_t *image) {
+void image_source_download(image_t *image) {
 
     if (!image || image->url[0] == '\0') {
-        return false;
+        return;
     }
 
     const char *tmpdir = getenv("TMPDIR");
@@ -44,7 +38,7 @@ static bool download_to_cache(image_t *image) {
         /* Download the image in memory */
         if (!http_download(image->url, &data, &size)) {
             obs_log(LOG_WARNING, "Unable to download %s image from URL: %s", image->display_name, image->url);
-            return false;
+            return;
         }
 
         obs_log(LOG_INFO, "Downloaded %zu bytes for %s image", size, image->display_name);
@@ -54,14 +48,15 @@ static bool download_to_cache(image_t *image) {
 
         if (!cache_file) {
             obs_log(LOG_ERROR, "Failed to create temp file for %s image", image->display_name);
-            bfree(data);
-            return false;
+            free_memory((void **)&data);
+            return;
         }
 
         size_t written = fwrite(data, sizeof(uint8_t), size, cache_file);
         fflush(cache_file);
         fclose(cache_file);
-        bfree(data);
+
+        free_memory((void **)&data);
 
         obs_log(LOG_INFO, "Image saved in cache '%s'", image->cache_path, written);
 
@@ -71,17 +66,6 @@ static bool download_to_cache(image_t *image) {
 
     /* Schedule reload on the next render */
     image->must_reload = true;
-
-    return true;
-}
-
-void image_source_download(image_t *image) {
-
-    if (!image) {
-        return;
-    }
-
-    download_to_cache(image);
 }
 
 void image_source_clear(image_t *image) {
