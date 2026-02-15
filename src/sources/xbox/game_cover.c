@@ -246,7 +246,7 @@ static const struct obs_source_info *xbox_game_cover_source_get(void) {
 void xbox_game_cover_source_register(void) {
 
     snprintf(g_game_cover.display_name, sizeof(g_game_cover.display_name), "Game Cover");
-    snprintf(g_game_cover.id, sizeof(g_game_cover.id), "");
+    g_game_cover.id[0] = '\0';
     snprintf(g_game_cover.type, sizeof(g_game_cover.type), "game_cover");
 
     obs_register_source(xbox_game_cover_source_get());
