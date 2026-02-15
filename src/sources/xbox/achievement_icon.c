@@ -14,7 +14,8 @@
  * This source is implemented as a singleton that stores the current achievement icon
  * in a global cache.
  */
-static image_t g_achievement_icon;
+static image_t *g_achievement_icon;
+static image_t *g_next_achievement_icon;
 
 static bool g_is_achievement_unlocked = false;
 
@@ -37,8 +38,6 @@ typedef struct icon_transition_state {
     icon_transition_phase_t phase;
     float                   opacity;
     float                   duration;
-    char                   *pending_url;
-    char                   *achievement_id;
     bool                    pending_is_unlocked;
 } icon_transition_state_t;
 
@@ -46,9 +45,17 @@ static icon_transition_state_t g_transition = {
     .phase               = ICON_TRANSITION_NONE,
     .opacity             = 1.0f,
     .duration            = ICON_TRANSITION_DEFAULT_DURATION,
-    .pending_url         = NULL,
     .pending_is_unlocked = false,
 };
+
+static void swap_achievement_icons(void) {
+    /* Swap the images */
+    image_t *tmp              = g_achievement_icon;
+    g_achievement_icon        = g_next_achievement_icon;
+    g_next_achievement_icon   = tmp;
+    /* Also swap the unlocked status */
+    g_is_achievement_unlocked = g_transition.pending_is_unlocked;
+}
 
 /**
  * @brief Update the achievement icon display.
@@ -57,41 +64,39 @@ static icon_transition_state_t g_transition = {
  */
 static void update_achievement_icon(const achievement_t *achievement) {
 
-    if (achievement && achievement->icon_url) {
-
-        bool is_new_unlocked_achievement = achievement->unlocked_timestamp != 0;
-
-        // Check if the icon URL or unlock state changed
-        bool has_url_changed   = strcmp(g_achievement_icon.url, achievement->icon_url) != 0;
-        bool has_state_changed = g_is_achievement_unlocked != is_new_unlocked_achievement;
-
-        if ((has_url_changed || has_state_changed) && g_achievement_icon.texture) {
-            // Start a fade-out transition and keep track of the achievement to show
-            free_memory((void **)&g_transition.pending_url);
-            free_memory((void **)&g_transition.achievement_id);
-            g_transition.achievement_id      = bstrdup(achievement->id);
-            g_transition.pending_url         = bstrdup(achievement->icon_url);
-            g_transition.pending_is_unlocked = is_new_unlocked_achievement;
-            g_transition.phase               = ICON_TRANSITION_FADE_OUT;
-            g_transition.opacity             = 1.0f;
-        } else {
-            // No existing texture or first load - load immediately
-            g_is_achievement_unlocked = is_new_unlocked_achievement;
-            snprintf(g_achievement_icon.url, sizeof(g_achievement_icon.url), "%s", achievement->icon_url);
-            snprintf(g_achievement_icon.id, sizeof(g_achievement_icon.id), "%s", achievement->id);
-            image_source_download(&g_achievement_icon);
-
-            if (g_achievement_icon.texture) {
-                // Start fade-in
-                g_transition.phase   = ICON_TRANSITION_FADE_IN;
-                g_transition.opacity = 0.0f;
-            }
-        }
-    } else {
-        image_source_clear(&g_achievement_icon);
+    if (!achievement || achievement->icon_url[0] == '\0') {
+        image_source_clear(g_achievement_icon);
         g_is_achievement_unlocked = false;
         g_transition.phase        = ICON_TRANSITION_NONE;
         g_transition.opacity      = 1.0f;
+        return;
+    }
+
+    // Check if the icon URL or unlock state changed
+    bool is_new_unlocked_achievement = achievement->unlocked_timestamp != 0;
+    bool has_url_changed             = strcmp(g_achievement_icon->url, achievement->icon_url) != 0;
+    bool has_state_changed           = g_is_achievement_unlocked != is_new_unlocked_achievement;
+
+    //  Immediately download the icon since we are NOT on a rendering thread
+    //  The rendering loop is tied to the cache_url value.
+    g_transition.pending_is_unlocked = is_new_unlocked_achievement;
+    snprintf(g_next_achievement_icon->id,
+             sizeof(g_next_achievement_icon->id),
+             "%s_%s",
+             achievement->service_config_id,
+             achievement->id);
+    snprintf(g_next_achievement_icon->url, sizeof(g_next_achievement_icon->url), "%s", achievement->icon_url);
+    image_source_download(g_next_achievement_icon);
+
+    if ((has_url_changed || has_state_changed) && g_next_achievement_icon->texture) {
+        /* Initiates the fade out now that the icon is loaded */
+        g_transition.phase   = ICON_TRANSITION_FADE_OUT;
+        g_transition.opacity = 1.0f;
+    } else {
+        // Initiates the fade out now that the icon is loaded */
+        g_transition.phase   = ICON_TRANSITION_FADE_IN;
+        g_transition.opacity = 0.0f;
+        swap_achievement_icons();
     }
 }
 
@@ -189,9 +194,10 @@ static void on_source_destroy(void *data) {
         return;
     }
 
-    image_source_destroy(&g_achievement_icon);
+    image_source_destroy(g_achievement_icon);
+    image_source_destroy(g_next_achievement_icon);
 
-    bfree(source);
+    free_memory((void **)&source);
 }
 
 /**
@@ -213,7 +219,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
  *
  * Loads a new texture if required and draws it with opacity for fade animations.
  * The texture is lazily loaded from the downloaded icon file on the first
- * render after an achievement unlocked.
+ * render after an achievement is unlocked.
  *
  * @param data   Source instance data containing width and height.
  * @param effect Effect to use when rendering. If NULL, OBS default effect is used.
@@ -227,16 +233,16 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     /* Load image if needed (deferred load in graphics context) */
-    image_source_reload_if_needed(&g_achievement_icon);
+    image_source_reload_if_needed(g_achievement_icon);
 
     /* Get current opacity from the transition state */
     float opacity = g_transition.opacity;
 
     if (g_is_achievement_unlocked) {
         /* Render the image with opacity if we have a texture */
-        image_source_render_with_opacity(&g_achievement_icon, source->size, effect, opacity);
+        image_source_render_with_opacity(g_achievement_icon, source->size, effect, opacity);
     } else {
-        image_source_render_greyscale_with_opacity(&g_achievement_icon, source->size, effect, opacity);
+        image_source_render_greyscale_with_opacity(g_achievement_icon, source->size, effect, opacity);
     }
 }
 
@@ -261,17 +267,9 @@ static void on_source_video_tick(void *data, float seconds) {
         g_transition.opacity = fmaxf(0.0f, g_transition.opacity - seconds / duration);
 
         if (g_transition.opacity <= 0.0f) {
-            g_transition.opacity = 0.0f;
 
-            /* Fade-out complete, load the pending icon */
-            if (g_transition.pending_url) {
-                g_is_achievement_unlocked = g_transition.pending_is_unlocked;
-                snprintf(g_achievement_icon.url, sizeof(g_achievement_icon.url), "%s", g_transition.pending_url);
-                snprintf(g_achievement_icon.id, sizeof(g_achievement_icon.id), "%s", g_transition.achievement_id);
-                image_source_download(&g_achievement_icon);
-                free_memory((void **)&g_transition.pending_url);
-                free_memory((void **)&g_transition.achievement_id);
-            }
+            /* Fade-out complete, swap to the next icon */
+            swap_achievement_icons();
 
             /* Start fade-in */
             g_transition.phase = ICON_TRANSITION_FADE_IN;
@@ -279,10 +277,10 @@ static void on_source_video_tick(void *data, float seconds) {
         break;
 
     case ICON_TRANSITION_FADE_IN:
-        g_transition.opacity += seconds / duration;
+        g_transition.opacity = fminf(1.0f, g_transition.opacity + seconds / duration);
+
         if (g_transition.opacity >= 1.0f) {
-            g_transition.opacity = 1.0f;
-            g_transition.phase   = ICON_TRANSITION_NONE;
+            g_transition.phase = ICON_TRANSITION_NONE;
         }
         break;
 
@@ -366,9 +364,15 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 
 void xbox_achievement_icon_source_register(void) {
 
-    snprintf(g_achievement_icon.display_name, sizeof(g_achievement_icon.display_name), "Achievement Icon");
-    snprintf(g_achievement_icon.id, sizeof(g_achievement_icon.id), "");
-    snprintf(g_achievement_icon.type, sizeof(g_achievement_icon.type), "achievement_icon");
+    g_achievement_icon = bzalloc(sizeof(image_t));
+    snprintf(g_achievement_icon->display_name, sizeof(g_achievement_icon->display_name), "Achievement Icon");
+    snprintf(g_achievement_icon->id, sizeof(g_achievement_icon->id), "");
+    snprintf(g_achievement_icon->type, sizeof(g_achievement_icon->type), "achievement_icon");
+
+    g_next_achievement_icon = bzalloc(sizeof(image_t));
+    snprintf(g_next_achievement_icon->display_name, sizeof(g_next_achievement_icon->display_name), "Achievement Icon");
+    snprintf(g_next_achievement_icon->id, sizeof(g_next_achievement_icon->id), "");
+    snprintf(g_next_achievement_icon->type, sizeof(g_next_achievement_icon->type), "achievement_icon");
 
     obs_register_source(xbox_achievement_icon_source_get());
 
