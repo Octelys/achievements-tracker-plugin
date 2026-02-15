@@ -75,7 +75,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
     // Check if the icon URL or unlock state changed
     bool is_new_unlocked_achievement = achievement->unlocked_timestamp != 0;
     bool has_url_changed             = strcmp(g_achievement_icon->url, achievement->icon_url) != 0;
-    bool has_state_changed = g_is_achievement_unlocked != is_new_unlocked_achievement;
+    bool has_state_changed           = g_is_achievement_unlocked != is_new_unlocked_achievement;
 
     if (!has_url_changed && g_transition.phase == ICON_TRANSITION_NONE) {
         return;
@@ -368,12 +368,12 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 
 void xbox_achievement_icon_source_register(void) {
 
-    g_achievement_icon = bzalloc(sizeof(image_t));
+    g_achievement_icon        = bzalloc(sizeof(image_t));
     g_achievement_icon->id[0] = '\0';
     snprintf(g_achievement_icon->display_name, sizeof(g_achievement_icon->display_name), "Achievement Icon");
     snprintf(g_achievement_icon->type, sizeof(g_achievement_icon->type), "achievement_icon");
 
-    g_next_achievement_icon = bzalloc(sizeof(image_t));
+    g_next_achievement_icon        = bzalloc(sizeof(image_t));
     g_next_achievement_icon->id[0] = '\0';
     snprintf(g_next_achievement_icon->display_name, sizeof(g_next_achievement_icon->display_name), "Achievement Icon");
     snprintf(g_next_achievement_icon->type, sizeof(g_next_achievement_icon->type), "achievement_icon");
