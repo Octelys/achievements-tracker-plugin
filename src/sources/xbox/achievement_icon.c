@@ -75,7 +75,12 @@ static void update_achievement_icon(const achievement_t *achievement) {
     // Check if the icon URL or unlock state changed
     bool is_new_unlocked_achievement = achievement->unlocked_timestamp != 0;
     bool has_url_changed             = strcmp(g_achievement_icon->url, achievement->icon_url) != 0;
-    bool has_state_changed           = g_is_achievement_unlocked != is_new_unlocked_achievement;
+
+    if (!has_url_changed || g_transition.phase == ICON_TRANSITION_NONE) {
+        return;
+    }
+
+    bool has_state_changed = g_is_achievement_unlocked != is_new_unlocked_achievement;
 
     //  Immediately download the icon since we are NOT on a rendering thread
     //  The rendering loop is tied to the cache_url value.
@@ -88,7 +93,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
     snprintf(g_next_achievement_icon->url, sizeof(g_next_achievement_icon->url), "%s", achievement->icon_url);
     image_source_download(g_next_achievement_icon);
 
-    if ((has_url_changed || has_state_changed) && g_next_achievement_icon->texture) {
+    if (has_state_changed && g_next_achievement_icon->texture) {
         /* Initiates the fade out now that the icon is loaded */
         g_transition.phase   = ICON_TRANSITION_FADE_OUT;
         g_transition.opacity = 1.0f;
