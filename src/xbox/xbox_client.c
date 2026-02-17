@@ -380,8 +380,8 @@ game_t *xbox_get_current_game(void) {
         return NULL;
     }
 
-    char   *response_json = NULL;
-    game_t *game          = NULL;
+    char   *presence_response = NULL;
+    game_t *game              = NULL;
 
     char headers[4096];
     snprintf(headers,
@@ -394,14 +394,12 @@ game_t *xbox_get_current_game(void) {
 
     obs_log(LOG_DEBUG, "Headers: %s", headers);
 
-    /*
-     * Sends the request
-     */
+    /* Sends the request */
     char presence_url[512];
     snprintf(presence_url, sizeof(presence_url), XBOX_PRESENCE_ENDPOINT, identity->xid);
 
-    long http_code = 0;
-    response_json  = http_get(presence_url, headers, NULL, &http_code);
+    long http_code    = 0;
+    presence_response = http_get(presence_url, headers, NULL, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
         /* Retry? */
@@ -409,16 +407,16 @@ game_t *xbox_get_current_game(void) {
         goto cleanup;
     }
 
-    if (!response_json) {
+    if (!presence_response) {
         obs_log(LOG_ERROR, "Failed to fetch the current game: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Response: %s", response_json);
+    obs_log(LOG_DEBUG, "Response: %s", presence_response);
 
-    cJSON *root = cJSON_Parse(response_json);
+    cJSON *presence_json = cJSON_Parse(presence_response);
 
-    if (!root) {
+    if (!presence_json) {
         obs_log(LOG_ERROR, "Failed to fetch the current game: unable to parse the JSON response");
         goto cleanup;
     }
@@ -426,7 +424,7 @@ game_t *xbox_get_current_game(void) {
     /* Retrieves the current state */
 
     char   user_state_key[512] = "/state";
-    cJSON *user_state_value    = cJSONUtils_GetPointer(root, user_state_key);
+    cJSON *user_state_value    = cJSONUtils_GetPointer(presence_json, user_state_key);
 
     if (!user_state_value || strcmp(user_state_value->valuestring, "Offline") == 0) {
         obs_log(LOG_INFO, "User is offline at the moment.");
@@ -446,9 +444,9 @@ game_t *xbox_get_current_game(void) {
         char state_key[512];
         snprintf(state_key, sizeof(state_key), "/devices/0/titles/%d/state", title_game_index);
 
-        cJSON *title_game_value = cJSONUtils_GetPointer(root, title_name_key);
-        cJSON *title_id_value   = cJSONUtils_GetPointer(root, title_id_key);
-        cJSON *state_value      = cJSONUtils_GetPointer(root, state_key);
+        cJSON *title_game_value = cJSONUtils_GetPointer(presence_json, title_name_key);
+        cJSON *title_id_value   = cJSONUtils_GetPointer(presence_json, title_id_key);
+        cJSON *state_value      = cJSONUtils_GetPointer(presence_json, state_key);
 
         if (!title_game_value || !title_id_value || !state_value) {
             /* There is nothing more */
@@ -481,11 +479,13 @@ game_t *xbox_get_current_game(void) {
     obs_log(LOG_INFO, "Game is '%s' (%s)", current_game_title, current_game_id);
 
     game        = bzalloc(sizeof(game_t));
-    game->id    = strdup(current_game_id);
-    game->title = strdup(current_game_title);
+    game->id    = bstrdup(current_game_id);
+    game->title = bstrdup(current_game_title);
 
 cleanup:
-    // FREE(response_json);
+    free_json_memory((void **)&presence_json);
+    free_memory((void **)&identity);
+    free_memory((void **)&presence_response);
 
     return game;
 }
@@ -583,11 +583,13 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
             cJSON_Delete(root);
         }
 
-        FREE(response_json);
+        free_memory((void **)&response_json);
 
     } while (continuation_token);
 
     obs_log(LOG_INFO, "Received %d achievements for game %s", count_achievements(all_achievements), game->title);
+
+    free_memory((void **)&identity);
 
     return all_achievements;
 }

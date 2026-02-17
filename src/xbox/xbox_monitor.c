@@ -257,16 +257,18 @@ static bool send_websocket_message(const char *message) {
  */
 static bool xbox_presence_subscribe() {
 
+    bool result = false;
+
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
         obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
-        return false;
+        goto cleanup;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
         obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
-        return false;
+        goto cleanup;
     }
 
     char message[512];
@@ -277,7 +279,12 @@ static bool xbox_presence_subscribe() {
              identity->xid);
 
     obs_log(LOG_INFO, "Monitoring | Subscribing for presence changes for XUID %s", identity->xid);
-    return send_websocket_message(message);
+    result = send_websocket_message(message);
+
+cleanup:
+    free_memory((void **)&identity);
+
+    return result;
 }
 
 /**
@@ -543,7 +550,7 @@ cleanup:
     if (message) {
         free(message);
     }
-    FREE_JSON(root);
+    free_json_memory((void **)&root);
 }
 
 /**
