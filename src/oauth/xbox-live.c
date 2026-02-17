@@ -2,24 +2,81 @@
 
 /**
  * @file xbox-live.c
- * @brief Xbox Live authentication flow implementation.
+ * @brief Xbox Live authentication flow implementation for OBS plugin.
  *
- * High-level flow:
- *  1) Acquire a user access token via Microsoft device-code flow.
- *     - Prefer cached access token if available.
- *     - Otherwise, prefer cached refresh token.
- *     - Otherwise, request a device_code/user_code and open the browser for the user.
- *     - Poll TOKEN_ENDPOINT until the user authorizes and tokens are returned.
- *  2) Acquire a device token (Proof-of-Possession) using the emulated device identity.
- *     - Prefer cached device token if available and not expired.
- *  3) Acquire a SISU token and persist the Xbox identity data.
+ * This module implements the complete Xbox Live authentication flow using Microsoft's
+ * OAuth 2.0 device code flow combined with Xbox Live's SISU (Sign-In Service Unified)
+ * authentication system.
  *
- * The work is performed on a background pthread; completion is reported via the
- * callback provided to xbox_live_authenticate().
+ * ## Authentication Flow Overview
  *
- * @note This module relies on other helpers for persistence (state_*), JSON
- *       extraction (json_*), HTTP (http_*), signing (crypto_sign), and opening a
- *       browser (open_url).
+ * The authentication process consists of three main stages:
+ *
+ * ### Stage 1: Microsoft User Authentication (OAuth 2.0 Device Code Flow)
+ * Acquires a user access token via Microsoft's device code flow:
+ * - **Cached Token**: If a valid cached access token exists, it is reused.
+ * - **Refresh Token**: If the access token is expired but a refresh token exists,
+ *   the access token is refreshed without user interaction.
+ * - **New Authentication**: If no valid tokens exist:
+ *   1. Request a device_code and user_code from Microsoft's OAuth endpoint
+ *   2. Open the user's browser to the verification URL
+ *   3. Poll TOKEN_ENDPOINT until the user completes authorization
+ *   4. Persist the returned access_token and refresh_token
+ *
+ * ### Stage 2: Device Token (Proof-of-Possession)
+ * Acquires a device authentication token using an emulated Xbox device identity:
+ * - Uses cryptographic signing (ECDSA P-256) to prove possession of the device key
+ * - The device token is required for SISU authentication
+ * - Cached device tokens are reused if not expired
+ * - Device identity includes UUID, serial number, and public/private key pair
+ *
+ * ### Stage 3: SISU Token and Xbox Identity
+ * Acquires the final Xbox Live authentication token:
+ * - Combines the user token and device token via signed SISU request
+ * - Extracts Xbox identity information (xid, uhs, gamertag)
+ * - Persists the complete Xbox identity for use by other plugin components
+ *
+ * ## Threading Model
+ *
+ * All authentication work is performed on a background pthread to avoid blocking
+ * the OBS main thread. Completion is signaled via callback.
+ *
+ * ## Token Expiration and Refresh
+ *
+ * - **Access Token**: Short-lived (~1 hour), automatically refreshed using refresh token
+ * - **Refresh Token**: Long-lived, stored persistently, used to obtain new access tokens
+ * - **Device Token**: Medium-lived (~24 hours), cached and refreshed when expired
+ * - **SISU Token**: Medium-lived, contains the final Xbox Live authorization
+ *
+ * ## Security Considerations
+ *
+ * - All tokens are URL-encoded when sent in form data to prevent injection attacks
+ * - Cryptographic signatures use ECDSA P-256 with proper timestamp and nonce handling
+ * - Tokens are persisted securely via the state management module
+ * - Device keys are generated once and reused to maintain consistent device identity
+ *
+ * ## Dependencies
+ *
+ * This module relies on several helper subsystems:
+ * - **State Management** (state_*): Token and identity persistence
+ * - **HTTP Client** (http_*): OAuth and Xbox Live API communication
+ * - **Cryptography** (crypto_*): Request signing and key management
+ * - **Encoding** (base64_*, http_urlencode): Data encoding utilities
+ * - **JSON** (cJSON): Response parsing
+ * - **Browser** (open_url): User authorization flow
+ *
+ * ## API Usage
+ *
+ * ```c
+ * // Initiate authentication (async)
+ * xbox_live_authenticate(user_data, on_auth_completed_callback);
+ *
+ * // Retrieve current identity (sync, may trigger refresh)
+ * xbox_identity_t *identity = xbox_live_get_identity();
+ * ```
+ *
+ * @see https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code
+ * @see https://docs.microsoft.com/en-us/gaming/xbox-live/api-ref/xbox-live-rest/additional/
  */
 
 #include "cJSON.h"
@@ -43,53 +100,120 @@
 #include <string.h>
 #include <time.h>
 
+/** @brief Microsoft OAuth token endpoint for token acquisition and refresh */
 #define TOKEN_ENDPOINT "https://login.live.com/oauth20_token.srf"
+
+/** @brief Microsoft OAuth connect endpoint for device code flow initiation */
 #define CONNECT_ENDPOINT "https://login.live.com/oauth20_connect.srf"
+
+/** @brief Microsoft OAuth remote connect endpoint for user verification URL */
 #define REGISTER_ENDPOINT "https://login.live.com/oauth20_remoteconnect.srf?otc="
-#define GRANT_TYPE "urn:ietf:params:oauth:grant-type:device_code"
+
+/** @brief OAuth grant type for device code flow */
+#define GRANT_TYPE_DEVICE_CODE "urn:ietf:params:oauth:grant-type:device_code"
+
+/** @brief OAuth grant type for refresh token flow */
+#define GRANT_TYPE_REFRESH_TOKEN "refresh_token"
+
+/** @brief Xbox Live user authentication endpoint (deprecated, not currently used) */
 #define XBOX_LIVE_AUTHENTICATE "https://user.auth.xboxlive.com/user/authenticate"
+
+/** @brief Xbox Live device authentication endpoint for Proof-of-Possession tokens */
 #define DEVICE_AUTHENTICATE "https://device.auth.xboxlive.com/device/authenticate"
+
+/** @brief Xbox Live SISU authorization endpoint for final token acquisition */
 #define SISU_AUTHENTICATE "https://sisu.xboxlive.com/authorize"
 
+/** @brief Xbox Live client ID for OAuth authentication */
 #define CLIENT_ID "000000004c12ae6f"
+
+/** @brief Required OAuth scope for Xbox Live authentication */
 #define SCOPE "service::user.auth.xboxlive.com::MBI_SSL"
 
+/**
+ * @struct authentication_ctx
+ * @brief Context structure for managing the Xbox Live authentication flow.
+ *
+ * This structure maintains all state required throughout the multi-stage
+ * authentication process, from initial OAuth through final SISU token acquisition.
+ * It is allocated at the start of the flow and freed when complete.
+ */
 typedef struct authentication_ctx {
-    /** Input device identity (owned by caller; must outlive the flow). */
+    /**
+     * Input device identity (owned by caller; must outlive the flow).
+     * Contains UUID, serial number, and cryptographic keys for device authentication.
+     */
     device_t *device;
-    bool      allow_cache;
 
-    /** Background worker thread running the flow. */
+    /**
+     * Whether to use cached tokens. Set to false to force token refresh.
+     * When true, cached user, device, and SISU tokens are preferred.
+     */
+    bool allow_cache;
+
+    /**
+     * Background worker thread running the authentication flow.
+     * Created by xbox_live_authenticate() to avoid blocking the main thread.
+     */
     pthread_t thread;
 
-    /** Completion callback invoked when the flow finishes (success or error). */
+    /**
+     * Completion callback invoked when the flow finishes (success or error).
+     * Called exactly once at the end of the authentication process.
+     */
     on_xbox_live_authenticated_t on_completed;
 
-    /** Opaque pointer forwarded to on_completed. */
+    /**
+     * Opaque user data pointer forwarded to on_completed callback.
+     * Allows caller to pass context through the async operation.
+     */
     void *on_completed_data;
 
-    /** Device-code flow: device_code (allocated). */
+    /**
+     * Device-code flow: device_code returned by Microsoft OAuth (allocated).
+     * Used to poll for token completion and stored for later token refresh.
+     */
     char *device_code;
 
-    /** Device-code flow: server-provided polling interval in seconds. */
+    /**
+     * Device-code flow: server-provided polling interval in seconds.
+     * Dictates how frequently to check if user has completed authorization.
+     */
     long interval_in_seconds;
 
-    /** Sleep time (currently unused / reserved). */
+    /**
+     * Sleep time (currently unused / reserved for future rate limiting).
+     */
     long sleep_time;
 
-    /** Device-code flow: device-code expiry in seconds. */
+    /**
+     * Device-code flow: device-code expiry time in seconds.
+     * After this duration, the device code expires and cannot be used.
+     */
     long expires_in_seconds;
 
-    /** Result struct holding any error message / status for the caller. */
+    /**
+     * Result struct holding any error message / status for the caller.
+     * Populated if authentication fails at any stage.
+     */
     xbox_live_authenticate_result_t result;
 
-    /** Access token obtained for the current user (allocated/persisted elsewhere). */
+    /**
+     * Microsoft access token obtained for the current user.
+     * Used to authenticate with Xbox Live services. Short-lived (~1 hour).
+     */
     token_t *user_token;
 
-    /** Refresh token for the current user (allocated/persisted elsewhere). */
+    /**
+     * Refresh token for renewing the user access token.
+     * Long-lived token that persists across sessions.
+     */
     token_t *refresh_token;
 
-    /** Device (PoP) token used for SISU/device authentication (allocated/persisted elsewhere). */
+    /**
+     * Device (Proof-of-Possession) token used for SISU/device authentication.
+     * Proves the client possesses the device private key.
+     */
     token_t *device_token;
 
 } authentication_ctx_t;
@@ -101,7 +225,17 @@ typedef struct authentication_ctx {
 /**
  * @brief Notify the caller that the authentication flow has completed.
  *
- * This simply invokes the caller-provided callback (if any).
+ * This function invokes the user-provided callback (if set) to signal that the
+ * authentication process has finished, either successfully or with an error.
+ * The callback receives the opaque user data pointer originally passed to
+ * xbox_live_authenticate().
+ *
+ * ## Usage Pattern
+ * Called at the end of each authentication stage when:
+ * - An error occurs (ctx->result.error_message is set)
+ * - The final SISU token is successfully obtained
+ *
+ * @param ctx Authentication context containing the callback and user data
  */
 static void complete(authentication_ctx_t *ctx) {
 
@@ -115,24 +249,55 @@ static void complete(authentication_ctx_t *ctx) {
 /**
  * @brief Retrieve the SISU token and persist Xbox identity data.
  *
- * This creates and signs a SISU_AUTHENTICATE request using the device PoP key,
- * then extracts:
- *  - AuthorizationToken.Token (the Xbox token)
- *  - xid, uhs, gtg (identity)
- *  - NotAfter (expiry)
+ * This is the final stage of the Xbox Live authentication flow. It combines the
+ * Microsoft user token and Xbox device token to obtain a complete Xbox Live identity.
  *
- * The resulting identity is persisted using state_set_xbox_identity().
+ * ## Process
+ * 1. Constructs a JSON request body containing:
+ *    - User access token (from Microsoft OAuth)
+ *    - Device token (from device authentication)
+ *    - Client ID and proof key (device public key)
+ * 2. Signs the entire request using the device private key (ECDSA P-256)
+ * 3. Sends POST request to SISU_AUTHENTICATE with signature in headers
+ * 4. Parses response to extract:
+ *    - AuthorizationToken.Token (the Xbox Live authorization token)
+ *    - xid (Xbox User ID)
+ *    - uhs (Xbox User Hash - used in API authorization headers)
+ *    - gtg (Gamertag)
+ *    - NotAfter (token expiration timestamp in ISO8601 format)
+ * 5. Creates xbox_identity_t structure and persists via state_set_xbox_identity()
  *
- * On success or failure, this function calls complete(ctx).
+ * ## Security
+ * The request signature proves possession of the device private key, preventing
+ * token replay attacks. The signature is base64-encoded and sent in the
+ * "signature" HTTP header.
+ *
+ * ## Error Handling
+ * On any failure (signing, network, parsing), sets ctx->result.error_message
+ * and calls complete(ctx) to notify the caller.
+ *
+ * @param ctx Authentication context containing user_token and device_token
+ * @return true on success, false on failure
+ *
+ * @note On success or failure, this function calls complete(ctx) to signal completion.
  */
 static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
-    bool     succeeded       = false;
-    uint8_t *signature       = NULL;
-    char    *signature_b64   = NULL;
-    char    *sisu_token_json = NULL;
+    bool     succeeded           = false;
+    uint8_t *signature           = NULL;
+    char    *signature_b64       = NULL;
+    char    *sisu_token_response = NULL;
+    char    *proof_key           = NULL;
 
     /* Creates the request */
+    proof_key = crypto_to_string(ctx->device->keys, false);
+
+    if (!proof_key) {
+        ctx->result.error_message = "Unable retrieve a sisu token: could not serialize proof key";
+        obs_log(LOG_ERROR, ctx->result.error_message);
+        goto cleanup;
+    }
+
     char json_body[16384];
     snprintf(json_body,
              sizeof(json_body),
@@ -140,7 +305,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
              ctx->user_token->value,
              CLIENT_ID,
              ctx->device_token->value,
-             crypto_to_string(ctx->device->keys, false));
+             proof_key);
 
     obs_log(LOG_DEBUG, "Body: %s", json_body);
 
@@ -179,15 +344,15 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     /*
      * Sends the request
      */
-    long http_code  = 0;
-    sisu_token_json = http_post(SISU_AUTHENTICATE, json_body, extra_headers, &http_code);
+    long http_code      = 0;
+    sisu_token_response = http_post(SISU_AUTHENTICATE, json_body, extra_headers, &http_code);
 
-    if (!sisu_token_json) {
+    if (!sisu_token_response) {
         ctx->result.error_message = "Unable to retrieve a sisu token: received no response from the server";
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Received response with status code %d: %s", http_code, sisu_token_json);
+    obs_log(LOG_DEBUG, "Received response with status code %d: %s", http_code, sisu_token_response);
 
     if (http_code < 200 || http_code >= 300) {
         ctx->result.error_message = "Unable to retrieve a sisu token: received error from the server";
@@ -195,15 +360,15 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
         goto cleanup;
     }
 
-    cJSON *root = cJSON_Parse(sisu_token_json);
+    cJSON *sisu_token_json = cJSON_Parse(sisu_token_response);
 
-    if (!root) {
+    if (!sisu_token_json) {
         ctx->result.error_message = "Unable retrieve a sisu token: unable to parse the JSON response";
         goto cleanup;
     }
 
     /* Extracts the token */
-    cJSON *token_node = cJSONUtils_GetPointer(root, "/AuthorizationToken/Token");
+    cJSON *token_node = cJSONUtils_GetPointer(sisu_token_json, "/AuthorizationToken/Token");
 
     if (!token_node) {
         ctx->result.error_message = "Unable to retrieve a sisu token: no token found";
@@ -212,7 +377,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     }
 
     /* Extracts the Xbox ID */
-    cJSON *xid_node = cJSONUtils_GetPointer(root, "/AuthorizationToken/DisplayClaims/xui/0/xid");
+    cJSON *xid_node = cJSONUtils_GetPointer(sisu_token_json, "/AuthorizationToken/DisplayClaims/xui/0/xid");
 
     if (!xid_node) {
         ctx->result.error_message = "Unable to retrieve the xid: no value found";
@@ -221,7 +386,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     }
 
     /* Extracts the Xbox User Hash */
-    cJSON *uhs_node = cJSONUtils_GetPointer(root, "/AuthorizationToken/DisplayClaims/xui/0/uhs");
+    cJSON *uhs_node = cJSONUtils_GetPointer(sisu_token_json, "/AuthorizationToken/DisplayClaims/xui/0/uhs");
 
     if (!uhs_node) {
         ctx->result.error_message = "Unable to retrieve the uhs: no value found";
@@ -230,7 +395,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     }
 
     /* Extracts the token expiration */
-    cJSON *not_after_date_node = cJSONUtils_GetPointer(root, "/AuthorizationToken/NotAfter");
+    cJSON *not_after_date_node = cJSONUtils_GetPointer(sisu_token_json, "/AuthorizationToken/NotAfter");
 
     if (!not_after_date_node) {
         ctx->result.error_message = "Unable to retrieve the NotAfter: no value found";
@@ -248,7 +413,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     }
 
     /* Extracts the gamertag */
-    cJSON *gtg_node = cJSONUtils_GetPointer(root, "/AuthorizationToken/DisplayClaims/xui/0/gtg");
+    cJSON *gtg_node = cJSONUtils_GetPointer(sisu_token_json, "/AuthorizationToken/DisplayClaims/xui/0/gtg");
 
     if (!gtg_node) {
         ctx->result.error_message = "Unable to retrieve the gtg: no value found";
@@ -281,7 +446,11 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
     succeeded = true;
 
 cleanup:
-    free_memory((void **)&sisu_token_json);
+    free_memory((void **)&proof_key);
+    free_memory((void **)&signature);
+    free_memory((void **)&signature_b64);
+    free_memory((void **)&sisu_token_response);
+    free_json_memory((void **)&sisu_token_json);
 
     complete(ctx);
 
@@ -289,13 +458,39 @@ cleanup:
 }
 
 /**
- * @brief Retrieve the device PoP token required for SISU.
+ * @brief Retrieve the device Proof-of-Possession (PoP) token required for SISU.
  *
- * If a cached device token exists, it is reused. Otherwise this signs and sends
- * a request to DEVICE_AUTHENTICATE and parses Token/NotAfter from the response.
+ * This implements Xbox Live's device authentication protocol, which proves the
+ * client possesses a specific device private key.
  *
- * On success, the device token is persisted and the flow proceeds to
- * retrieve_sisu_token(). On failure it calls complete(ctx).
+ * ## Caching Behavior
+ * If allow_cache is true and a valid cached device token exists, it is reused
+ * and the flow proceeds directly to retrieve_sisu_token().
+ *
+ * ## Device Authentication Process
+ * 1. Constructs a JSON request containing:
+ *    - AuthMethod: "ProofOfPossession"
+ *    - Device ID (UUID), SerialNumber, DeviceType ("iOS"), Version
+ *    - ProofKey: The device's public key in JWK format
+ * 2. Signs the request using the device private key (ECDSA P-256)
+ * 3. Sends POST to DEVICE_AUTHENTICATE with signature in headers
+ * 4. Parses response for:
+ *    - Token: The device authentication token (JWT)
+ *    - NotAfter: Token expiration timestamp (ISO8601)
+ * 5. Persists the token via state_set_device_token()
+ *
+ * ## Security
+ * The cryptographic signature proves that the client controls the private key
+ * corresponding to the ProofKey. This prevents device spoofing.
+ *
+ * ## Error Handling
+ * On failure (signing, network, parsing), sets ctx->result.error_message and
+ * calls complete(ctx).
+ *
+ * @param ctx Authentication context containing device identity
+ * @return true if successful and proceeding to next stage, false on failure
+ *
+ * @note On success, proceeds to retrieve_sisu_token(). On failure, calls complete(ctx).
  */
 static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
@@ -308,21 +503,30 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
         return retrieve_sisu_token(ctx);
     }
 
-    bool     succeeded         = false;
-    char    *encoded_signature = NULL;
-    char    *device_token_json = NULL;
-    uint8_t *signature         = NULL;
+    bool     succeeded             = false;
+    char    *encoded_signature     = NULL;
+    char    *device_token_response = NULL;
+    uint8_t *signature             = NULL;
+    char    *proof_key             = NULL;
 
     obs_log(LOG_INFO, "No device token cached found. Requesting a new device token");
 
     /* Builds the device token request */
+    proof_key = crypto_to_string(ctx->device->keys, false);
+
+    if (!proof_key) {
+        ctx->result.error_message = "Unable retrieve a device token: could not serialize proof key";
+        obs_log(LOG_ERROR, ctx->result.error_message);
+        goto cleanup;
+    }
+
     char json_body[8192];
     snprintf(json_body,
              sizeof(json_body),
              "{\"Properties\":{\"AuthMethod\":\"ProofOfPossession\",\"Id\":\"{%s}\",\"DeviceType\":\"iOS\",\"SerialNumber\":\"{%s}\",\"Version\":\"1.0.0\",\"ProofKey\":%s},\"RelyingParty\":\"http://auth.xboxlive.com\",\"TokenType\":\"JWT\"}",
              ctx->device->uuid,
              ctx->device->serial_number,
-             crypto_to_string(ctx->device->keys, false));
+             proof_key);
 
     obs_log(LOG_DEBUG, "Device token request is: %s", json_body);
 
@@ -358,33 +562,33 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
              encoded_signature);
 
     /* Sends the request */
-    long http_code    = 0;
-    device_token_json = http_post(DEVICE_AUTHENTICATE, json_body, extra_headers, &http_code);
+    long http_code        = 0;
+    device_token_response = http_post(DEVICE_AUTHENTICATE, json_body, extra_headers, &http_code);
 
-    if (!device_token_json) {
+    if (!device_token_response) {
         ctx->result.error_message = "Unable retrieve a device token: server returned no response";
         obs_log(LOG_ERROR, ctx->result.error_message);
         return false;
     }
 
-    obs_log(LOG_INFO, "Received response with status code %d: %s", http_code, device_token_json);
+    obs_log(LOG_DEBUG, "Received response with status code %d: %s", http_code, device_token_response);
 
     if (http_code < 200 || http_code >= 300) {
         ctx->result.error_message = "Unable retrieve a device token: server returned an error";
         obs_log(LOG_ERROR, "Unable retrieve a device token: server returned status code %d", http_code);
-        free_memory((void **)&device_token_json);
+        free_memory((void **)&device_token_response);
         return false;
     }
 
     /* Retrieves the device token */
-    cJSON *root = cJSON_Parse(device_token_json);
+    cJSON *device_token_json = cJSON_Parse(device_token_response);
 
-    if (!root) {
+    if (!device_token_json) {
         ctx->result.error_message = "Unable retrieve a device token: unable to parse the JSON response";
         goto cleanup;
     }
 
-    cJSON *token_node = cJSONUtils_GetPointer(root, "/Token");
+    cJSON *token_node = cJSONUtils_GetPointer(device_token_json, "/Token");
 
     if (!token_node) {
         ctx->result.error_message = "Unable retrieve a device token: unable to read the token from the response";
@@ -392,7 +596,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
         goto cleanup;
     }
 
-    cJSON *not_after_date_node = cJSONUtils_GetPointer(root, "/NotAfter");
+    cJSON *not_after_date_node = cJSONUtils_GetPointer(device_token_json, "/NotAfter");
 
     if (!not_after_date_node) {
         ctx->result.error_message =
@@ -423,9 +627,11 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     succeeded         = true;
 
 cleanup:
+    free_memory((void **)&proof_key);
     free_memory((void **)&signature);
     free_memory((void **)&encoded_signature);
-    free_memory((void **)&device_token_json);
+    free_memory((void **)&device_token_response);
+    free_json_memory((void **)&device_token_json);
 
     if (ctx->result.error_message) {
         complete(ctx);
@@ -441,62 +647,93 @@ cleanup:
 /**
  * @brief Refresh the user access token using a cached refresh token.
  *
- * Sends a request to TOKEN_ENDPOINT and extracts access_token, refresh_token and
- * expires_in. On success it persists the tokens and proceeds to
- * retrieve_device_token(). On failure it calls complete(ctx).
+ * This implements the OAuth 2.0 refresh token flow to obtain a new access token
+ * without requiring user interaction.
+ *
+ * ## Process
+ * 1. URL-encodes the refresh token and scope to prevent injection
+ * 2. Constructs form-urlencoded POST data with:
+ *    - client_id: The Xbox Live client ID
+ *    - refresh_token: The previously obtained refresh token
+ *    - scope: Required permission scope (service::user.auth.xboxlive.com::MBI_SSL)
+ *    - grant_type: "refresh_token"
+ * 3. Sends POST to TOKEN_ENDPOINT
+ * 4. Parses response for:
+ *    - access_token: New access token for API calls
+ *    - refresh_token: New refresh token (may rotate)
+ *    - expires_in: Token lifetime in milliseconds
+ * 5. Persists both tokens via state_set_user_token()
+ * 6. Calculates absolute expiration time (current time + expires_in)
+ *
+ * ## Security Considerations
+ * Both the refresh token and scope are URL-encoded to prevent injection attacks
+ * when constructing form-urlencoded data. The refresh token is long-lived and
+ * should be stored securely.
+ *
+ * ## Error Handling
+ * On failure (network error, HTTP error, parse error), sets ctx->result.error_message
+ * and calls complete(ctx). Common failures include expired refresh tokens.
+ *
+ * @param ctx Authentication context containing refresh_token and device_code
+ * @return true if successful and proceeding to device token retrieval, false on failure
+ *
+ * @note On success, proceeds to retrieve_device_token(). On failure, calls complete(ctx).
  */
 static bool refresh_user_token(authentication_ctx_t *ctx) {
 
-    bool  succeeded     = false;
-    char *response_json = NULL;
+    bool  succeeded              = false;
+    char *refresh_token_response = NULL;
 
-    /* Creates the request */
+    /* URL-encode both refresh_token and scope to prevent injection attacks
+     * and ensure proper form-urlencoded format. The refresh_token may contain
+     * special characters like +, /, = that must be percent-encoded.
+     * The scope contains : characters that encode to %3A. */
     char *encoded_refresh_token = http_urlencode(ctx->refresh_token->value);
+    char *encoded_scope         = http_urlencode(SCOPE);
 
     char refresh_token_form_url_encoded[8192];
+
     snprintf(refresh_token_form_url_encoded,
              sizeof(refresh_token_form_url_encoded),
-             "client_id=%s&refresh_token=%s&device_code=%s&grant_type=%s",
+             "client_id=%s&refresh_token=%s&scope=%s&grant_type=%s",
              CLIENT_ID,
              encoded_refresh_token,
-             ctx->device_code,
-             GRANT_TYPE);
+             encoded_scope,
+             GRANT_TYPE_REFRESH_TOKEN);
 
-    obs_log(LOG_WARNING, "URL: %s", refresh_token_form_url_encoded);
+    obs_log(LOG_DEBUG, "URL: %s", refresh_token_form_url_encoded);
 
-    long http_code = 0;
-    response_json  = http_get(TOKEN_ENDPOINT, NULL, refresh_token_form_url_encoded, &http_code);
-
-    free_memory((void **)&encoded_refresh_token);
+    long http_code         = 0;
+    refresh_token_response = http_get(TOKEN_ENDPOINT, NULL, refresh_token_form_url_encoded, &http_code);
 
     if (http_code < 200 || http_code > 300) {
         ctx->result.error_message = "Unable to refresh the user token: server returned an error";
         obs_log(LOG_ERROR,
                 "Unable to refresh the user token: server returned a status %d. Content: %s",
                 http_code,
-                response_json);
+                refresh_token_response);
         goto cleanup;
     }
 
-    if (!response_json) {
+    if (!refresh_token_response) {
         ctx->result.error_message = "Unable to refresh the user token: server returned no response";
         obs_log(LOG_ERROR, ctx->result.error_message);
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Response received: %s", response_json);
+    obs_log(LOG_DEBUG, "Response received: %s", refresh_token_response);
 
-    cJSON *root = cJSON_Parse(response_json);
+    cJSON *refresh_token_json = cJSON_Parse(refresh_token_response);
 
-    if (!root) {
+    if (!refresh_token_json) {
         ctx->result.error_message = "Unable to refresh the user token: unable to parse the JSON response";
         obs_log(LOG_ERROR, ctx->result.error_message);
         goto cleanup;
     }
 
-    cJSON *access_token_node  = cJSONUtils_GetPointer(root, "/access_token");
-    cJSON *refresh_token_node = cJSONUtils_GetPointer(root, "/refresh_token");
-    cJSON *expires_in_node    = cJSONUtils_GetPointer(root, "/expires_in");
+    cJSON *access_token_node  = cJSONUtils_GetPointer(refresh_token_json, "/access_token");
+    cJSON *refresh_token_node = cJSONUtils_GetPointer(refresh_token_json, "/refresh_token");
+    cJSON *expires_in_node    = cJSONUtils_GetPointer(refresh_token_json, "/expires_in");
 
     if (!access_token_node) {
         ctx->result.error_message = "Unable to refresh the user token: no access_token field found";
@@ -516,9 +753,7 @@ static bool refresh_user_token(authentication_ctx_t *ctx) {
         goto cleanup;
     }
 
-    /*
-     *  The token has been found and is saved in the context
-     */
+    /* The token has been found and is saved in the context */
     token_t *user_token = bzalloc(sizeof(token_t));
     user_token->value   = bstrdup(access_token_node->valuestring);
     user_token->expires = time(NULL) + expires_in_node->valueint / 1000;
@@ -536,7 +771,10 @@ static bool refresh_user_token(authentication_ctx_t *ctx) {
     obs_log(LOG_INFO, "User & refresh token received");
 
 cleanup:
-    free_memory((void **)&response_json);
+    free_memory((void **)&encoded_refresh_token);
+    free_memory((void **)&encoded_scope);
+    free_memory((void **)&refresh_token_response);
+    free_json_memory((void **)&refresh_token_json);
 
     /* Either complete the process if an error has been encountered or go to the next step */
     if (!ctx->user_token) {
@@ -554,12 +792,41 @@ cleanup:
 /**
  * @brief Poll TOKEN_ENDPOINT until the user completes device-code verification.
  *
- * This repeatedly sleeps for the server-provided interval and performs a GET to
- * TOKEN_ENDPOINT with device_code and grant_type. When a 200 response includes
- * access_token/refresh_token/expires_in, the tokens are persisted and the flow
- * proceeds to retrieve_device_token().
+ * This implements the polling phase of OAuth 2.0 device code flow. After the user
+ * has been shown a verification URL and code, this function repeatedly checks if
+ * they've completed authorization.
  *
- * On timeout/expiry or parse failure, the flow completes with an error.
+ * ## Polling Behavior
+ * 1. Constructs form-urlencoded GET parameters with:
+ *    - client_id: Xbox Live client ID
+ *    - device_code: The device code from the initial request
+ *    - grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+ * 2. Sleeps for the server-specified interval (typically 5 seconds)
+ * 3. Sends GET request to TOKEN_ENDPOINT
+ * 4. Handles responses:
+ *    - HTTP 200: Parse access_token, refresh_token, expires_in and exit loop
+ *    - HTTP 4xx: User hasn't authorized yet, continue polling
+ *    - HTTP 5xx: Server error, continue polling (may want to abort)
+ * 5. Repeats until:
+ *    - Success (HTTP 200 with tokens)
+ *    - Timeout (expires_in_seconds elapsed)
+ *    - Parse error
+ *
+ * ## Token Persistence
+ * On success, creates token_t structures for both access and refresh tokens,
+ * calculates absolute expiration time, and persists via state_set_user_token().
+ *
+ * ## Threading
+ * This function blocks the worker thread for the entire polling duration
+ * (potentially several minutes). It should never be called on the main thread.
+ *
+ * ## Error Handling
+ * On timeout or parse error, exits without setting ctx->user_token. The caller
+ * checks this condition and calls complete(ctx) with an error.
+ *
+ * @param ctx Authentication context containing device_code and polling parameters
+ *
+ * @note On success, proceeds to retrieve_device_token(). On failure, calls complete(ctx).
  */
 static void poll_for_user_token(authentication_ctx_t *ctx) {
 
@@ -570,10 +837,10 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
              "client_id=%s&device_code=%s&grant_type=%s",
              CLIENT_ID,
              ctx->device_code,
-             GRANT_TYPE);
+             GRANT_TYPE_DEVICE_CODE);
 
     obs_log(LOG_INFO, "Waiting for the user to validate the code");
-    obs_log(LOG_INFO, "URL: %s", get_token_form_url_encoded);
+    obs_log(LOG_DEBUG, "URL: %s", get_token_form_url_encoded);
 
     /* Polls the server at a regular interval (as instructed by the server) */
     time_t       start_time = time(NULL);
@@ -585,7 +852,7 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
 
         sleep_ms(interval);
 
-        char *token_json = http_get(TOKEN_ENDPOINT, NULL, get_token_form_url_encoded, &code);
+        char *token_response = http_get(TOKEN_ENDPOINT, NULL, get_token_form_url_encoded, &code);
 
         if (code != 200) {
             obs_log(LOG_INFO,
@@ -594,19 +861,19 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
                     interval);
         } else {
 
-            obs_log(LOG_INFO, "Response received: %s", token_json);
+            obs_log(LOG_INFO, "Response received: %s", token_response);
 
-            cJSON *root = cJSON_Parse(token_json);
+            cJSON *token_json = cJSON_Parse(token_response);
 
-            if (!root) {
+            if (!token_json) {
                 obs_log(LOG_ERROR, "Failed to retrieve the user token: unable to parse the JSON response");
-                free_memory((void **)&token_json);
+                free_memory((void **)&token_response);
                 break;
             }
 
-            cJSON *access_token_node     = cJSONUtils_GetPointer(root, "/access_token");
-            cJSON *refresh_token_node    = cJSONUtils_GetPointer(root, "/refresh_token");
-            cJSON *token_expires_in_node = cJSONUtils_GetPointer(root, "/expires_in");
+            cJSON *access_token_node     = cJSONUtils_GetPointer(token_json, "/access_token");
+            cJSON *refresh_token_node    = cJSONUtils_GetPointer(token_json, "/refresh_token");
+            cJSON *token_expires_in_node = cJSONUtils_GetPointer(token_json, "/expires_in");
 
             if (access_token_node && refresh_token_node && token_expires_in_node) {
 
@@ -624,15 +891,16 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
                 state_set_user_token(ctx->device_code, user_token, refresh_token);
 
                 obs_log(LOG_INFO, "User & refresh token received");
-                free_memory((void **)&token_json);
+                free_json_memory((void **)&token_json);
                 break;
             }
 
             ctx->result.error_message = "Could not parse access_token from token response";
             obs_log(LOG_ERROR, ctx->result.error_message);
+            free_json_memory((void **)&token_json);
         }
 
-        free_memory((void **)&token_json);
+        free_memory((void **)&token_response);
     }
 
     /* Either complete the process if an error has been encountered or go to the next step */
@@ -646,17 +914,44 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
 /**
  * @brief Worker thread entry point running the full authentication flow.
  *
- * Order of preference:
- *  1) If a non-expired cached user token exists, reuse it.
- *  2) Else if a refresh token exists, refresh the user token.
- *  3) Else perform device-code flow: request codes, open browser, poll.
+ * This is the main entry point for the background authentication thread. It
+ * implements a cascading fallback strategy to obtain a user access token, then
+ * proceeds through device and SISU authentication.
  *
- * Final step after user token is available: retrieve device token + SISU token.
+ * ## Token Acquisition Priority
+ * The function attempts to obtain a user token in this order:
+ * 1. **Cached Access Token**: If a valid (non-expired) cached user token exists, reuse it
+ * 2. **Refresh Token**: If the access token is expired but a refresh token exists, refresh it
+ * 3. **Device Code Flow**: If no tokens exist, perform full OAuth device code flow:
+ *    - Request device_code and user_code from CONNECT_ENDPOINT
+ *    - Open browser to verification URL
+ *    - Poll TOKEN_ENDPOINT until user authorizes
+ *
+ * ## Flow Continuation
+ * After obtaining a user token (by any method), the flow proceeds to:
+ * 1. retrieve_device_token() - Get device Proof-of-Possession token
+ * 2. retrieve_sisu_token() - Get final Xbox Live authorization
+ *
+ * ## Threading Context
+ * This function runs entirely on a background pthread created by
+ * xbox_live_authenticate(). It must not block the OBS main thread.
+ *
+ * ## Error Handling
+ * Any failure in the device code request phase sets ctx->result.error_message
+ * and calls complete(ctx). Failures in later stages are handled by those
+ * respective functions.
+ *
+ * ## Memory Management
+ * The authentication_ctx_t is freed at the end of this function. All allocated
+ * resources (device, tokens, JSON) are cleaned up via the goto cleanup pattern.
+ *
+ * @param param Opaque pointer to authentication_ctx_t
+ * @return Always returns (void *)false (return value currently unused)
  */
 static void *start_authentication_flow(void *param) {
 
-    char *scope_enc  = NULL;
-    char *token_json = NULL;
+    char *scope_enc      = NULL;
+    char *token_response = NULL;
 
     authentication_ctx_t *ctx = param;
 
@@ -697,9 +992,9 @@ static void *start_authentication_flow(void *param) {
 
     /* Requests a device code from the connect endpoint */
     long http_code = 0;
-    token_json     = http_post_form(CONNECT_ENDPOINT, form_url_encoded, &http_code);
+    token_response = http_post_form(CONNECT_ENDPOINT, form_url_encoded, &http_code);
 
-    if (!token_json) {
+    if (!token_response) {
         ctx->result.error_message = "Unable to retrieve a user token: received no response from the server";
         obs_log(LOG_ERROR, ctx->result.error_message);
         goto cleanup;
@@ -711,17 +1006,17 @@ static void *start_authentication_flow(void *param) {
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Response received: %s", token_json);
+    obs_log(LOG_DEBUG, "Response received: %s", token_response);
 
-    cJSON *root = cJSON_Parse(token_json);
+    cJSON *token_json = cJSON_Parse(token_response);
 
-    if (!root) {
+    if (!token_json) {
         obs_log(LOG_ERROR, "Failed to retrieve the user token: unable to parse the JSON response");
         goto cleanup;
     }
 
     /* Retrieves the information from the response */
-    cJSON *user_code_node = cJSONUtils_GetPointer(root, "/user_code");
+    cJSON *user_code_node = cJSONUtils_GetPointer(token_json, "/user_code");
 
     if (!user_code_node || strlen(user_code_node->valuestring) == 0) {
         ctx->result.error_message = "Unable to received a user token: could not parse the user_code from the response";
@@ -729,7 +1024,7 @@ static void *start_authentication_flow(void *param) {
         goto cleanup;
     }
 
-    cJSON *device_code_node = cJSONUtils_GetPointer(root, "/device_code");
+    cJSON *device_code_node = cJSONUtils_GetPointer(token_json, "/device_code");
 
     if (!device_code_node || strlen(device_code_node->valuestring) == 0) {
         ctx->result.error_message =
@@ -738,7 +1033,7 @@ static void *start_authentication_flow(void *param) {
         goto cleanup;
     }
 
-    cJSON *interval_node = cJSONUtils_GetPointer(root, "/interval");
+    cJSON *interval_node = cJSONUtils_GetPointer(token_json, "/interval");
 
     if (!interval_node) {
         ctx->result.error_message = "Unable to received a user token: could not parse the interval from token response";
@@ -746,7 +1041,7 @@ static void *start_authentication_flow(void *param) {
         goto cleanup;
     }
 
-    cJSON *expires_in_node = cJSONUtils_GetPointer(root, "/expires_in");
+    cJSON *expires_in_node = cJSONUtils_GetPointer(token_json, "/expires_in");
 
     if (!expires_in_node) {
         ctx->result.error_message =
@@ -776,7 +1071,8 @@ static void *start_authentication_flow(void *param) {
 
 cleanup:
     free_memory((void **)&scope_enc);
-    free_memory((void **)&token_json);
+    free_memory((void **)&token_response);
+    free_json_memory((void **)&token_json);
 
     if (!ctx->result.error_message) {
         retrieve_device_token(ctx);
@@ -784,15 +1080,68 @@ cleanup:
         complete(ctx);
     }
 
-    /* TODO ctx! */
+    free_memory((void **)&ctx);
 
     return (void *)false;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//  Public
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
+/**
+ * @brief Initiate Xbox Live authentication flow asynchronously.
+ *
+ * This function starts the complete Xbox Live authentication process on a background
+ * thread. It attempts to authenticate the user through a multi-stage process involving
+ * Microsoft OAuth, device authentication, and SISU token acquisition.
+ *
+ * ## Authentication Process
+ * The function will attempt authentication in this priority order:
+ * 1. Use cached access token if available and valid
+ * 2. Refresh access token using cached refresh token if available
+ * 3. Perform full OAuth device code flow (opens browser for user authorization)
+ *
+ * After obtaining a user token, it automatically proceeds to:
+ * - Acquire device Proof-of-Possession token
+ * - Acquire final SISU token and Xbox identity
+ *
+ * ## Threading
+ * All network operations and token acquisition occur on a background pthread to
+ * avoid blocking the OBS main thread. The callback is invoked when the process
+ * completes (success or failure).
+ *
+ * ## Callback Behavior
+ * The provided callback is invoked exactly once when authentication finishes.
+ * The callback receives the opaque data pointer passed to this function.
+ * Check the result via xbox_live_get_identity() after callback invocation.
+ *
+ * ## Error Conditions
+ * - Returns false immediately if no device identity is available
+ * - Returns false if pthread creation fails
+ * - Asynchronous failures are reported via the callback
+ *
+ * ## Example Usage
+ * ```c
+ * void on_auth_complete(void *user_data) {
+ *     xbox_identity_t *identity = xbox_live_get_identity();
+ *     if (identity) {
+ *         obs_log(LOG_INFO, "Authenticated as: %s", identity->gamertag);
+ *     } else {
+ *         obs_log(LOG_ERROR, "Authentication failed");
+ *     }
+ * }
+ *
+ * xbox_live_authenticate(my_context, on_auth_complete);
+ * ```
+ *
+ * @param data Opaque user data pointer forwarded to the callback
+ * @param callback Function to call when authentication completes (may be NULL)
+ * @return true if authentication thread was started successfully, false on immediate failure
+ *
+ * @note The device identity must be initialized via state_get_device() before calling this.
+ * @see xbox_live_get_identity() to retrieve the authenticated identity
+ */
 bool xbox_live_authenticate(void *data, on_xbox_live_authenticated_t callback) {
 
     device_t *device = state_get_device();
@@ -812,6 +1161,72 @@ bool xbox_live_authenticate(void *data, on_xbox_live_authenticated_t callback) {
     return pthread_create(&ctx->thread, NULL, start_authentication_flow, ctx) == 0;
 }
 
+/**
+ * @brief Retrieve the current Xbox Live identity, refreshing if expired.
+ *
+ * This function returns the authenticated Xbox identity for API usage. It automatically
+ * handles token expiration by refreshing tokens when necessary.
+ *
+ * ## Behavior
+ * 1. Retrieves the cached Xbox identity from persistent storage
+ * 2. If no identity exists, returns NULL (user must authenticate first)
+ * 3. If identity exists but SISU token is not expired, returns it immediately
+ * 4. If SISU token is expired:
+ *    - Attempts to refresh using the cached refresh token
+ *    - Performs full re-authentication flow (user, device, SISU tokens)
+ *    - Returns NULL if refresh fails
+ *
+ * ## Token Expiration Handling
+ * The function checks the SISU token's NotAfter timestamp. If expired, it
+ * synchronously refreshes all tokens (user, device, SISU) before returning.
+ * This ensures the returned identity always has valid authorization.
+ *
+ * ## Synchronous vs Asynchronous
+ * Unlike xbox_live_authenticate(), this function is **synchronous**. Token refresh
+ * blocks until complete. Use this for API calls where immediate identity is needed.
+ * For initial authentication or background refresh, use xbox_live_authenticate().
+ *
+ * ## Thread Safety
+ * This function should be called from the main thread or properly synchronized.
+ * Internal token refresh operations use synchronous HTTP calls.
+ *
+ * ## Return Value
+ * The returned xbox_identity_t* pointer is owned by the state management system.
+ * Do not free it manually. It remains valid until the next authentication or
+ * state modification.
+ *
+ * ## Identity Contents
+ * When successful, the identity contains:
+ * - **gamertag**: Xbox gamertag (display name)
+ * - **xid**: Xbox User ID (unique identifier)
+ * - **uhs**: Xbox User Hash (used in Authorization headers)
+ * - **token**: SISU authorization token with expiration timestamp
+ *
+ * ## Example Usage
+ * ```c
+ * xbox_identity_t *identity = xbox_live_get_identity();
+ * if (!identity) {
+ *     // User not authenticated or refresh failed
+ *     xbox_live_authenticate(ctx, on_complete);
+ *     return;
+ * }
+ *
+ * // Use identity for API calls
+ * char auth_header[512];
+ * snprintf(auth_header, sizeof(auth_header),
+ *          "XBL3.0 x=%s;%s", identity->uhs, identity->token->value);
+ * ```
+ *
+ * @return Pointer to xbox_identity_t if authenticated and valid, NULL otherwise
+ *
+ * @note Returns NULL if:
+ *       - User has never authenticated
+ *       - Token refresh fails (expired refresh token, network error)
+ *       - No device identity is available for refresh
+ *
+ * @see xbox_live_authenticate() for initial authentication
+ * @see token_is_expired() for token expiration checking
+ */
 xbox_identity_t *xbox_live_get_identity(void) {
 
     xbox_identity_t *identity = state_get_xbox_identity();
@@ -836,65 +1251,15 @@ xbox_identity_t *xbox_live_get_identity(void) {
         return false;
     }
 
-    char *device_code = state_get_device_code();
-
     authentication_ctx_t *ctx = bzalloc(sizeof(authentication_ctx_t));
     ctx->device               = device;
-    ctx->device_code          = device_code;
     ctx->on_completed         = NULL;
     ctx->on_completed_data    = NULL;
     ctx->allow_cache          = false;
+    ctx->refresh_token        = state_get_user_refresh_token();
 
-    /* Retrieves the user token */
-    obs_log(LOG_INFO, "Retrieving the user & refresh tokens.");
-
-    token_t *user_token = state_get_user_token();
-
-    if (!user_token) {
-        obs_log(LOG_ERROR, "No user token found for Xbox token refresh");
-        identity = NULL;
-        goto cleanup;
-    }
-
-    ctx->refresh_token = state_get_user_refresh_token();
-
-    if (token_is_expired(user_token)) {
-        /* All the tokens (User, Device and Sisu) will be retrieved */
-        if (!refresh_user_token(ctx)) {
-            identity = NULL;
-            goto cleanup;
-        }
-        identity = state_get_xbox_identity();
-        goto cleanup;
-    }
-
-    ctx->user_token = user_token;
-
-    /* Retrieves the device token */
-    obs_log(LOG_INFO, "Retrieving the device token.");
-
-    token_t *device_token = state_get_device_token();
-
-    if (!device_token) {
-        obs_log(LOG_ERROR, "No device token found for Xbox token refresh");
-        identity = NULL;
-        goto cleanup;
-    }
-
-    if (token_is_expired(device_token)) {
-        /* All the tokens (Device and Sisu) will be retrieved */
-        if (!retrieve_device_token(ctx)) {
-            identity = NULL;
-            goto cleanup;
-        }
-        identity = state_get_xbox_identity();
-        goto cleanup;
-    }
-
-    ctx->device_token = device_token;
-
-    /* Defines the structure that will filled up by the different authentication steps */
-    if (!retrieve_sisu_token(ctx)) {
+    /* All the tokens (User, Device and Sisu) will be retrieved */
+    if (!refresh_user_token(ctx)) {
         identity = NULL;
         goto cleanup;
     }
