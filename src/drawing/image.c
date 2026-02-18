@@ -5,11 +5,11 @@
 #include <graphics/matrix4.h>
 
 /* Static effects cached for the lifetime of the plugin */
-static gs_effect_t *greyscale_effect         = NULL;
-static gs_effect_t *opacity_effect           = NULL;
-static gs_effect_t *greyscale_opacity_effect = NULL;
-static bool         greyscale_load_attempted = false;
-static bool         opacity_load_attempted   = false;
+static gs_effect_t *greyscale_effect                 = NULL;
+static gs_effect_t *opacity_effect                   = NULL;
+static gs_effect_t *greyscale_opacity_effect         = NULL;
+static bool         greyscale_load_attempted         = false;
+static bool         opacity_load_attempted           = false;
 static bool         greyscale_opacity_load_attempted = false;
 
 void draw_texture(gs_texture_t *texture, const uint32_t width, const uint32_t height, gs_effect_t *effect) {
@@ -322,4 +322,3 @@ void image_cleanup(void) {
         greyscale_opacity_effect = NULL;
     }
 }
-

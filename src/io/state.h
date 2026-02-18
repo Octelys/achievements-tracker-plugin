@@ -18,10 +18,18 @@ extern "C" {
 void io_load(void);
 
 /**
+ * @brief Clean up and free the persisted plugin state.
+ *
+ * This function releases all memory associated with the global state object.
+ * Should be called during plugin shutdown (obs_module_unload).
+ */
+void io_cleanup(void);
+
+/**
  * @brief Get the current device information associated with the state.
  *
- * @return Pointer to the in-memory device object, or NULL if no device is
- *         available/loaded.
+ * @return Newly allocated device object (caller must free with state_free_device()),
+ *         or NULL if no device is available/loaded.
  */
 device_t *state_get_device(void);
 
@@ -40,21 +48,24 @@ void state_set_user_token(const char *device_code, const token_t *user_token, co
 /**
  * @brief Get the current user's access token.
  *
- * @return Pointer to the stored token, or NULL if none is set.
+ * @return Newly allocated token (caller must free with state_free_token()),
+ *         or NULL if none is set.
  */
 token_t *state_get_user_token(void);
 
 /**
  * @brief Get the current user's refresh token.
  *
- * @return Pointer to the stored refresh token, or NULL if none is set.
+ * @return Newly allocated refresh token (caller must free with state_free_token()),
+ *         or NULL if none is set.
  */
 token_t *state_get_user_refresh_token(void);
 
 /**
  * @brief Get the device code used to refresh the token.
  *
- * @return Pointer to the stored refresh token, or NULL if none is set.
+ * @return Newly allocated device code string (caller must free with bfree()),
+ *         or NULL if none is set.
  */
 char *state_get_device_code(void);
 
@@ -68,7 +79,8 @@ void state_set_device_token(const token_t *device_token);
 /**
  * @brief Get the currently stored device token.
  *
- * @return Pointer to the stored device token, or NULL if none is set.
+ * @return Newly allocated device token (caller must free with state_free_token()),
+ *         or NULL if none is set.
  */
 token_t *state_get_device_token(void);
 
@@ -82,7 +94,8 @@ void state_set_sisu_token(const token_t *sisu_token);
 /**
  * @brief Get the currently stored SISU token.
  *
- * @return Pointer to the stored SISU token, or NULL if none is set.
+ * @return Newly allocated SISU token (caller must free with state_free_token()),
+ *         or NULL if none is set.
  */
 token_t *state_get_sisu_token(void);
 
@@ -96,7 +109,8 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity);
 /**
  * @brief Get the currently stored Xbox identity information.
  *
- * @return Pointer to the stored identity, or NULL if none is set.
+ * @return Newly allocated identity (caller must free with state_free_xbox_identity()),
+ *         or NULL if none is set.
  */
 xbox_identity_t *state_get_xbox_identity(void);
 
@@ -117,7 +131,8 @@ void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamers
  * - Default color: 0xFFFFFF (white)
  * - Default size: 12 pixels
  *
- * @return Newly allocated configuration structure. Caller must free it with bfree().
+ * @return Newly allocated configuration structure. Caller must free it with
+ *         state_free_gamerscore_configuration().
  */
 gamerscore_configuration_t *state_get_gamerscore_configuration();
 
@@ -138,7 +153,8 @@ void state_set_gamertag_configuration(const gamertag_configuration_t *configurat
  * - Default color: 0xFFFFFF (white)
  * - Default size: 12 pixels
  *
- * @return Newly allocated configuration structure. Caller must free it with bfree().
+ * @return Newly allocated configuration structure. Caller must free it with
+ *         state_free_gamertag_configuration().
  */
 gamertag_configuration_t *state_get_gamertag_configuration();
 
@@ -159,7 +175,8 @@ void state_set_achievement_name_configuration(const achievement_name_configurati
  * - Default color: 0xFFFFFF (white)
  * - Default size: 12 pixels
  *
- * @return Newly allocated configuration structure. Caller must free it with bfree().
+ * @return Newly allocated configuration structure. Caller must free it with
+ *         state_free_achievement_name_configuration().
  */
 achievement_name_configuration_t *state_get_achievement_name_configuration();
 
@@ -180,7 +197,8 @@ void state_set_achievement_description_configuration(const achievement_descripti
  * - Default color: 0xFFFFFF (white)
  * - Default size: 12 pixels
  *
- * @return Newly allocated configuration structure. Caller must free it with bfree().
+ * @return Newly allocated configuration structure. Caller must free it with
+ *         state_free_achievement_description_configuration().
  */
 achievement_description_configuration_t *state_get_achievement_description_configuration();
 
@@ -201,7 +219,8 @@ void state_set_achievements_count_configuration(const achievements_count_configu
  * - Default color: 0xFFFFFFFF (white)
  * - Default size: 48 pixels
  *
- * @return Newly allocated configuration structure. Caller must free it with bfree().
+ * @return Newly allocated configuration structure. Caller must free it with
+ *         state_free_achievements_count_configuration().
  */
 achievements_count_configuration_t *state_get_achievements_count_configuration();
 

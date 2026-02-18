@@ -22,12 +22,22 @@ extern "C" {
  */
 typedef struct device {
     /** Unique identifier for the device (typically a UUID string). */
-    const char     *uuid;
+    char     *uuid;
     /** Device serial number string. */
-    const char     *serial_number;
+    char     *serial_number;
     /** Proof-of-ownership key pair. */
-    const EVP_PKEY *keys;
+    EVP_PKEY *keys;
 } device_t;
+
+/**
+ * @brief Free a device structure and its contents.
+ *
+ * Frees the EVP_PKEY and the device_t structure itself.
+ * Safe to call with NULL.
+ *
+ * @param device Device structure to free. Set to NULL after freeing.
+ */
+void free_device(device_t **device);
 
 #ifdef __cplusplus
 }

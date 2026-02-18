@@ -166,6 +166,13 @@ void io_load(void) {
     (void)last_sync;
 }
 
+void io_cleanup(void) {
+    if (g_state) {
+        obs_data_release(g_state);
+        g_state = NULL;
+    }
+}
+
 void state_clear(void) {
     /* Considering how sensitive the Xbox live API appears, let's always keep the UUID / Serial / Keys constant */
     /*obs_data_set_string(g_state, DEVICE_UUID, "");*/
@@ -276,8 +283,8 @@ device_t *state_get_device(void) {
     }
 
     device_t *device      = bzalloc(sizeof(device_t));
-    device->uuid          = device_uuid;
-    device->serial_number = device_serial_number;
+    device->uuid          = bstrdup(device_uuid);
+    device->serial_number = bstrdup(device_serial_number);
     device->keys          = device_evp_pkeys;
 
     return device;
@@ -298,7 +305,7 @@ token_t *state_get_device_token(void) {
     }
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = device_token;
+    token->value   = bstrdup(device_token);
 
     return token;
 }
@@ -318,7 +325,7 @@ token_t *state_get_sisu_token(void) {
     }
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = sisu_token;
+    token->value   = bstrdup(sisu_token);
 
     return token;
 }

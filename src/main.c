@@ -44,5 +44,7 @@ bool obs_module_load(void) {
 void obs_module_unload(void) {
     achievement_cycle_destroy();
     image_cleanup();
+    io_cleanup();
+
     obs_log(LOG_INFO, "plugin unloaded");
 }
