@@ -243,7 +243,7 @@ void achievement_cycle_tick(float seconds) {
     case DISPLAY_PHASE_LAST_UNLOCKED:
         /* Check if it's time to switch to locked achievements rotation */
         if (g_phase_timer <= 0.0f) {
-            obs_log(LOG_INFO, "Achievement Cycle: Switching to locked achievements rotation");
+            obs_log(LOG_DEBUG, "Achievement Cycle: Switching to locked achievements rotation");
             /* Only switch if there are locked achievements to show */
             if (count_locked_achievements(achievements) > 0) {
                 g_display_phase        = DISPLAY_PHASE_LOCKED_ROTATION;
@@ -254,13 +254,13 @@ void achievement_cycle_tick(float seconds) {
                 const achievement_t *locked = get_random_locked_achievement(achievements);
 
                 if (locked) {
-                    obs_log(LOG_INFO, "Achievement Cycle: Showing random locked achievement: %s", locked->name);
+                    obs_log(LOG_DEBUG, "Achievement Cycle: Showing random locked achievement: %s", locked->name);
                     notify_subscribers(locked);
                 } else {
                     obs_log(LOG_WARNING, "Achievement Cycle: No locked achievements to show");
                 }
             } else {
-                obs_log(LOG_INFO, "Achievement Cycle: No locked achievements, keeping last unlocked");
+                obs_log(LOG_DEBUG, "Achievement Cycle: No locked achievements, keeping last unlocked");
                 /* No locked achievements, keep showing last unlocked */
                 g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
             }
@@ -283,7 +283,7 @@ void achievement_cycle_tick(float seconds) {
 
         /* Check if the locked rotation phase is complete */
         if (g_phase_timer <= 0.0f) {
-            obs_log(LOG_INFO, "Achievement Cycle: Locked achievements rotation complete");
+            obs_log(LOG_DEBUG, "Achievement Cycle: Locked achievements rotation complete");
             g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
             g_phase_timer   = LAST_UNLOCKED_DISPLAY_DURATION;
 

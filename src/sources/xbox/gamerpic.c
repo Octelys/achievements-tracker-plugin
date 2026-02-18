@@ -39,7 +39,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
         return;
     }
 
-    obs_log(LOG_INFO, "[Gamerpic] Connected to Xbox Live - fetching Gamerpic URL %s", g_gamerpic.type);
+    obs_log(LOG_DEBUG, "[Gamerpic] Connected to Xbox Live - fetching Gamerpic URL %s", g_gamerpic.type);
 
     char *gamerpic_url = xbox_fetch_gamerpic();
 
@@ -50,7 +50,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     }
 
     if (strcasecmp(gamerpic_url, g_gamerpic.url) != 0) {
-        obs_log(LOG_INFO, "[Gamerpic] Gamerpic URL changed - downloading");
+        obs_log(LOG_DEBUG, "[Gamerpic] Gamerpic URL changed - downloading");
         snprintf(g_gamerpic.url, sizeof(g_gamerpic.url), "%s", gamerpic_url);
         snprintf(g_gamerpic.id, sizeof(g_gamerpic.id), "%s", "default");
         image_source_download(&g_gamerpic);

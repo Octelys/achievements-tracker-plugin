@@ -117,14 +117,14 @@ static obs_data_t *load_state(void) {
         return NULL;
     }
 
-    obs_log(LOG_INFO, "loading state from %s", path);
+    obs_log(LOG_INFO, "Loading state from %s", path);
 
     obs_data_t *data = obs_data_create_from_json_file(path);
     bfree(path);
 
     /* If the file does not exist yet, return an empty object */
     if (!data) {
-        obs_log(LOG_INFO, "no state found: creating a new one");
+        obs_log(LOG_INFO, "No state found: creating a new one");
         data = obs_data_create();
     }
 

@@ -19,7 +19,7 @@ OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
 bool obs_module_load(void) {
-    obs_log(LOG_INFO, "loading plugin (version %s)", PLUGIN_VERSION);
+    obs_log(LOG_INFO, "Loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
 
     xbox_account_source_register();

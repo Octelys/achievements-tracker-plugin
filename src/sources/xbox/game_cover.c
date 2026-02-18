@@ -47,7 +47,7 @@ static image_t g_game_cover;
  */
 static void on_xbox_game_played(const game_t *game) {
 
-    obs_log(LOG_INFO, "Playing game %s (%s)", game->title, game->id);
+    obs_log(LOG_DEBUG, "Playing game %s (%s)", game->title, game->id);
 
     char *game_cover_url = xbox_get_game_cover(game);
     snprintf(g_game_cover.url, sizeof(g_game_cover.url), "%s", game_cover_url);

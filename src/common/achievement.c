@@ -192,7 +192,7 @@ int count_achievements(const achievement_t *achievements) {
         current = current->next;
     }
 
-    obs_log(LOG_INFO, "Found %d achievements", count);
+    obs_log(LOG_DEBUG, "Found %d achievements", count);
 
     return count;
 }
@@ -221,7 +221,7 @@ int count_locked_achievements(const achievement_t *achievements) {
         }
     }
 
-    obs_log(LOG_INFO, "Found %d locked achievements", count);
+    obs_log(LOG_DEBUG, "Found %d locked achievements", count);
 
     return count;
 }
@@ -235,7 +235,7 @@ int count_unlocked_achievements(const achievement_t *achievements) {
         }
     }
 
-    obs_log(LOG_INFO, "Found %d unlocked achievements", count);
+    obs_log(LOG_DEBUG, "Found %d unlocked achievements", count);
 
     return count;
 }

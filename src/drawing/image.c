@@ -109,7 +109,7 @@ void draw_texture_greyscale(gs_texture_t *texture, const uint32_t width, const u
             blog(LOG_ERROR, "[Greyscale] Effect compile error: %s", error_string);
             bfree(error_string);
         } else if (greyscale_effect) {
-            blog(LOG_INFO, "[Greyscale] Custom effect created successfully");
+            blog(LOG_DEBUG, "[Greyscale] Custom effect created successfully");
         } else {
             blog(LOG_WARNING, "[Greyscale] Failed to create custom effect (no error string)");
         }

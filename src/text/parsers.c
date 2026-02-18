@@ -171,7 +171,7 @@ game_t *parse_game(const char *json_string) {
             continue;
         }
 
-        obs_log(LOG_INFO, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
+        obs_log(LOG_DEBUG, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
 
         char game_id_key[512];
         snprintf(game_id_key, sizeof(game_id_key), "/presenceDetails/%d/titleId", detail_index);
@@ -422,7 +422,7 @@ achievement_t *parse_achievements(const char *json_string) {
 
         achievement->rewards = rewards;
 
-        obs_log(LOG_INFO,
+        obs_log(LOG_DEBUG,
                 "%s | Achievement %s (%s G) is %s",
                 achievement->service_config_id,
                 achievement->name,

@@ -359,7 +359,7 @@ char *xbox_fetch_gamerpic() {
      * Xbox sometimes returns URLs containing "\\u0026" for '&'. Fix it up for curl/http. */
     str_replace(gamerpic_url, "u0026", "&");
 
-    obs_log(LOG_INFO, "User gamerpic URL is '%s'", gamerpic_url);
+    obs_log(LOG_DEBUG, "User gamerpic URL is '%s'", gamerpic_url);
 
 cleanup:
     free_json_memory((void **)&profile_settings_json);
@@ -371,7 +371,7 @@ cleanup:
 
 game_t *xbox_get_current_game(void) {
 
-    obs_log(LOG_INFO, "Retrieving current game");
+    obs_log(LOG_DEBUG, "Retrieving current game");
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
