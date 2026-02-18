@@ -102,7 +102,7 @@ static bool contains_node(const char *json_string, const char *node_key) {
     contains_node = node != NULL;
 
 cleanup:
-    FREE_JSON(json_message);
+    free_json_memory((void **)&json_message);
 
     return contains_node;
 }
@@ -192,11 +192,11 @@ game_t *parse_game(const char *json_string) {
     obs_log(LOG_DEBUG, "Game is %s (%s)", current_game_title, current_game_id);
 
     game        = bzalloc(sizeof(game_t));
-    game->id    = strdup(current_game_id);
-    game->title = strdup(current_game_title);
+    game->id    = bstrdup(current_game_id);
+    game->title = bstrdup(current_game_title);
 
 cleanup:
-    FREE_JSON(json_root);
+    free_json_memory((void **)&json_root);
 
     return game;
 }
@@ -269,9 +269,9 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
         }
 
         achievement_progress_t *progress = bzalloc(sizeof(achievement_progress_t));
-        progress->service_config_id      = strdup(current_service_config_id);
-        progress->id                     = strdup(id_node->valuestring);
-        progress->progress_state         = strdup(progress_state_node->valuestring);
+        progress->service_config_id      = bstrdup(current_service_config_id);
+        progress->id                     = bstrdup(id_node->valuestring);
+        progress->progress_state         = bstrdup(progress_state_node->valuestring);
         progress->unlocked_timestamp     = unlocked_timestamp;
         progress->next                   = NULL;
 
@@ -287,7 +287,7 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
     }
 
 cleanup:
-    FREE_JSON(json_root);
+    free_json_memory((void **)&json_root);
 
     return achievement_progress;
 }
@@ -440,7 +440,7 @@ achievement_t *parse_achievements(const char *json_string) {
         }
     }
 
-    FREE_JSON(json_root);
+    free_json_memory((void **)&json_root);
 
     return achievements;
 }
