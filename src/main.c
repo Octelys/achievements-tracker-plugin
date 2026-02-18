@@ -13,6 +13,7 @@
 #include "sources/xbox/achievement_description.h"
 #include "sources/xbox/achievement_icon.h"
 #include "sources/xbox/achievements_count.h"
+#include "drawing/image.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -42,5 +43,6 @@ bool obs_module_load(void) {
 
 void obs_module_unload(void) {
     achievement_cycle_destroy();
+    image_cleanup();
     obs_log(LOG_INFO, "plugin unloaded");
 }

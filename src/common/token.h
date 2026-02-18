@@ -17,7 +17,7 @@ extern "C" {
  */
 typedef struct token {
     /** Token value (typically a bearer/access token). */
-    const char *value;
+    char *value;
     /** Expiration time as a Unix timestamp (seconds since epoch). */
     int64_t     expires;
 } token_t;

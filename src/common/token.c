@@ -29,7 +29,6 @@ void free_token(token_t **token) {
     token_t *current = *token;
 
     free_memory((void **)&current->value);
-    current->expires = 0;
 
     bfree(current);
     *token = NULL;
