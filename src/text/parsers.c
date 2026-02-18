@@ -34,23 +34,28 @@ static char *get_node_string(cJSON *json_root, int achievement_index, const char
 
 static bool get_node_bool(cJSON *json_root, int achievement_index, const char *property_name) {
 
-    const char *property_value = get_node_string(json_root, achievement_index, property_name);
+    char *property_value = get_node_string(json_root, achievement_index, property_name);
 
     if (!property_value) {
         return false;
     }
 
-    return strcmp(property_value, "true") == 0;
+    bool result = strcmp(property_value, "true") == 0;
+    free_memory((void **)&property_value);
+
+    return result;
 }
 
 static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, const char *property_name) {
 
-    const char *property_value = get_node_string(json_root, achievement_index, property_name);
+    int64_t result = 0;
+
+    char *property_value = get_node_string(json_root, achievement_index, property_name);
 
     obs_log(LOG_DEBUG, "%s=%s", property_name, property_value);
 
     if (!property_value || strlen(property_value) == 0) {
-        return 0;
+        goto cleanup;
     }
 
     int32_t fraction       = 0;
@@ -61,14 +66,19 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
                 "Unable to convert property '%s' as a unix timestamp. Value: %s",
                 property_name,
                 property_value);
-        return 0;
+        goto cleanup;
     }
 
     obs_log(LOG_DEBUG, "%s=%" PRId64, property_name, unix_timestamp);
 
     /* If the achievement is locked, the date returned is 0001-01-01, which in unix timestamp is definitely negative */
     /* We assume a timestamp equal to 0 is a locked achievement */
-    return unix_timestamp > 0 ? unix_timestamp : 0;
+    result = unix_timestamp > 0 ? unix_timestamp : 0;
+
+cleanup:
+    free_memory((void **)&property_value);
+
+    return result;
 }
 
 static bool contains_node(const char *json_string, const char *node_key) {
@@ -299,7 +309,7 @@ achievement_t *parse_achievements(const char *json_string) {
 
     for (int achievement_index = 0;; achievement_index++) {
 
-        const char *id = get_node_string(json_root, achievement_index, "id");
+        char *id = get_node_string(json_root, achievement_index, "id");
 
         if (!id) {
             /* There is nothing more */

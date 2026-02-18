@@ -21,6 +21,7 @@ achievement_progress_t *copy_achievement_progress(const achievement_progress_t *
         copy->id                     = bstrdup(current->id);
         copy->progress_state         = bstrdup(current->progress_state);
         copy->service_config_id      = bstrdup(current->service_config_id);
+        copy->unlocked_timestamp     = current->unlocked_timestamp;
 
         if (previous_copy) {
             previous_copy->next = copy;
