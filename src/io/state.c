@@ -117,14 +117,14 @@ static obs_data_t *load_state(void) {
         return NULL;
     }
 
-    obs_log(LOG_INFO, "loading state from %s", path);
+    obs_log(LOG_INFO, "Loading state from %s", path);
 
     obs_data_t *data = obs_data_create_from_json_file(path);
     bfree(path);
 
     /* If the file does not exist yet, return an empty object */
     if (!data) {
-        obs_log(LOG_INFO, "no state found: creating a new one");
+        obs_log(LOG_INFO, "No state found: creating a new one");
         data = obs_data_create();
     }
 
@@ -164,6 +164,13 @@ void io_load(void) {
 
     (void)token;
     (void)last_sync;
+}
+
+void io_cleanup(void) {
+    if (g_state) {
+        obs_data_release(g_state);
+        g_state = NULL;
+    }
 }
 
 void state_clear(void) {
@@ -276,8 +283,8 @@ device_t *state_get_device(void) {
     }
 
     device_t *device      = bzalloc(sizeof(device_t));
-    device->uuid          = device_uuid;
-    device->serial_number = device_serial_number;
+    device->uuid          = bstrdup(device_uuid);
+    device->serial_number = bstrdup(device_serial_number);
     device->keys          = device_evp_pkeys;
 
     return device;
@@ -298,7 +305,7 @@ token_t *state_get_device_token(void) {
     }
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = device_token;
+    token->value   = bstrdup(device_token);
 
     return token;
 }
@@ -318,7 +325,7 @@ token_t *state_get_sisu_token(void) {
     }
 
     token_t *token = bzalloc(sizeof(token_t));
-    token->value   = sisu_token;
+    token->value   = bstrdup(sisu_token);
 
     return token;
 }
@@ -633,4 +640,140 @@ xbox_identity_t *state_get_xbox_identity(void) {
     identity->token           = token;
 
     return identity;
+}
+
+void state_free_device(device_t **device) {
+    if (!device || !*device) {
+        return;
+    }
+
+    if ((*device)->keys) {
+        EVP_PKEY_free((EVP_PKEY *)(*device)->keys);
+    }
+
+    bfree(*device);
+    *device = NULL;
+}
+
+void state_free_token(token_t **token) {
+    if (!token || !*token) {
+        return;
+    }
+
+    if ((*token)->value) {
+        bfree((void *)(*token)->value);
+    }
+
+    bfree(*token);
+    *token = NULL;
+}
+
+void state_free_xbox_identity(xbox_identity_t **identity) {
+    if (!identity || !*identity) {
+        return;
+    }
+
+    if ((*identity)->gamertag) {
+        bfree((void *)(*identity)->gamertag);
+    }
+
+    if ((*identity)->xid) {
+        bfree((void *)(*identity)->xid);
+    }
+
+    if ((*identity)->uhs) {
+        bfree((void *)(*identity)->uhs);
+    }
+
+    if ((*identity)->token) {
+        state_free_token(&(*identity)->token);
+    }
+
+    bfree(*identity);
+    *identity = NULL;
+}
+
+void state_free_gamerscore_configuration(gamerscore_configuration_t **config) {
+    if (!config || !*config) {
+        return;
+    }
+
+    if ((*config)->font_face) {
+        bfree((void *)(*config)->font_face);
+    }
+
+    if ((*config)->font_style) {
+        bfree((void *)(*config)->font_style);
+    }
+
+    bfree(*config);
+    *config = NULL;
+}
+
+void state_free_gamertag_configuration(gamertag_configuration_t **config) {
+    if (!config || !*config) {
+        return;
+    }
+
+    if ((*config)->font_face) {
+        bfree((void *)(*config)->font_face);
+    }
+
+    if ((*config)->font_style) {
+        bfree((void *)(*config)->font_style);
+    }
+
+    bfree(*config);
+    *config = NULL;
+}
+
+void state_free_achievement_name_configuration(achievement_name_configuration_t **config) {
+    if (!config || !*config) {
+        return;
+    }
+
+    if ((*config)->font_face) {
+        bfree((void *)(*config)->font_face);
+    }
+
+    if ((*config)->font_style) {
+        bfree((void *)(*config)->font_style);
+    }
+
+    bfree(*config);
+    *config = NULL;
+}
+
+void state_free_achievement_description_configuration(achievement_description_configuration_t **config) {
+    if (!config || !*config) {
+        return;
+    }
+
+    if ((*config)->font_face) {
+        bfree((void *)(*config)->font_face);
+    }
+
+    if ((*config)->font_style) {
+        bfree((void *)(*config)->font_style);
+    }
+
+    bfree(*config);
+    *config = NULL;
+}
+
+void state_free_achievements_count_configuration(achievements_count_configuration_t **config) {
+    if (!config || !*config) {
+        return;
+    }
+
+    if ((*config)->font_face) {
+        bfree((void *)(*config)->font_face);
+    }
+
+    if ((*config)->font_style) {
+        bfree((void *)(*config)->font_style);
+    }
+
+    bfree(*config);
+    *config = NULL;
 }

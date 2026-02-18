@@ -28,6 +28,14 @@ extern "C" {
  */
 void xbox_achievement_icon_source_register(void);
 
+/**
+ * @brief Clean up resources allocated by the achievement icon source.
+ *
+ * Frees the global icon cache structures and destroys associated textures.
+ * Should be called during plugin shutdown (obs_module_unload()).
+ */
+void xbox_achievement_icon_source_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

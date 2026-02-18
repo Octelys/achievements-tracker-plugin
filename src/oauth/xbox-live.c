@@ -423,11 +423,11 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     obs_log(LOG_INFO, "Sisu authentication succeeded!");
 
-    obs_log(LOG_INFO, "gtg: %s", gtg_node->valuestring);
-    obs_log(LOG_INFO, "XID: %s", xid_node->valuestring);
-    obs_log(LOG_INFO, "Hash: %s", uhs_node->valuestring);
-    obs_log(LOG_INFO, "Now: %d", now());
-    obs_log(LOG_INFO, "Expires: %d (%s)", unix_timestamp, not_after_date_node->valuestring);
+    obs_log(LOG_DEBUG, "gtg: %s", gtg_node->valuestring);
+    obs_log(LOG_DEBUG, "XID: %s", xid_node->valuestring);
+    obs_log(LOG_DEBUG, "Hash: %s", uhs_node->valuestring);
+    obs_log(LOG_DEBUG, "Now: %d", now());
+    obs_log(LOG_DEBUG, "Expires: %d (%s)", unix_timestamp, not_after_date_node->valuestring);
 
     /* Creates the Xbox identity */
     token_t *xbox_token = bzalloc(sizeof(token_t));
@@ -861,7 +861,7 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
                     interval);
         } else {
 
-            obs_log(LOG_INFO, "Response received: %s", token_response);
+            obs_log(LOG_DEBUG, "Response received: %s", token_response);
 
             cJSON *token_json = cJSON_Parse(token_response);
 
@@ -1238,7 +1238,7 @@ xbox_identity_t *xbox_live_get_identity(void) {
 
     /* Checks if the Sisu token is expired */
     if (!token_is_expired(identity->token)) {
-        obs_log(LOG_INFO, "Token is NOT expired, reusing existing identity");
+        obs_log(LOG_DEBUG, "Token is NOT expired, reusing existing identity");
         return identity;
     }
 

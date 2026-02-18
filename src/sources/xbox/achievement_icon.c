@@ -185,8 +185,9 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 /**
  * @brief OBS callback destroying an achievement icon source instance.
  *
- * Frees the text rendering context and source data structure. Safe to call
- * with NULL data pointer.
+ * Frees the source data structure. Safe to call with NULL data pointer.
+ * Note: Global achievement icons (g_achievement_icon, g_next_achievement_icon)
+ * are cleaned up during plugin unload, not per-source-instance.
  *
  * @param data Source instance data to destroy.
  */
@@ -197,9 +198,6 @@ static void on_source_destroy(void *data) {
     if (!source) {
         return;
     }
-
-    image_source_destroy(g_achievement_icon);
-    image_source_destroy(g_next_achievement_icon);
 
     free_memory((void **)&source);
 }
@@ -310,7 +308,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     /* Gets or refreshes the token */
-    const xbox_identity_t *xbox_identity = xbox_live_get_identity();
+    xbox_identity_t *xbox_identity = xbox_live_get_identity();
 
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
@@ -325,6 +323,8 @@ static obs_properties_t *source_get_properties(void *data) {
                                 "You are not connected to your xbox account",
                                 OBS_TEXT_INFO);
     }
+
+    free_identity(&xbox_identity);
 
     return p;
 }
@@ -381,4 +381,16 @@ void xbox_achievement_icon_source_register(void) {
     obs_register_source(xbox_achievement_icon_source_get());
 
     achievement_cycle_subscribe(&on_achievement_changed);
+}
+
+void xbox_achievement_icon_source_cleanup(void) {
+    if (g_achievement_icon) {
+        image_source_destroy(g_achievement_icon);
+        free_memory((void **)&g_achievement_icon);
+    }
+
+    if (g_next_achievement_icon) {
+        image_source_destroy(g_next_achievement_icon);
+        free_memory((void **)&g_next_achievement_icon);
+    }
 }

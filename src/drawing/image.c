@@ -4,6 +4,14 @@
 #include <graphics/graphics.h>
 #include <graphics/matrix4.h>
 
+/* Static effects cached for the lifetime of the plugin */
+static gs_effect_t *greyscale_effect                 = NULL;
+static gs_effect_t *opacity_effect                   = NULL;
+static gs_effect_t *greyscale_opacity_effect         = NULL;
+static bool         greyscale_load_attempted         = false;
+static bool         opacity_load_attempted           = false;
+static bool         greyscale_opacity_load_attempted = false;
+
 void draw_texture(gs_texture_t *texture, const uint32_t width, const uint32_t height, gs_effect_t *effect) {
 
     if (!texture) {
@@ -53,11 +61,8 @@ void draw_texture_greyscale(gs_texture_t *texture, const uint32_t width, const u
      * This is necessary because OBS's default effect doesn't support color manipulation.
      */
 
-    static gs_effect_t *greyscale_effect      = NULL;
-    static bool         effect_load_attempted = false;
-
-    if (!greyscale_effect && !effect_load_attempted) {
-        effect_load_attempted = true;
+    if (!greyscale_effect && !greyscale_load_attempted) {
+        greyscale_load_attempted = true;
 
         const char *effect_code = "uniform float4x4 ViewProj;\n"
                                   "uniform texture2d image;\n"
@@ -104,7 +109,7 @@ void draw_texture_greyscale(gs_texture_t *texture, const uint32_t width, const u
             blog(LOG_ERROR, "[Greyscale] Effect compile error: %s", error_string);
             bfree(error_string);
         } else if (greyscale_effect) {
-            blog(LOG_INFO, "[Greyscale] Custom effect created successfully");
+            blog(LOG_DEBUG, "[Greyscale] Custom effect created successfully");
         } else {
             blog(LOG_WARNING, "[Greyscale] Failed to create custom effect (no error string)");
         }
@@ -145,11 +150,8 @@ void draw_texture_with_opacity(gs_texture_t *texture, const uint32_t width, cons
     }
 
     // Create an inline effect with opacity support on first use (same as text opacity effect)
-    static gs_effect_t *opacity_effect        = NULL;
-    static bool         effect_load_attempted = false;
-
-    if (!opacity_effect && !effect_load_attempted) {
-        effect_load_attempted = true;
+    if (!opacity_effect && !opacity_load_attempted) {
+        opacity_load_attempted = true;
 
         const char *effect_code = "uniform float4x4 ViewProj;\n"
                                   "uniform texture2d image;\n"
@@ -228,12 +230,9 @@ void draw_texture_greyscale_with_opacity(gs_texture_t *texture, const uint32_t w
         return;
     }
 
-    // Create inline greyscale effect with opacity support
-    static gs_effect_t *greyscale_opacity_effect = NULL;
-    static bool         effect_load_attempted    = false;
-
-    if (!greyscale_opacity_effect && !effect_load_attempted) {
-        effect_load_attempted = true;
+    // Create an inline greyscale effect with opacity support
+    if (!greyscale_opacity_effect && !greyscale_opacity_load_attempted) {
+        greyscale_opacity_load_attempted = true;
 
         const char *effect_code = "uniform float4x4 ViewProj;\n"
                                   "uniform texture2d image;\n"
@@ -301,5 +300,25 @@ void draw_texture_greyscale_with_opacity(gs_texture_t *texture, const uint32_t w
     } else {
         // Fallback: draw greyscale without opacity
         draw_texture_greyscale(texture, width, height, NULL);
+    }
+}
+
+void image_cleanup(void) {
+    /* Clean up static effects created by this module.
+     * These are created once and cached but need to be destroyed on plugin unload. */
+
+    if (greyscale_effect) {
+        gs_effect_destroy(greyscale_effect);
+        greyscale_effect = NULL;
+    }
+
+    if (opacity_effect) {
+        gs_effect_destroy(opacity_effect);
+        opacity_effect = NULL;
+    }
+
+    if (greyscale_opacity_effect) {
+        gs_effect_destroy(greyscale_opacity_effect);
+        greyscale_opacity_effect = NULL;
     }
 }

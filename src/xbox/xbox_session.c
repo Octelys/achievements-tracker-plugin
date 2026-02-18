@@ -42,7 +42,7 @@ static achievement_t *find_achievement_by_id(const achievement_progress_t *progr
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//  Public functions.
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game) {
@@ -100,6 +100,7 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
     }
 
     /* Updates the achievement status */
+    free_memory((void **)&achievement->progress_state);
     achievement->progress_state     = bstrdup(progress->progress_state);
     achievement->unlocked_timestamp = progress->unlocked_timestamp;
 

@@ -31,7 +31,7 @@ void crypto_print_keys(const EVP_PKEY *pkey) {
     }
 
     /* Export public key (SPKI format) */
-    obs_log(LOG_INFO, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
+    obs_log(LOG_DEBUG, "=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
     printf("=== XboxTokenManager ProofOfPossession Key (PUBLIC, PEM) ===");
     if (PEM_write_bio_PUBKEY(bio, pkey)) {
         char *pem_data = NULL;
@@ -52,7 +52,7 @@ void crypto_print_keys(const EVP_PKEY *pkey) {
     BIO_reset(bio);
 
     /* Export private key (PKCS8 format) */
-    obs_log(LOG_INFO, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
+    obs_log(LOG_DEBUG, "=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
     printf("=== XboxTokenManager ProofOfPossession Key (PRIVATE, PEM) ===");
     if (PEM_write_bio_PrivateKey(bio, pkey, NULL, NULL, 0, NULL, NULL)) {
         char *pem_data = NULL;

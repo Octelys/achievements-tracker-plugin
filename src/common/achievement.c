@@ -4,6 +4,7 @@
 
 #include <inttypes.h>
 #include <obs-module.h>
+
 #include <stdlib.h>
 
 media_asset_t *copy_media_asset(const media_asset_t *media_asset) {
@@ -133,9 +134,11 @@ achievement_t *copy_achievement(const achievement_t *achievement) {
         copy->name               = bstrdup(current->name);
         copy->progress_state     = bstrdup(current->progress_state);
         copy->service_config_id  = bstrdup(current->service_config_id);
+        copy->icon_url           = bstrdup(current->icon_url);
         copy->media_assets       = copy_media_asset(current->media_assets);
         copy->rewards            = copy_reward(current->rewards);
         copy->is_secret          = current->is_secret;
+        copy->unlocked_timestamp = current->unlocked_timestamp;
 
         if (previous_copy) {
             previous_copy->next = copy;
@@ -169,8 +172,9 @@ void free_achievement(achievement_t **achievement) {
         free_memory((void **)&current->description);
         free_memory((void **)&current->locked_description);
         free_memory((void **)&current->progress_state);
-        free_media_asset((media_asset_t **)&current->media_assets);
-        free_reward((reward_t **)&current->rewards);
+        free_memory((void **)&current->icon_url);
+        free_media_asset(&current->media_assets);
+        free_reward(&current->rewards);
         free_memory((void **)&current);
 
         current = next;
@@ -188,7 +192,7 @@ int count_achievements(const achievement_t *achievements) {
         current = current->next;
     }
 
-    obs_log(LOG_INFO, "Found %d achievements", count);
+    obs_log(LOG_DEBUG, "Found %d achievements", count);
 
     return count;
 }
@@ -217,7 +221,7 @@ int count_locked_achievements(const achievement_t *achievements) {
         }
     }
 
-    obs_log(LOG_INFO, "Found %d locked achievements", count);
+    obs_log(LOG_DEBUG, "Found %d locked achievements", count);
 
     return count;
 }
@@ -231,20 +235,20 @@ int count_unlocked_achievements(const achievement_t *achievements) {
         }
     }
 
-    obs_log(LOG_INFO, "Found %d unlocked achievements", count);
+    obs_log(LOG_DEBUG, "Found %d unlocked achievements", count);
 
     return count;
 }
 
 const achievement_t *get_random_locked_achievement(const achievement_t *achievements) {
-    int locked_count = count_locked_achievements(achievements);
+    const int locked_count = count_locked_achievements(achievements);
 
     if (locked_count == 0) {
         return NULL;
     }
 
-    int target_index  = rand() % locked_count;
-    int current_index = 0;
+    const int target_index  = rand() % locked_count;
+    int       current_index = 0;
 
     for (const achievement_t *a = achievements; a != NULL; a = a->next) {
         if (a->unlocked_timestamp == 0) {
@@ -273,7 +277,7 @@ void sort_achievements(achievement_t **achievements) {
 
         /* Insert current into the sorted list at the correct position */
         if (!sorted) {
-            /* First node in sorted list */
+            /* First node in the sorted list */
             sorted       = current;
             sorted->next = NULL;
         } else {

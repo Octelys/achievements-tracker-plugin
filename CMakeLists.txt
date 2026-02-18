@@ -356,6 +356,7 @@ target_sources(
     src/time/time.c
     src/common/achievement.c
     src/common/achievement_progress.c
+    src/common/device.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c

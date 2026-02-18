@@ -109,7 +109,7 @@ void image_source_reload_if_needed(image_t *image) {
     image->must_reload = false;
 
     if (image->texture) {
-        obs_log(LOG_INFO,
+        obs_log(LOG_DEBUG,
                 "[%s] New texture has been successfully loaded from cache file '%s'",
                 image->display_name,
                 image->cache_path);

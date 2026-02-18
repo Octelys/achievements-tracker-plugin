@@ -66,6 +66,14 @@ void draw_texture_greyscale(gs_texture_t *texture, uint32_t width, uint32_t heig
 void draw_texture_greyscale_with_opacity(gs_texture_t *texture, uint32_t width, uint32_t height, gs_effect_t *effect,
                                          float opacity);
 
+/**
+ * @brief Clean up image drawing resources.
+ *
+ * Destroys all static shader effects created by the image drawing functions.
+ * Should be called during plugin unload.
+ */
+void image_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

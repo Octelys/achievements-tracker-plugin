@@ -41,7 +41,7 @@ static void update_gamertag(void) {
 
     g_must_reload = true;
 
-    free_memory((void **)&identity);
+    free_identity(&identity);
 }
 
 /**
@@ -148,4 +148,8 @@ void xbox_gamertag_source_register(void) {
     obs_register_source(&xbox_gamertag_source);
 
     xbox_subscribe_connected_changed(&on_connection_changed);
+}
+
+void xbox_gamertag_source_cleanup(void) {
+    state_free_gamertag_configuration(&g_configuration);
 }

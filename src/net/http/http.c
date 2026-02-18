@@ -53,6 +53,41 @@ static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *use
 }
 
 /**
+ * @brief libcurl write callback for binary data (image downloads).
+ *
+ * Appends received bytes into a growable image_buffer. Unlike curl_write_cb,
+ * this does not NUL-terminate because it handles raw binary data.
+ *
+ * @return Number of bytes taken. Returning 0 signals an out-of-memory condition
+ *         to libcurl.
+ */
+static size_t curl_write_image_cb(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t               realsize = size * nmemb;
+    struct image_buffer *buf      = userp;
+
+    /* Ensure capacity */
+    if (buf->size + realsize > buf->capacity) {
+        size_t new_capacity = buf->capacity == 0 ? 4096 : buf->capacity * 2;
+        while (new_capacity < buf->size + realsize) {
+            new_capacity *= 2;
+        }
+
+        uint8_t *new_data = brealloc(buf->data, new_capacity);
+        if (!new_data) {
+            return 0; /* Out of memory */
+        }
+
+        buf->data     = new_data;
+        buf->capacity = new_capacity;
+    }
+
+    memcpy(buf->data + buf->size, contents, realsize);
+    buf->size += realsize;
+
+    return realsize;
+}
+
+/**
  * @brief libcurl debug callback used when CURLOPT_VERBOSE is enabled.
  *
  * Logs text and HTTP headers at LOG_DEBUG. Data payloads are intentionally
@@ -409,7 +444,7 @@ bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
     struct image_buffer buf = {0};
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_image_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);

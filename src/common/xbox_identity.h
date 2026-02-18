@@ -22,13 +22,13 @@ extern "C" {
  */
 typedef struct xbox_identity {
     /** User-facing name (gamertag). */
-    const char    *gamertag;
+    char    *gamertag;
     /** Xbox user identifier (XUID/XID). */
-    const char    *xid;
+    char    *xid;
     /** User hash string. */
-    const char    *uhs;
+    char    *uhs;
     /** Authentication token. */
-    const token_t *token;
+    token_t *token;
 } xbox_identity_t;
 
 /**

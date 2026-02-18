@@ -17,6 +17,14 @@ extern "C" {
  */
 void xbox_gamerpic_source_register(void);
 
+/**
+ * @brief Clean up resources allocated by the gamerpic source.
+ *
+ * Frees the global gamerpic cache and destroys associated textures.
+ * Should be called during plugin shutdown (obs_module_unload()).
+ */
+void xbox_gamerpic_source_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -34,23 +34,28 @@ static char *get_node_string(cJSON *json_root, int achievement_index, const char
 
 static bool get_node_bool(cJSON *json_root, int achievement_index, const char *property_name) {
 
-    const char *property_value = get_node_string(json_root, achievement_index, property_name);
+    char *property_value = get_node_string(json_root, achievement_index, property_name);
 
     if (!property_value) {
         return false;
     }
 
-    return strcmp(property_value, "true") == 0;
+    bool result = strcmp(property_value, "true") == 0;
+    free_memory((void **)&property_value);
+
+    return result;
 }
 
 static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, const char *property_name) {
 
-    const char *property_value = get_node_string(json_root, achievement_index, property_name);
+    int64_t result = 0;
+
+    char *property_value = get_node_string(json_root, achievement_index, property_name);
 
     obs_log(LOG_DEBUG, "%s=%s", property_name, property_value);
 
     if (!property_value || strlen(property_value) == 0) {
-        return 0;
+        goto cleanup;
     }
 
     int32_t fraction       = 0;
@@ -61,14 +66,19 @@ static int64_t get_node_unix_timestamp(cJSON *json_root, int achievement_index, 
                 "Unable to convert property '%s' as a unix timestamp. Value: %s",
                 property_name,
                 property_value);
-        return 0;
+        goto cleanup;
     }
 
     obs_log(LOG_DEBUG, "%s=%" PRId64, property_name, unix_timestamp);
 
     /* If the achievement is locked, the date returned is 0001-01-01, which in unix timestamp is definitely negative */
     /* We assume a timestamp equal to 0 is a locked achievement */
-    return unix_timestamp > 0 ? unix_timestamp : 0;
+    result = unix_timestamp > 0 ? unix_timestamp : 0;
+
+cleanup:
+    free_memory((void **)&property_value);
+
+    return result;
 }
 
 static bool contains_node(const char *json_string, const char *node_key) {
@@ -92,7 +102,7 @@ static bool contains_node(const char *json_string, const char *node_key) {
     contains_node = node != NULL;
 
 cleanup:
-    FREE_JSON(json_message);
+    free_json_memory((void **)&json_message);
 
     return contains_node;
 }
@@ -161,7 +171,7 @@ game_t *parse_game(const char *json_string) {
             continue;
         }
 
-        obs_log(LOG_INFO, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
+        obs_log(LOG_DEBUG, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
 
         char game_id_key[512];
         snprintf(game_id_key, sizeof(game_id_key), "/presenceDetails/%d/titleId", detail_index);
@@ -182,11 +192,11 @@ game_t *parse_game(const char *json_string) {
     obs_log(LOG_DEBUG, "Game is %s (%s)", current_game_title, current_game_id);
 
     game        = bzalloc(sizeof(game_t));
-    game->id    = strdup(current_game_id);
-    game->title = strdup(current_game_title);
+    game->id    = bstrdup(current_game_id);
+    game->title = bstrdup(current_game_title);
 
 cleanup:
-    FREE_JSON(json_root);
+    free_json_memory((void **)&json_root);
 
     return game;
 }
@@ -259,9 +269,9 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
         }
 
         achievement_progress_t *progress = bzalloc(sizeof(achievement_progress_t));
-        progress->service_config_id      = strdup(current_service_config_id);
-        progress->id                     = strdup(id_node->valuestring);
-        progress->progress_state         = strdup(progress_state_node->valuestring);
+        progress->service_config_id      = bstrdup(current_service_config_id);
+        progress->id                     = bstrdup(id_node->valuestring);
+        progress->progress_state         = bstrdup(progress_state_node->valuestring);
         progress->unlocked_timestamp     = unlocked_timestamp;
         progress->next                   = NULL;
 
@@ -277,7 +287,7 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
     }
 
 cleanup:
-    FREE_JSON(json_root);
+    free_json_memory((void **)&json_root);
 
     return achievement_progress;
 }
@@ -299,7 +309,7 @@ achievement_t *parse_achievements(const char *json_string) {
 
     for (int achievement_index = 0;; achievement_index++) {
 
-        const char *id = get_node_string(json_root, achievement_index, "id");
+        char *id = get_node_string(json_root, achievement_index, "id");
 
         if (!id) {
             /* There is nothing more */
@@ -412,7 +422,7 @@ achievement_t *parse_achievements(const char *json_string) {
 
         achievement->rewards = rewards;
 
-        obs_log(LOG_INFO,
+        obs_log(LOG_DEBUG,
                 "%s | Achievement %s (%s G) is %s",
                 achievement->service_config_id,
                 achievement->name,
@@ -430,7 +440,7 @@ achievement_t *parse_achievements(const char *json_string) {
         }
     }
 
-    FREE_JSON(json_root);
+    free_json_memory((void **)&json_root);
 
     return achievements;
 }

@@ -39,7 +39,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
         return;
     }
 
-    obs_log(LOG_INFO, "[Gamerpic] Connected to Xbox Live - fetching Gamerpic URL %s", g_gamerpic.type);
+    obs_log(LOG_DEBUG, "[Gamerpic] Connected to Xbox Live - fetching Gamerpic URL %s", g_gamerpic.type);
 
     char *gamerpic_url = xbox_fetch_gamerpic();
 
@@ -50,7 +50,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     }
 
     if (strcasecmp(gamerpic_url, g_gamerpic.url) != 0) {
-        obs_log(LOG_INFO, "[Gamerpic] Gamerpic URL changed - downloading");
+        obs_log(LOG_DEBUG, "[Gamerpic] Gamerpic URL changed - downloading");
         snprintf(g_gamerpic.url, sizeof(g_gamerpic.url), "%s", gamerpic_url);
         snprintf(g_gamerpic.id, sizeof(g_gamerpic.id), "%s", "default");
         image_source_download(&g_gamerpic);
@@ -106,7 +106,8 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 /**
  * @brief OBS callback destroying a source instance.
  *
- * Frees the instance data and any global image resources.
+ * Frees the per-instance data. Note: Global gamerpic (g_gamerpic)
+ * is cleaned up during plugin unload, not per-source-instance.
  */
 static void on_source_destroy(void *data) {
 
@@ -115,8 +116,6 @@ static void on_source_destroy(void *data) {
     if (!source) {
         return;
     }
-
-    image_source_destroy(&g_gamerpic);
 
     bfree(source);
 }
@@ -162,7 +161,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     /* Gets or refreshes the token */
-    const xbox_identity_t *xbox_identity = xbox_live_get_identity();
+    xbox_identity_t *xbox_identity = xbox_live_get_identity();
 
     /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
@@ -177,6 +176,8 @@ static obs_properties_t *source_get_properties(void *data) {
                                 "You are not connected to your xbox account",
                                 OBS_TEXT_INFO);
     }
+
+    free_identity(&xbox_identity);
 
     return p;
 }
@@ -219,4 +220,8 @@ void xbox_gamerpic_source_register(void) {
     obs_register_source(xbox_gamerpic_source_get());
 
     xbox_subscribe_connected_changed(&on_connection_changed);
+}
+
+void xbox_gamerpic_source_cleanup(void) {
+    image_source_destroy(&g_gamerpic);
 }

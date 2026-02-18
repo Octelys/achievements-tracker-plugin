@@ -13,12 +13,13 @@
 #include "sources/xbox/achievement_description.h"
 #include "sources/xbox/achievement_icon.h"
 #include "sources/xbox/achievements_count.h"
+#include "drawing/image.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
 bool obs_module_load(void) {
-    obs_log(LOG_INFO, "loading plugin (version %s)", PLUGIN_VERSION);
+    obs_log(LOG_INFO, "Loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
 
     xbox_account_source_register();
@@ -35,12 +36,26 @@ bool obs_module_load(void) {
     xbox_achievement_icon_source_register();
     xbox_achievements_count_source_register();
 
-    obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
+    obs_log(LOG_INFO, "Plugin loaded successfully (version %s)", PLUGIN_VERSION);
 
     return true;
 }
 
 void obs_module_unload(void) {
     achievement_cycle_destroy();
-    obs_log(LOG_INFO, "plugin unloaded");
+    image_cleanup();
+
+    /* Clean up source configurations */
+    xbox_achievement_name_source_cleanup();
+    xbox_achievement_description_source_cleanup();
+    xbox_achievement_icon_source_cleanup();
+    xbox_achievements_count_source_cleanup();
+    xbox_game_cover_source_cleanup();
+    xbox_gamerpic_source_cleanup();
+    xbox_gamerscore_source_cleanup();
+    xbox_gamertag_source_cleanup();
+
+    io_cleanup();
+
+    obs_log(LOG_INFO, "Plugin unloaded");
 }

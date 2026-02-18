@@ -52,33 +52,33 @@ typedef struct reward {
  */
 typedef struct achievement {
     /** Achievement id. */
-    const char          *id;
+    char               *id;
     /** Service configuration id. Used for monitoring. */
-    const char          *service_config_id;
+    char               *service_config_id;
     /** Display name. */
-    const char          *name;
+    char               *name;
     /** Progress state (service-provided string). */
-    char                *progress_state;
+    char               *progress_state;
     /** Linked list of media assets associated with this achievement. */
-    const media_asset_t *media_assets;
+    media_asset_t      *media_assets;
     /** Whether the achievement is secret. */
-    bool                 is_secret;
+    bool                is_secret;
     /** Description shown when not secret/unlocked. */
-    const char          *description;
+    char               *description;
     /** Description shown when locked/secret. */
-    const char          *locked_description;
+    char               *locked_description;
     /** Linked list of rewards associated with this achievement. */
-    const reward_t      *rewards;
+    reward_t           *rewards;
     /** Unix timestamp (seconds since epoch) when the achievement was unlocked, or 0 if locked. */
-    int64_t              unlocked_timestamp;
+    int64_t             unlocked_timestamp;
     /**
      * Small icon or tile image URL for the achievement.
      *
      * Typically points to a PNG/JPEG hosted by the service.
      */
-    const char          *icon_url;
+    char               *icon_url;
     /** Next achievement in the list, or NULL. */
-    struct achievement  *next;
+    struct achievement *next;
 } achievement_t;
 
 /**

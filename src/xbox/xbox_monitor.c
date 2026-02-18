@@ -248,7 +248,7 @@ static bool send_websocket_message(const char *message) {
         return false;
     }
 
-    obs_log(LOG_INFO, "Monitoring | Sent message: %s", message);
+    obs_log(LOG_DEBUG, "Monitoring | Sent message: %s", message);
     return true;
 }
 
@@ -257,16 +257,18 @@ static bool send_websocket_message(const char *message) {
  */
 static bool xbox_presence_subscribe() {
 
+    bool result = false;
+
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
         obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
-        return false;
+        goto cleanup;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
         obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
-        return false;
+        goto cleanup;
     }
 
     char message[512];
@@ -276,8 +278,13 @@ static bool xbox_presence_subscribe() {
              SUBSCRIBE,
              identity->xid);
 
-    obs_log(LOG_INFO, "Monitoring | Subscribing for presence changes for XUID %s", identity->xid);
-    return send_websocket_message(message);
+    obs_log(LOG_DEBUG, "Monitoring | Subscribing for presence changes for XUID %s", identity->xid);
+    result = send_websocket_message(message);
+
+cleanup:
+    free_identity(&identity);
+
+    return result;
 }
 
 /**
@@ -299,7 +306,7 @@ static bool xbox_presence_unsubscribe(const char *subscription_id) {
     char message[256];
     snprintf(message, sizeof(message), "[%d,1,\"%s\"]", UNSUBSCRIBE, subscription_id);
 
-    obs_log(LOG_INFO, "Monitoring | Unsubscribing from %s", subscription_id);
+    obs_log(LOG_DEBUG, "Monitoring | Unsubscribing from %s", subscription_id);
     return send_websocket_message(message);
 }
 
@@ -342,7 +349,7 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
              identity->xid,
              service_config_id);
 
-    obs_log(LOG_INFO,
+    obs_log(LOG_DEBUG,
             "Monitoring | Subscribing for achievement updates for service config id %s (XUID %s)",
             service_config_id,
             identity->xid);
@@ -387,7 +394,7 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
              identity->xid,
              achievements->service_config_id);
 
-    obs_log(LOG_INFO,
+    obs_log(LOG_DEBUG,
             "Monitoring | Unsubscribing from achievement updates for service config id %s (XUID %s)",
             achievements->service_config_id,
             identity->xid);
@@ -543,7 +550,7 @@ cleanup:
     if (message) {
         free(message);
     }
-    FREE_JSON(root);
+    free_json_memory((void **)&root);
 }
 
 /**
@@ -636,10 +643,10 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
             break;
         }
 
-        obs_log(LOG_INFO, "Monitoring | Refreshing token");
+        obs_log(LOG_DEBUG, "Monitoring | Refreshing token");
 
         free_memory((void **)&g_monitoring_context->auth_token);
-        free_memory((void **)&g_monitoring_context->identity);
+        free_identity(&g_monitoring_context->identity);
 
         g_monitoring_context->identity = xbox_live_get_identity();
 
@@ -661,7 +668,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         break;
 
     case LWS_CALLBACK_CLIENT_CLOSED:
-        obs_log(LOG_INFO, "Monitoring | Connection closed");
+        obs_log(LOG_DEBUG, "Monitoring | Connection closed");
         ctx->connected = false;
         ctx->wsi       = NULL;
         on_websocket_disconnected();
@@ -728,7 +735,7 @@ static void *monitoring_thread(void *arg) {
     ccinfo.protocol       = PROTOCOL;
     ccinfo.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 
-    obs_log(LOG_INFO, "Monitoring | Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
+    obs_log(LOG_DEBUG, "Monitoring | Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
 
     ctx->wsi = lws_client_connect_via_info(&ccinfo);
 
@@ -749,7 +756,7 @@ static void *monitoring_thread(void *arg) {
         lws_service(ctx->context, 50);
     }
 
-    obs_log(LOG_INFO, "Monitoring | Monitoring thread shutting down");
+    obs_log(LOG_DEBUG, "Monitoring | Monitoring thread shutting down");
 
     if (ctx->context) {
         lws_context_destroy(ctx->context);
@@ -825,7 +832,7 @@ void xbox_monitoring_stop(void) {
         return;
     }
 
-    obs_log(LOG_INFO, "Monitoring | Stopping monitoring");
+    obs_log(LOG_DEBUG, "Monitoring | Stopping monitoring");
 
     g_monitoring_context->running = false;
 

@@ -28,6 +28,14 @@ extern "C" {
  */
 void xbox_achievement_name_source_register(void);
 
+/**
+ * @brief Clean up resources allocated by the achievement name source.
+ *
+ * Frees the global configuration structure and its nested allocations.
+ * Should be called during plugin shutdown (obs_module_unload()).
+ */
+void xbox_achievement_name_source_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

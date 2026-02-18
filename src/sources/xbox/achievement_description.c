@@ -319,3 +319,7 @@ void xbox_achievement_description_source_register(void) {
 
     achievement_cycle_subscribe(&on_achievement_changed);
 }
+
+void xbox_achievement_description_source_cleanup(void) {
+    state_free_achievement_description_configuration(&g_configuration);
+}

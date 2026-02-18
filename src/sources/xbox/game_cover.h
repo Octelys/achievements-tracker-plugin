@@ -21,6 +21,14 @@ extern "C" {
  */
 void xbox_game_cover_source_register(void);
 
+/**
+ * @brief Clean up resources allocated by the game cover source.
+ *
+ * Frees the global cover image cache and destroys associated textures.
+ * Should be called during plugin shutdown (obs_module_unload()).
+ */
+void xbox_game_cover_source_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif
