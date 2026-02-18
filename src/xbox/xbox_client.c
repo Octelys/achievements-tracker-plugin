@@ -199,7 +199,7 @@ char *xbox_get_game_cover(const game_t *game) {
     }
 
 cleanup:
-    free_memory((void **)&identity);
+    free_identity(&identity);
     free_memory((void **)&titlehub_response);
     free_json_memory((void **)&titlehub_json);
 
@@ -282,7 +282,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     }
 
 cleanup:
-    free_memory((void **)&identity);
+    free_identity(&identity);
     free_memory((void **)&profile_settings_response);
     free_memory((void **)&gamerscore_text);
 
@@ -363,7 +363,7 @@ char *xbox_fetch_gamerpic() {
 
 cleanup:
     free_json_memory((void **)&profile_settings_json);
-    free_memory((void **)&identity);
+    free_identity(&identity);
     free_memory((void **)&profile_response);
 
     return gamerpic_url;
@@ -484,7 +484,7 @@ game_t *xbox_get_current_game(void) {
 
 cleanup:
     free_json_memory((void **)&presence_json);
-    free_memory((void **)&identity);
+    free_identity(&identity);
     free_memory((void **)&presence_response);
 
     return game;
@@ -589,7 +589,7 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     obs_log(LOG_INFO, "Received %d achievements for game %s", count_achievements(all_achievements), game->title);
 
-    free_memory((void **)&identity);
+    free_identity(&identity);
 
     return all_achievements;
 }

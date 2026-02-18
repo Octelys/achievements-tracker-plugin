@@ -28,7 +28,7 @@ static void start_monitoring_if_needed(void) {
 
     xbox_monitoring_start();
 
-    free_memory((void **)&identity);
+    free_identity(&identity);
 }
 
 /**
@@ -239,7 +239,7 @@ static obs_properties_t *source_get_properties(void *data) {
         obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
     }
 
-    free_memory((void **)&xbox_identity);
+    free_identity(&xbox_identity);
 
     return p;
 }

@@ -259,6 +259,11 @@ void text_source_destroy(text_source_t *text_source) {
         text_source->private_obs_source = NULL;
     }
 
+    if (text_source->private_obs_source_settings) {
+        obs_data_release(text_source->private_obs_source_settings);
+        text_source->private_obs_source_settings = NULL;
+    }
+
     if (text_source->texrender) {
         obs_enter_graphics();
         gs_texrender_destroy(text_source->texrender);
@@ -274,6 +279,11 @@ void text_source_destroy(text_source_t *text_source) {
     if (text_source->pending_text) {
         bfree(text_source->pending_text);
         text_source->pending_text = NULL;
+    }
+
+    if (text_source->name) {
+        bfree(text_source->name);
+        text_source->name = NULL;
     }
 
     bfree(text_source);

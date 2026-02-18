@@ -245,3 +245,7 @@ void xbox_achievements_count_source_register(void) {
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
     xbox_subscribe_game_played(&on_game_played);
 }
+
+void xbox_achievements_count_source_cleanup(void) {
+    state_free_achievements_count_configuration(&g_configuration);
+}

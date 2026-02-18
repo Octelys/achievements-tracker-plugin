@@ -2,6 +2,8 @@
 
 #include "memory.h"
 
+#include <openssl/evp.h>
+
 void free_device(device_t **device) {
 
     if (!device || !*device) {

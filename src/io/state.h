@@ -232,6 +232,86 @@ achievements_count_configuration_t *state_get_achievements_count_configuration()
  */
 void state_clear(void);
 
+/**
+ * @brief Free a device structure and its contents.
+ *
+ * Frees the EVP_PKEY and the device_t structure itself.
+ * Safe to call with NULL.
+ *
+ * @param device Device structure to free. Set to NULL after freeing.
+ */
+void state_free_device(device_t **device);
+
+/**
+ * @brief Free a token structure and its contents.
+ *
+ * Frees the token value string and the token_t structure itself.
+ * Safe to call with NULL.
+ *
+ * @param token Token structure to free. Set to NULL after freeing.
+ */
+void state_free_token(token_t **token);
+
+/**
+ * @brief Free an xbox_identity structure and its contents.
+ *
+ * Frees all strings, the embedded token, and the identity structure itself.
+ * Safe to call with NULL.
+ *
+ * @param identity Identity structure to free. Set to NULL after freeing.
+ */
+void state_free_xbox_identity(xbox_identity_t **identity);
+
+/**
+ * @brief Free a gamerscore configuration structure and its contents.
+ *
+ * Frees the font strings and the configuration structure itself.
+ * Safe to call with NULL.
+ *
+ * @param config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_gamerscore_configuration(gamerscore_configuration_t **config);
+
+/**
+ * @brief Free a gamertag configuration structure and its contents.
+ *
+ * Frees the font strings and the configuration structure itself.
+ * Safe to call with NULL.
+ *
+ * @param config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_gamertag_configuration(gamertag_configuration_t **config);
+
+/**
+ * @brief Free an achievement name configuration structure and its contents.
+ *
+ * Frees the font strings and the configuration structure itself.
+ * Safe to call with NULL.
+ *
+ * @param config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_achievement_name_configuration(achievement_name_configuration_t **config);
+
+/**
+ * @brief Free an achievement description configuration structure and its contents.
+ *
+ * Frees the font strings and the configuration structure itself.
+ * Safe to call with NULL.
+ *
+ * @param config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_achievement_description_configuration(achievement_description_configuration_t **config);
+
+/**
+ * @brief Free an achievements count configuration structure and its contents.
+ *
+ * Frees the font strings and the configuration structure itself.
+ * Safe to call with NULL.
+ *
+ * @param config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_achievements_count_configuration(achievements_count_configuration_t **config);
+
 #ifdef __cplusplus
 }
 #endif

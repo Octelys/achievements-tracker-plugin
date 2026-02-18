@@ -19,6 +19,14 @@ extern "C" {
  */
 void xbox_achievements_count_source_register(void);
 
+/**
+ * @brief Clean up resources allocated by the achievements count source.
+ *
+ * Frees the global configuration structure and its nested allocations.
+ * Should be called during plugin shutdown (obs_module_unload()).
+ */
+void xbox_achievements_count_source_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

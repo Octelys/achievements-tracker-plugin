@@ -256,3 +256,7 @@ void xbox_gamerscore_source_register(void) {
     xbox_subscribe_connected_changed(&on_connection_changed);
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
 }
+
+void xbox_gamerscore_source_cleanup(void) {
+    state_free_gamerscore_configuration(&g_default_configuration);
+}

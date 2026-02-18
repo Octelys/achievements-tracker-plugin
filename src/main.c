@@ -36,7 +36,7 @@ bool obs_module_load(void) {
     xbox_achievement_icon_source_register();
     xbox_achievements_count_source_register();
 
-    obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
+    obs_log(LOG_INFO, "Plugin loaded successfully (version %s)", PLUGIN_VERSION);
 
     return true;
 }
@@ -44,7 +44,18 @@ bool obs_module_load(void) {
 void obs_module_unload(void) {
     achievement_cycle_destroy();
     image_cleanup();
+
+    /* Clean up source configurations */
+    xbox_achievement_name_source_cleanup();
+    xbox_achievement_description_source_cleanup();
+    xbox_achievement_icon_source_cleanup();
+    xbox_achievements_count_source_cleanup();
+    xbox_game_cover_source_cleanup();
+    xbox_gamerpic_source_cleanup();
+    xbox_gamerscore_source_cleanup();
+    xbox_gamertag_source_cleanup();
+
     io_cleanup();
 
-    obs_log(LOG_INFO, "plugin unloaded");
+    obs_log(LOG_INFO, "Plugin unloaded");
 }

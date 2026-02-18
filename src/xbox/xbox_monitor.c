@@ -282,7 +282,7 @@ static bool xbox_presence_subscribe() {
     result = send_websocket_message(message);
 
 cleanup:
-    free_memory((void **)&identity);
+    free_identity(&identity);
 
     return result;
 }
@@ -646,7 +646,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         obs_log(LOG_INFO, "Monitoring | Refreshing token");
 
         free_memory((void **)&g_monitoring_context->auth_token);
-        free_memory((void **)&g_monitoring_context->identity);
+        free_identity(&g_monitoring_context->identity);
 
         g_monitoring_context->identity = xbox_live_get_identity();
 
