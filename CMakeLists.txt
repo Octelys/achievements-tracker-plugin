@@ -349,6 +349,7 @@ target_sources(
     src/xbox/xbox_client.c
     src/xbox/xbox_monitor.c
     src/io/state.c
+    src/io/cache.c
     src/encoding/base64.c
     src/util/uuid.c
     src/text/convert.c

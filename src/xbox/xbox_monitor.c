@@ -85,6 +85,16 @@ typedef struct connection_changed_subscription {
 static connection_changed_subscription_t *g_connection_changed_subscriptions = NULL;
 
 /**
+ * @brief Subscription node for session-ready events.
+ */
+typedef struct session_ready_subscription {
+    on_xbox_session_ready_t            callback;
+    struct session_ready_subscription *next;
+} session_ready_subscription_t;
+
+static session_ready_subscription_t *g_session_ready_subscriptions = NULL;
+
+/**
  * @brief Monitor thread state.
  *
  * This struct is allocated when monitoring starts and owned by the module-level
@@ -212,6 +222,23 @@ static void notify_connection_changed(bool is_connected, const char *error_messa
 
     while (node) {
         node->callback(is_connected, error_message);
+        node = node->next;
+    }
+}
+
+/**
+ * @brief Invoke all registered session-ready subscribers.
+ *
+ * Called from the prefetch background thread when all icons have been downloaded.
+ */
+static void notify_session_ready(void) {
+
+    obs_log(LOG_INFO, "Notifying session ready (icons prefetched)");
+
+    session_ready_subscription_t *node = g_session_ready_subscriptions;
+
+    while (node) {
+        node->callback();
         node = node->next;
     }
 }
@@ -421,16 +448,21 @@ static void xbox_change_game(game_t *game) {
     /* First, let's make sure we unsubscribe from the previous achievements */
     xbox_achievements_progress_unsubscribe(&g_current_session);
 
-    /* Change the game which includes getting the new list of achievements */
-    xbox_session_change_game(&g_current_session, game);
+    /*
+     * Notify subscribers that a new game is being loaded BEFORE starting the
+     * session change.  This ensures achievement_cycle sets g_session_ready=false
+     * before the prefetch thread can complete and fire the session-ready event.
+     */
+    notify_game_played(game);
+
+    /* Change the game which includes getting the new list of achievements
+     * and spawning a background thread to prefetch icons. */
+    xbox_session_change_game(&g_current_session, game, &notify_session_ready);
 
     if (game) {
         /* Now let's subscribe to the new achievements */
         xbox_achievements_progress_subscribe(&g_current_session);
     }
-
-    /* And finally notify the subscribers */
-    notify_game_played(game);
 }
 
 /**
@@ -459,7 +491,7 @@ static void on_achievement_progress_received(const achievement_progress_t *progr
 }
 
 /**
- * @brief Called when the websocket transitions to connected state.
+ * @brief Called when the websocket transitions to a connected state.
  *
  * Fetches the initial gamerscore, sets up subscriptions, and notifies listeners.
  */
@@ -542,14 +574,16 @@ static void on_buffer_received(const char *buffer) {
 
     if (is_achievement_message(message)) {
         obs_log(LOG_DEBUG, "Message is an achievement message");
-        const achievement_progress_t *progress = parse_achievement_progress(message);
+        achievement_progress_t *progress = parse_achievement_progress(message);
         on_achievement_progress_received(progress);
+        free_achievement_progress(&progress);
     }
 
 cleanup:
     if (message) {
         free(message);
     }
+    free_game(&game);
     free_json_memory((void **)&root);
 }
 
@@ -622,7 +656,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
 
             on_buffer_received(ctx->rx_buffer);
 
-            /* Reset buffer for next message */
+            /* Reset buffer for the next message */
             ctx->rx_buffer_used = 0;
         }
         break;
@@ -750,6 +784,7 @@ static void *monitoring_thread(void *arg) {
     /* Immediately retrieves the game */
     game_t *current_game = xbox_get_current_game();
     xbox_change_game(current_game);
+    free_game(&current_game);
 
     /* Service the WebSocket connection */
     while (ctx->running && ctx->context) {
@@ -939,6 +974,24 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
     }
 }
 
+void xbox_subscribe_session_ready(const on_xbox_session_ready_t callback) {
+
+    if (!callback) {
+        return;
+    }
+
+    session_ready_subscription_t *new_node = bzalloc(sizeof(session_ready_subscription_t));
+
+    if (!new_node) {
+        obs_log(LOG_ERROR, "Failed to allocate subscription node");
+        return;
+    }
+
+    new_node->callback            = callback;
+    new_node->next                = g_session_ready_subscriptions;
+    g_session_ready_subscriptions = new_node;
+}
+
 #else /* !HAVE_LIBWEBSOCKETS */
 
 /* Stub implementations when libwebsockets is not available */
@@ -977,6 +1030,10 @@ void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t ca
 }
 
 void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callback) {
+    (void)callback;
+}
+
+void xbox_subscribe_session_ready(const on_xbox_session_ready_t callback) {
     (void)callback;
 }
 

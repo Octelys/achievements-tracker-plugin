@@ -34,21 +34,32 @@ extern "C" {
 bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game);
 
 /**
+ * @brief Callback type invoked when icon prefetching completes.
+ *
+ * Called from the background prefetch thread. Implementations must be
+ * thread-safe and return quickly.
+ */
+typedef void (*xbox_session_ready_callback_t)(void);
+
+/**
  * @brief Updates the session to use a new current game.
  *
  * Implementations typically free/replace the previous @c session->game and reset
  * cached session state derived from that game (e.g., achievements list and
- * gamerscore).
+ * gamerscore).  Achievement icons are prefetched on a background thread; when
+ * the prefetch completes @p on_ready is invoked (if non-NULL).
  *
  * Ownership:
  *  - The session makes its own copy of @p game. The caller retains ownership of
  *    the passed-in @p game and remains responsible for freeing it.
  *  - If @p game is NULL, the session is cleared.
  *
- * @param session Session to update.
- * @param game New game to set for this session.
+ * @param session  Session to update.
+ * @param game     New game to set for this session.
+ * @param on_ready Optional callback invoked from the prefetch thread when all
+ *                 icons have been downloaded.  May be NULL.
  */
-void xbox_session_change_game(xbox_session_t *session, game_t *game);
+void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_session_ready_callback_t on_ready);
 
 /**
  * @brief Applies an unlock/progress update to the session.

@@ -1,6 +1,8 @@
 #include "sources/xbox/achievement_icon.h"
 
 #include <obs-module.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
@@ -48,6 +50,40 @@ static icon_transition_state_t g_transition = {
     .pending_is_unlocked = false,
 };
 
+/**
+ * @brief Atomic flag set by the download thread when image_source_download completes.
+ *
+ * The OBS video tick checks this flag and applies the transition state on the
+ * render thread, avoiding any blocking I/O on the graphics pipeline.
+ */
+static atomic_bool g_download_ready = false;
+
+/**
+ * @brief Whether the achievement whose icon is being downloaded was unlocked.
+ *
+ * Written by the video tick thread before spawning the download, read back when
+ * the download completes.  Only accessed from one thread at a time (set before
+ * pthread_create, read after g_download_ready is observed).
+ */
+static bool g_pending_has_state_changed = false;
+
+/**
+ * @brief Background thread entry point for downloading achievement icons.
+ *
+ * Calls image_source_download (which may perform HTTP I/O and file writes),
+ * then signals completion via g_download_ready so the video tick can apply the
+ * transition on the render thread.
+ *
+ * @param arg Pointer to the image_t to download into (g_next_achievement_icon).
+ * @return NULL (unused).
+ */
+static void *download_thread_func(void *arg) {
+    image_t *image = arg;
+    image_source_download(image);
+    atomic_store(&g_download_ready, true);
+    return NULL;
+}
+
 static void swap_achievement_icons(void) {
     /* Swap the images */
     image_t *tmp              = g_achievement_icon;
@@ -81,26 +117,22 @@ static void update_achievement_icon(const achievement_t *achievement) {
         return;
     }
 
-    //  Immediately download the icon since we are NOT on a rendering thread
-    //  The rendering loop is tied to the cache_url value.
+    //  Dispatch the download to a background thread so we never block the
+    //  OBS video/render thread with HTTP I/O.
     g_transition.pending_is_unlocked = is_new_unlocked_achievement;
+    g_pending_has_state_changed      = has_state_changed;
     snprintf(g_next_achievement_icon->id,
              sizeof(g_next_achievement_icon->id),
              "%s_%s",
              achievement->service_config_id,
              achievement->id);
     snprintf(g_next_achievement_icon->url, sizeof(g_next_achievement_icon->url), "%s", achievement->icon_url);
-    image_source_download(g_next_achievement_icon);
 
-    if (has_state_changed && g_next_achievement_icon->texture) {
-        /* Initiates the fade out now that the icon is loaded */
-        g_transition.phase   = ICON_TRANSITION_FADE_OUT;
-        g_transition.opacity = 1.0f;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, download_thread_func, g_next_achievement_icon) == 0) {
+        pthread_detach(thread);
     } else {
-        // Initiates the fade out now that the icon is loaded */
-        g_transition.phase   = ICON_TRANSITION_FADE_IN;
-        g_transition.opacity = 0.0f;
-        swap_achievement_icons();
+        obs_log(LOG_ERROR, "Achievement Icon: failed to create download thread");
     }
 }
 
@@ -258,6 +290,20 @@ static void on_source_video_tick(void *data, float seconds) {
 
     UNUSED_PARAMETER(data);
 
+    /* Check if a background download has completed */
+    if (atomic_exchange(&g_download_ready, false)) {
+        if (g_pending_has_state_changed && g_next_achievement_icon->must_reload) {
+            /* State changed (locked↔unlocked): fade out first, then swap */
+            g_transition.phase   = ICON_TRANSITION_FADE_OUT;
+            g_transition.opacity = 1.0f;
+        } else {
+            /* Same state or fresh icon: swap immediately and fade in */
+            g_transition.phase   = ICON_TRANSITION_FADE_IN;
+            g_transition.opacity = 0.0f;
+            swap_achievement_icons();
+        }
+    }
+
     /* Update fade transition animations */
     float duration = g_transition.duration;
     if (duration <= 0.0f) {
@@ -298,7 +344,7 @@ static void on_source_video_tick(void *data, float seconds) {
 /**
  * @brief OBS callback constructing the properties UI for the achievement icon source.
  *
- * Shows connection status to Xbox Live. Currently provides no editable settings.
+ * Shows connection status to Xbox Live. Currently, provides no editable settings.
  *
  * @param data Source instance data (unused).
  * @return Newly created obs_properties_t structure containing the UI controls.
@@ -363,7 +409,7 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//      Public API
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 void xbox_achievement_icon_source_register(void) {
