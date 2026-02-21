@@ -53,6 +53,9 @@
 
 #define SUBSCRIBE 1
 #define UNSUBSCRIBE 1
+#define LOOP_CHECK_MS 50
+#define INITIAL_RETRY_DELAY_MS 1000
+#define MAX_RETRY_DELAY_MS 60000
 
 /**
  * @brief Subscription node for game-played events.
@@ -171,17 +174,42 @@ static char *build_authorization_header(const xbox_identity_t *identity) {
     return bstrdup(auth_header);
 }
 
+static void refresh_token_if_needed() {
+    obs_log(LOG_DEBUG, "[Monitoring] Checking token");
+
+    if (g_monitoring_context->identity && !token_is_expired(g_monitoring_context->identity->token)) {
+        return;
+    }
+
+    obs_log(LOG_DEBUG, "[Monitoring] Refreshing token");
+
+    free_memory((void **)&g_monitoring_context->auth_token);
+    free_identity(&g_monitoring_context->identity);
+
+    g_monitoring_context->identity = xbox_live_get_identity();
+
+    if (!g_monitoring_context->identity) {
+        obs_log(LOG_ERROR, "[Monitoring] Failed to refresh the token");
+        return;
+    }
+
+    /* Replace the cached auth header for future handshakes */
+    g_monitoring_context->auth_token = build_authorization_header(g_monitoring_context->identity);
+
+    obs_log(LOG_INFO, "[Monitoring] Token refreshed");
+}
+
 /**
  * @brief Invoke all registered game-played subscribers.
  */
 static void notify_game_played(const game_t *game) {
 
     if (!game) {
-        obs_log(LOG_DEBUG, "No notification to be sent: no game is being played");
+        obs_log(LOG_DEBUG, "[Monitoring] No notification to be sent: no game is being played");
         return;
     }
 
-    obs_log(LOG_INFO, "Notifying game played: %s (%s)", game->title, game->id);
+    obs_log(LOG_INFO, "[Monitoring] Notifying game played: %s (%s)", game->title, game->id);
 
     game_played_subscription_t *subscriptions = g_game_played_subscriptions;
 
@@ -196,7 +224,7 @@ static void notify_game_played(const game_t *game) {
  */
 static void notify_achievements_progressed(const achievement_progress_t *achievements_progress) {
 
-    obs_log(LOG_INFO, "Notifying achievements progress: %s", achievements_progress->service_config_id);
+    obs_log(LOG_INFO, "[Monitoring] Notifying achievements progress: %s", achievements_progress->service_config_id);
 
     achievements_updated_subscription_t *subscription = g_achievements_updated_subscriptions;
 
@@ -211,12 +239,13 @@ static void notify_achievements_progressed(const achievement_progress_t *achieve
  */
 static void notify_connection_changed(bool is_connected, const char *error_message) {
 
-    UNUSED_PARAMETER(error_message);
-
     obs_log(LOG_INFO,
-            "Notifying of a connection changed: %s (%s)",
-            is_connected ? "Connected" : "Not connected",
-            error_message);
+            "[Monitoring] Notifying of a connection changed: %s",
+            is_connected ? "Connected" : "Not connected");
+
+    if (error_message) {
+        obs_log(LOG_ERROR, "[Monitoring] Connection error: %s", error_message);
+    }
 
     connection_changed_subscription_t *node = g_connection_changed_subscriptions;
 
@@ -233,7 +262,7 @@ static void notify_connection_changed(bool is_connected, const char *error_messa
  */
 static void notify_session_ready(void) {
 
-    obs_log(LOG_INFO, "Notifying session ready (icons prefetched)");
+    obs_log(LOG_INFO, "[Monitoring] Notifying session ready (icons prefetched)");
 
     session_ready_subscription_t *node = g_session_ready_subscriptions;
 
@@ -252,7 +281,7 @@ static void notify_session_ready(void) {
 static bool send_websocket_message(const char *message) {
 
     if (!g_monitoring_context || !g_monitoring_context->wsi || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Monitoring | Cannot send message - not connected");
+        obs_log(LOG_ERROR, "[Monitoring] Cannot send message - not connected");
         return false;
     }
 
@@ -261,7 +290,7 @@ static bool send_websocket_message(const char *message) {
     /* Allocate buffer with LWS_PRE padding */
     unsigned char *buf = (unsigned char *)bmalloc(LWS_PRE + len);
     if (!buf) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to allocate send buffer");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate send buffer");
         return false;
     }
 
@@ -271,11 +300,11 @@ static bool send_websocket_message(const char *message) {
     bfree(buf);
 
     if (written < (int)len) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to send message (wrote %d of %zu bytes)", written, len);
+        obs_log(LOG_ERROR, "[Monitoring] Failed to send message (wrote %d of %zu bytes)", written, len);
         return false;
     }
 
-    obs_log(LOG_DEBUG, "Monitoring | Sent message: %s", message);
+    obs_log(LOG_DEBUG, "[Monitoring] Sent message: %s", message);
     return true;
 }
 
@@ -289,12 +318,12 @@ static bool xbox_presence_subscribe() {
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
+        obs_log(LOG_ERROR, "[Monitoring] Invalid Xbox identity for subscription");
         goto cleanup;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
+        obs_log(LOG_ERROR, "[Monitoring] Cannot subscribe - not connected");
         goto cleanup;
     }
 
@@ -305,7 +334,7 @@ static bool xbox_presence_subscribe() {
              SUBSCRIBE,
              identity->xid);
 
-    obs_log(LOG_DEBUG, "Monitoring | Subscribing for presence changes for XUID %s", identity->xid);
+    obs_log(LOG_DEBUG, "[Monitoring] Subscribing for presence changes for XUID %s", identity->xid);
     result = send_websocket_message(message);
 
 cleanup:
@@ -321,19 +350,19 @@ cleanup:
  */
 static bool xbox_presence_unsubscribe(const char *subscription_id) {
     if (!subscription_id || !*subscription_id) {
-        obs_log(LOG_ERROR, "Monitoring | Invalid subscription ID for unsubscribe");
+        obs_log(LOG_ERROR, "[Monitoring] Invalid subscription ID for unsubscribe");
         return false;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Monitoring | Cannot unsubscribe - not connected");
+        obs_log(LOG_ERROR, "[Monitoring] Cannot unsubscribe - not connected");
         return false;
     }
 
     char message[256];
     snprintf(message, sizeof(message), "[%d,1,\"%s\"]", UNSUBSCRIBE, subscription_id);
 
-    obs_log(LOG_DEBUG, "Monitoring | Unsubscribing from %s", subscription_id);
+    obs_log(LOG_DEBUG, "[Monitoring] Unsubscribing from %s", subscription_id);
     return send_websocket_message(message);
 }
 
@@ -343,14 +372,19 @@ static bool xbox_presence_unsubscribe(const char *subscription_id) {
 static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) {
 
     if (!session) {
-        obs_log(LOG_ERROR, "Monitoring | No session specified");
+        obs_log(LOG_ERROR, "[Monitoring] No session specified");
+        return false;
+    }
+
+    if (!session->game) {
+        obs_log(LOG_DEBUG, "[Monitoring] No game being played, skipping achievement subscription");
         return false;
     }
 
     const achievement_t *achievements = session->achievements;
 
     if (!achievements) {
-        obs_log(LOG_ERROR, "Monitoring | No achievements specified");
+        obs_log(LOG_ERROR, "[Monitoring] No achievements specified");
         return false;
     }
 
@@ -359,12 +393,12 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
+        obs_log(LOG_ERROR, "[Monitoring] Invalid Xbox identity for subscription");
         return false;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
+        obs_log(LOG_ERROR, "[Monitoring] Cannot subscribe - not connected");
         return false;
     }
 
@@ -377,7 +411,7 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
              service_config_id);
 
     obs_log(LOG_DEBUG,
-            "Monitoring | Subscribing for achievement updates for service config id %s (XUID %s)",
+            "[Monitoring] Subscribing for achievement updates for service config id %s (XUID %s)",
             service_config_id,
             identity->xid);
 
@@ -390,26 +424,31 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
 static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session) {
 
     if (!session) {
-        obs_log(LOG_ERROR, "Monitoring | No session specified");
+        obs_log(LOG_ERROR, "[Monitoring] No session specified");
+        return false;
+    }
+
+    if (!session->game) {
+        obs_log(LOG_DEBUG, "[Monitoring] No game being played, skipping achievement unsubscription");
         return false;
     }
 
     const achievement_t *achievements = session->achievements;
 
     if (!achievements) {
-        obs_log(LOG_ERROR, "Monitoring | No achievements specified");
+        obs_log(LOG_ERROR, "[Monitoring] No achievements specified");
         return false;
     }
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Monitoring | Invalid Xbox identity for subscription");
+        obs_log(LOG_ERROR, "[Monitoring] Invalid Xbox identity for subscription");
         return false;
     }
 
     if (!g_monitoring_context || !g_monitoring_context->connected) {
-        obs_log(LOG_ERROR, "Monitoring | Cannot subscribe - not connected");
+        obs_log(LOG_ERROR, "[Monitoring] Cannot subscribe - not connected");
         return false;
     }
 
@@ -422,7 +461,7 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
              achievements->service_config_id);
 
     obs_log(LOG_DEBUG,
-            "Monitoring | Unsubscribing from achievement updates for service config id %s (XUID %s)",
+            "[Monitoring] Unsubscribing from achievement updates for service config id %s (XUID %s)",
             achievements->service_config_id,
             identity->xid);
 
@@ -459,10 +498,8 @@ static void xbox_change_game(game_t *game) {
      * and spawning a background thread to prefetch icons. */
     xbox_session_change_game(&g_current_session, game, &notify_session_ready);
 
-    if (game) {
-        /* Now let's subscribe to the new achievements */
-        xbox_achievements_progress_subscribe(&g_current_session);
-    }
+    /* Now let's subscribe to the new achievements */
+    xbox_achievements_progress_subscribe(&g_current_session);
 }
 
 /**
@@ -507,7 +544,9 @@ static void on_websocket_connected() {
 
     xbox_presence_subscribe();
 
-    xbox_achievements_progress_subscribe(&g_current_session);
+    if (g_current_session.game != NULL) {
+        xbox_achievements_progress_subscribe(&g_current_session);
+    }
 
     notify_connection_changed(true, NULL);
 }
@@ -539,7 +578,7 @@ static void on_buffer_received(const char *buffer) {
         return;
     }
 
-    obs_log(LOG_DEBUG, "New buffer received %s", buffer);
+    obs_log(LOG_DEBUG, "[Monitoring] New buffer received %s", buffer);
 
     /* Parse the buffer [X,X,X] */
     root = cJSON_Parse(buffer);
@@ -552,28 +591,28 @@ static void on_buffer_received(const char *buffer) {
     presence_item = cJSON_GetArrayItem(root, 2);
 
     if (!presence_item) {
-        obs_log(LOG_WARNING, "No presence item found");
+        obs_log(LOG_WARNING, "[Monitoring] No presence item found");
         goto cleanup;
     }
 
     message = cJSON_PrintUnformatted(presence_item);
 
     if (strlen(message) < 5) {
-        obs_log(LOG_DEBUG, "No message");
+        obs_log(LOG_DEBUG, "[Monitoring] No message");
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Message is %s", message);
+    obs_log(LOG_DEBUG, "[Monitoring] Message is %s", message);
 
     if (is_presence_message(message)) {
-        obs_log(LOG_DEBUG, "Message is a presence message");
+        obs_log(LOG_DEBUG, "[Monitoring] Message is a presence message");
         game = parse_game(message);
         on_game_update_received(game);
         goto cleanup;
     }
 
     if (is_achievement_message(message)) {
-        obs_log(LOG_DEBUG, "Message is an achievement message");
+        obs_log(LOG_DEBUG, "[Monitoring] Message is an achievement message");
         achievement_progress_t *progress = parse_achievement_progress(message);
         on_achievement_progress_received(progress);
         free_achievement_progress(&progress);
@@ -614,22 +653,22 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
                                             (int)strlen(ctx->auth_token),
                                             p,
                                             end)) {
-                obs_log(LOG_ERROR, "Monitoring | Failed to add Authorization header");
+                obs_log(LOG_ERROR, "[Monitoring] Failed to add Authorization header");
                 return -1;
             }
 
-            obs_log(LOG_DEBUG, "Monitoring | Added Authorization header to handshake");
+            obs_log(LOG_DEBUG, "[Monitoring] Added Authorization header to handshake");
         }
         break;
 
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
-        obs_log(LOG_DEBUG, "Monitoring | WebSocket connection established");
+        obs_log(LOG_DEBUG, "[Monitoring] WebSocket connection established");
         ctx->connected = true;
         on_websocket_connected();
         break;
 
     case LWS_CALLBACK_CLIENT_RECEIVE:
-        obs_log(LOG_DEBUG, "Monitoring | Received %zu bytes", len);
+        obs_log(LOG_DEBUG, "[Monitoring] Received %zu bytes", len);
 
         /* Ensure the buffer has enough space */
         size_t needed = ctx->rx_buffer_used + len + 1;
@@ -637,7 +676,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
             size_t new_size   = needed * 2;
             char  *new_buffer = (char *)brealloc(ctx->rx_buffer, new_size);
             if (!new_buffer) {
-                obs_log(LOG_ERROR, "Monitoring | Failed to allocate receive buffer");
+                obs_log(LOG_ERROR, "[Monitoring] Failed to allocate receive buffer");
                 return -1;
             }
             ctx->rx_buffer      = new_buffer;
@@ -652,7 +691,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         if (lws_is_final_fragment(wsi)) {
             ctx->rx_buffer[ctx->rx_buffer_used] = '\0';
 
-            obs_log(LOG_DEBUG, "Monitoring | Complete message received: %s", ctx->rx_buffer);
+            obs_log(LOG_DEBUG, "[Monitoring] Complete message received: %s", ctx->rx_buffer);
 
             on_buffer_received(ctx->rx_buffer);
 
@@ -671,38 +710,16 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
          * here prepares the next connection attempt (reconnect) to use fresh
          * credentials.
          */
-        obs_log(LOG_DEBUG, "Monitoring | Checking token");
-
-        if (g_monitoring_context->identity && !token_is_expired(g_monitoring_context->identity->token)) {
-            break;
-        }
-
-        obs_log(LOG_DEBUG, "Monitoring | Refreshing token");
-
-        free_memory((void **)&g_monitoring_context->auth_token);
-        free_identity(&g_monitoring_context->identity);
-
-        g_monitoring_context->identity = xbox_live_get_identity();
-
-        if (!g_monitoring_context->identity) {
-            obs_log(LOG_ERROR, "Monitoring | Failed to refresh the token");
-            break;
-        }
-
-        /* Replace the cached auth header for future handshakes */
-        g_monitoring_context->auth_token = build_authorization_header(g_monitoring_context->identity);
-
-        obs_log(LOG_INFO, "Monitoring | Token refreshed");
-
+        refresh_token_if_needed();
         break;
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-        obs_log(LOG_ERROR, "Monitoring | Connection error: %s", in ? (char *)in : "unknown");
+        obs_log(LOG_ERROR, "[Monitoring] Connection error: %s", in ? (char *)in : "unknown");
         ctx->connected = false;
         notify_connection_changed(false, in ? (char *)in : "Connection error");
         break;
 
     case LWS_CALLBACK_CLIENT_CLOSED:
-        obs_log(LOG_DEBUG, "Monitoring | Connection closed");
+        obs_log(LOG_DEBUG, "[Monitoring] Connection closed");
         ctx->connected = false;
         ctx->wsi       = NULL;
         on_websocket_disconnected();
@@ -752,7 +769,7 @@ static void *monitoring_thread(void *arg) {
     ctx->context = lws_create_context(&info);
 
     if (!ctx->context) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to create WebSocket context");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to create WebSocket context");
         notify_connection_changed(false, "Failed to create WebSocket context");
         return (void *)1;
     }
@@ -769,12 +786,12 @@ static void *monitoring_thread(void *arg) {
     ccinfo.protocol       = PROTOCOL;
     ccinfo.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 
-    obs_log(LOG_DEBUG, "Monitoring | Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
+    obs_log(LOG_DEBUG, "[Monitoring] Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
 
     ctx->wsi = lws_client_connect_via_info(&ccinfo);
 
     if (!ctx->wsi) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to connect");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to connect");
         notify_connection_changed(false, "Failed to connect");
         lws_context_destroy(ctx->context);
         ctx->context = NULL;
@@ -786,12 +803,47 @@ static void *monitoring_thread(void *arg) {
     xbox_change_game(current_game);
     free_game(&current_game);
 
+    /* Start at 1 second */
+    int retry_delay_ms = INITIAL_RETRY_DELAY_MS;
+
     /* Service the WebSocket connection */
     while (ctx->running && ctx->context) {
-        lws_service(ctx->context, 50);
+        lws_service(ctx->context, LOOP_CHECK_MS);
+
+        /* Reconnect if the connection was lost */
+        if (ctx->running && !ctx->wsi && ctx->context) {
+            obs_log(LOG_INFO, "[Monitoring] Connection lost, retrying in %d ms...", retry_delay_ms);
+
+            /* Sleep for retry_delay_ms while keeping lws alive (50ms increments) */
+            int iterations = retry_delay_ms / LOOP_CHECK_MS;
+            for (int i = 0; i < iterations && ctx->running; i++) {
+                lws_service(ctx->context, LOOP_CHECK_MS);
+            }
+
+            if (!ctx->running) {
+                obs_log(LOG_ERROR, "[Monitoring] NOT RUNNING - aborting reconnect");
+                break;
+            }
+
+            ctx->wsi = lws_client_connect_via_info(&ccinfo);
+
+            if (!ctx->wsi) {
+                obs_log(LOG_ERROR, "[Monitoring] Reconnect attempt failed");
+
+                /* Double the delay, capped at max */
+                retry_delay_ms = retry_delay_ms * 2;
+                if (retry_delay_ms > MAX_RETRY_DELAY_MS) {
+                    retry_delay_ms = MAX_RETRY_DELAY_MS;
+                }
+            } else {
+                obs_log(LOG_INFO, "[Monitoring] Connection reestablished.");
+                /* Reset delay on successful connection attempt */
+                retry_delay_ms = INITIAL_RETRY_DELAY_MS;
+            }
+        }
     }
 
-    obs_log(LOG_DEBUG, "Monitoring | Monitoring thread shutting down");
+    obs_log(LOG_INFO, "[Monitoring] Monitoring thread shutting down");
 
     if (ctx->context) {
         lws_context_destroy(ctx->context);
@@ -808,7 +860,7 @@ static void *monitoring_thread(void *arg) {
 bool xbox_monitoring_start() {
 
     if (g_monitoring_context) {
-        obs_log(LOG_WARNING, "Monitoring | Monitoring already active");
+        obs_log(LOG_WARNING, "[Monitoring] Monitoring already active");
         return false;
     }
 
@@ -816,14 +868,14 @@ bool xbox_monitoring_start() {
     xbox_identity_t *identity = xbox_live_get_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Monitoring | No identity available");
+        obs_log(LOG_ERROR, "[Monitoring] No identity available");
         return false;
     }
 
     g_monitoring_context = (monitoring_context_t *)bzalloc(sizeof(monitoring_context_t));
 
     if (!g_monitoring_context) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to allocate context");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate context");
         return false;
     }
 
@@ -840,7 +892,7 @@ bool xbox_monitoring_start() {
     g_monitoring_context->rx_buffer_used = 0;
 
     if (!g_monitoring_context->rx_buffer) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to allocate receive buffer");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate receive buffer");
         bfree(g_monitoring_context->auth_token);
         bfree(g_monitoring_context);
         g_monitoring_context = NULL;
@@ -848,7 +900,7 @@ bool xbox_monitoring_start() {
     }
 
     if (pthread_create(&g_monitoring_context->thread, NULL, monitoring_thread, g_monitoring_context) != 0) {
-        obs_log(LOG_ERROR, "Monitoring | Failed to create monitoring thread");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to create monitoring thread");
         bfree(g_monitoring_context->rx_buffer);
         bfree(g_monitoring_context->auth_token);
         bfree(g_monitoring_context);
@@ -856,7 +908,7 @@ bool xbox_monitoring_start() {
         return false;
     }
 
-    obs_log(LOG_INFO, "Monitoring | Monitoring started");
+    obs_log(LOG_INFO, "[Monitoring] Monitoring started");
 
     return true;
 }
@@ -867,7 +919,7 @@ void xbox_monitoring_stop(void) {
         return;
     }
 
-    obs_log(LOG_DEBUG, "Monitoring | Stopping monitoring");
+    obs_log(LOG_DEBUG, "[Monitoring] Stopping monitoring");
 
     g_monitoring_context->running = false;
 
@@ -888,7 +940,7 @@ void xbox_monitoring_stop(void) {
     bfree(g_monitoring_context);
     g_monitoring_context = NULL;
 
-    obs_log(LOG_INFO, "Monitoring | Monitoring stopped");
+    obs_log(LOG_INFO, "[Monitoring] Monitoring stopped");
 }
 
 bool xbox_monitoring_is_active(void) {
@@ -920,7 +972,7 @@ void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
     game_played_subscription_t *new_subscription = bzalloc(sizeof(game_played_subscription_t));
 
     if (!new_subscription) {
-        obs_log(LOG_ERROR, "Failed to allocate subscription node");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate subscription node");
         return;
     }
 
@@ -943,7 +995,7 @@ void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t ca
     achievements_updated_subscription_t *new_subscription = bzalloc(sizeof(achievements_updated_subscription_t));
 
     if (!new_subscription) {
-        obs_log(LOG_ERROR, "Failed to allocate subscription node");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate subscription node");
         return;
     }
 
@@ -961,7 +1013,7 @@ void xbox_subscribe_connected_changed(const on_xbox_connection_changed_t callbac
     connection_changed_subscription_t *new_node = bzalloc(sizeof(connection_changed_subscription_t));
 
     if (!new_node) {
-        obs_log(LOG_ERROR, "Failed to allocate subscription node");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate subscription node");
         return;
     }
 
@@ -983,7 +1035,7 @@ void xbox_subscribe_session_ready(const on_xbox_session_ready_t callback) {
     session_ready_subscription_t *new_node = bzalloc(sizeof(session_ready_subscription_t));
 
     if (!new_node) {
-        obs_log(LOG_ERROR, "Failed to allocate subscription node");
+        obs_log(LOG_ERROR, "[Monitoring] Failed to allocate subscription node");
         return;
     }
 
@@ -998,7 +1050,7 @@ void xbox_subscribe_session_ready(const on_xbox_session_ready_t callback) {
 
 bool xbox_monitoring_start() {
 
-    obs_log(LOG_WARNING, "Monitoring | WebSockets support not available, monitoring not started");
+    obs_log(LOG_WARNING, "[Monitoring] WebSockets support not available, monitoring not started");
 
     return false;
 }
