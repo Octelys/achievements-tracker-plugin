@@ -93,7 +93,7 @@
 #include "text/convert.h"
 #include "time/time.h"
 
-#include <pthread.h>
+#include <util/thread_compat.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>

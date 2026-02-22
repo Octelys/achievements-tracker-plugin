@@ -1,7 +1,7 @@
 #include "sources/xbox/achievement_icon.h"
 
 #include <obs-module.h>
-#include <pthread.h>
+#include <util/thread_compat.h>
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
@@ -316,7 +316,7 @@ static bool lock_and_check_download_status(void) {
     bool download_ready = g_download_ready;
 
     /* Get current and deactivate the flag for the next download */
-    g_download_ready    = false;
+    g_download_ready = false;
     pthread_mutex_unlock(&g_download_ready_mutex);
 
     return download_ready;

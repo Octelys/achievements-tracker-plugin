@@ -8,7 +8,7 @@
 #include "xbox/xbox_client.h"
 
 #include <errno.h>
-#include <pthread.h>
+#include <util/thread_compat.h>
 #include <stdlib.h>
 #include <string.h>
 

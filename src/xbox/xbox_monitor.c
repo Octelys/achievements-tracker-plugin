@@ -34,7 +34,7 @@
 #include "xbox_session.h"
 
 #include <libwebsockets.h>
-#include <pthread.h>
+#include <util/thread_compat.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
