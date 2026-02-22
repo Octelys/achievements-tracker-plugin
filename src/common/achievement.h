@@ -1,5 +1,7 @@
 #pragma once
 
+#include "time/time.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 

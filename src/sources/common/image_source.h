@@ -75,7 +75,7 @@ typedef struct image {
     /** Currently cached image URL. Used for change detection to avoid redundant downloads. */
     char url[1024];
 
-    /** Path to cache file where downloaded image is stored. Used by gs_texture_create_from_file(). */
+    /** Path to the cache file where the downloaded image is stored. Used by gs_texture_create_from_file(). */
     char cache_path[1024];
 
     /** Unique identifier for this image (e.g., gamertag hash, title ID, achievement ID). */
@@ -84,7 +84,7 @@ typedef struct image {
     /** GPU texture created from the downloaded image. NULL if no image loaded. Owned by this cache. */
     gs_texture_t *texture;
 
-    /** If true, texture will be reloaded from image_path on next render tick. Set by download functions. */
+    /** If true, texture will be reloaded from image_path on the next render tick. Set by download functions. */
     bool must_reload;
 
     /** Unique suffix for cache file naming (e.g., "gamerpic", "game_cover", "achievement_icon"). */

@@ -57,7 +57,7 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
     snprintf(g_gamerscore, sizeof(g_gamerscore), "%dG", total_gamerscore);
     g_must_reload = true;
 
-    obs_log(LOG_INFO, "Gamerscore is %" PRId64, total_gamerscore);
+    obs_log(LOG_INFO, "[Gamerscore] Gamerscore is %" PRId64, total_gamerscore);
 }
 
 /**
@@ -70,8 +70,13 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
  */
 static void on_connection_changed(bool is_connected, const char *error_message) {
 
-    UNUSED_PARAMETER(is_connected);
     UNUSED_PARAMETER(error_message);
+
+    if (!is_connected) {
+        g_gamerscore[0] = '\0';
+        g_must_reload   = true;
+        return;
+    }
 
     const gamerscore_t *gamerscore = get_current_gamerscore();
 

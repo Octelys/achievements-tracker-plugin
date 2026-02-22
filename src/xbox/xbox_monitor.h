@@ -58,6 +58,17 @@ typedef void (*on_xbox_achievements_progressed_t)(const gamerscore_t           *
 typedef void (*on_xbox_connection_changed_t)(bool connected, const char *error_message);
 
 /**
+ * @brief Callback invoked when the session is fully ready.
+ *
+ * "Ready" means the current game's achievements have been fetched and all
+ * achievement icons have been prefetched to the local cache.  This is the
+ * appropriate moment to start the achievement display cycle.
+ *
+ * Threading: may be invoked from the background prefetch thread.
+ */
+typedef void (*on_xbox_session_ready_t)(void);
+
+/**
  * @brief Get the most recently cached gamerscore snapshot.
  *
  * Ownership/lifetime: the returned pointer is owned by the monitor and may be
@@ -137,6 +148,16 @@ void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t ca
  * @param callback Callback invoked when connectivity changes.
  */
 void xbox_subscribe_connected_changed(on_xbox_connection_changed_t callback);
+
+/**
+ * @brief Subscribe to session-ready events.
+ *
+ * The callback is invoked once per game change after all achievement icons
+ * have been prefetched.  Passing NULL clears/unsubscribes the callback.
+ *
+ * @param callback Callback invoked when the session is fully ready.
+ */
+void xbox_subscribe_session_ready(on_xbox_session_ready_t callback);
 
 #ifdef __cplusplus
 }

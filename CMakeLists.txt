@@ -349,6 +349,7 @@ target_sources(
     src/xbox/xbox_client.c
     src/xbox/xbox_monitor.c
     src/io/state.c
+    src/io/cache.c
     src/encoding/base64.c
     src/util/uuid.c
     src/text/convert.c
@@ -582,6 +583,7 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
+    test/stubs/io/cache_stub.c
   )
 
   add_test(NAME test_xbox_session COMMAND test_xbox_session)
@@ -621,6 +623,7 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
+    test/stubs/io/cache_stub.c
   )
 
   add_test(NAME test_types COMMAND test_types)

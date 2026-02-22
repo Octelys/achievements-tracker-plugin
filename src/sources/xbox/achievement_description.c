@@ -63,6 +63,8 @@ static void update_render_config(void) {
 static void update_achievement_description(const achievement_t *achievement) {
 
     if (!achievement) {
+        g_achievement_description[0] = '\0';
+        g_must_reload                = true;
         return;
     }
 

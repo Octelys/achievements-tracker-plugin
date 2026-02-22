@@ -1,6 +1,7 @@
 #include "sources/xbox/achievement_icon.h"
 
 #include <obs-module.h>
+#include <util/thread_compat.h>
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
@@ -48,6 +49,51 @@ static icon_transition_state_t g_transition = {
     .pending_is_unlocked = false,
 };
 
+/**
+ * @brief Flag set by the download thread when image_source_download completes.
+ *
+ * The OBS video tick checks this flag and applies the transition state on the
+ * render thread, avoiding any blocking I/O on the graphics pipeline.
+ * Protected by g_download_ready_mutex for cross-platform compatibility.
+ */
+static pthread_mutex_t g_download_ready_mutex = PTHREAD_MUTEX_INITIALIZER;
+static volatile bool   g_download_ready       = false;
+
+/**
+ * @brief Whether the achievement whose icon is being downloaded was unlocked.
+ *
+ * Written by the video tick thread before spawning the download, read back when
+ * the download completes.  Only accessed from one thread at a time (set before
+ * pthread_create, read after g_download_ready is observed).
+ */
+static bool g_pending_has_state_changed = false;
+
+/**
+ * @brief Background thread entry point for downloading achievement icons.
+ *
+ * Calls image_source_download (which may perform HTTP I/O and file writes),
+ * then signals completion via g_download_ready so the video tick can apply the
+ * transition on the render thread.
+ *
+ * @param arg Pointer to the image_t to download into (g_next_achievement_icon).
+ * @return NULL (unused).
+ */
+static void *download_thread_func(void *arg) {
+    image_t *image = arg;
+    image_source_download(image);
+    pthread_mutex_lock(&g_download_ready_mutex);
+    g_download_ready = true;
+    pthread_mutex_unlock(&g_download_ready_mutex);
+    return NULL;
+}
+
+/**
+ * @brief Swap the current and next achievement icons, and sync the unlock status.
+ *
+ * Exchanges g_achievement_icon and g_next_achievement_icon, then copies the
+ * pending unlock flag into g_is_achievement_unlocked so the render thread
+ * reflects the correct visual state after the swap.
+ */
 static void swap_achievement_icons(void) {
     /* Swap the images */
     image_t *tmp              = g_achievement_icon;
@@ -60,11 +106,20 @@ static void swap_achievement_icons(void) {
 /**
  * @brief Update the achievement icon display.
  *
- * @param achievement Achievement to display icon for. If NULL, it clears the display.
+ * Compares the incoming achievement's icon URL and unlock state against the
+ * currently displayed icon.  If nothing has changed and no transition is in
+ * progress, the function returns early to avoid redundant downloads.
+ * Otherwise it stages the next icon into g_next_achievement_icon, records
+ * whether the unlock state changed, and spawns a detached background thread
+ * to download the new icon without blocking the OBS render thread.
+ *
+ * @param achievement Achievement whose icon should be displayed.
+ *                    Pass NULL (or an achievement with no icon URL) to clear
+ *                    the display and reset the transition state.
  */
 static void update_achievement_icon(const achievement_t *achievement) {
 
-    if (!achievement || achievement->icon_url[0] == '\0') {
+    if (!achievement || !achievement->icon_url || achievement->icon_url[0] == '\0') {
         image_source_clear(g_achievement_icon);
         g_is_achievement_unlocked = false;
         g_transition.phase        = ICON_TRANSITION_NONE;
@@ -81,26 +136,22 @@ static void update_achievement_icon(const achievement_t *achievement) {
         return;
     }
 
-    //  Immediately download the icon since we are NOT on a rendering thread
-    //  The rendering loop is tied to the cache_url value.
+    //  Dispatch the download to a background thread so we never block the
+    //  OBS video/render thread with HTTP I/O.
     g_transition.pending_is_unlocked = is_new_unlocked_achievement;
+    g_pending_has_state_changed      = has_state_changed;
     snprintf(g_next_achievement_icon->id,
              sizeof(g_next_achievement_icon->id),
              "%s_%s",
              achievement->service_config_id,
              achievement->id);
     snprintf(g_next_achievement_icon->url, sizeof(g_next_achievement_icon->url), "%s", achievement->icon_url);
-    image_source_download(g_next_achievement_icon);
 
-    if (has_state_changed && g_next_achievement_icon->texture) {
-        /* Initiates the fade out now that the icon is loaded */
-        g_transition.phase   = ICON_TRANSITION_FADE_OUT;
-        g_transition.opacity = 1.0f;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, download_thread_func, g_next_achievement_icon) == 0) {
+        pthread_detach(thread);
     } else {
-        // Initiates the fade out now that the icon is loaded */
-        g_transition.phase   = ICON_TRANSITION_FADE_IN;
-        g_transition.opacity = 0.0f;
-        swap_achievement_icons();
+        obs_log(LOG_ERROR, "[Achievement Icon] Failed to create download thread");
     }
 }
 
@@ -249,6 +300,29 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 /**
+ * @brief Atomically read and clear the download-ready flag.
+ *
+ * Acquires g_download_ready_mutex, snapshots g_download_ready, resets it to
+ * false, then releases the lock.  The caller receives the value that was set
+ * by the download thread, without holding the lock during subsequent
+ * transition logic.
+ *
+ * @return true if a download completed since the last call; false otherwise.
+ */
+static bool lock_and_check_download_status(void) {
+
+    pthread_mutex_lock(&g_download_ready_mutex);
+
+    bool download_ready = g_download_ready;
+
+    /* Get current and deactivate the flag for the next download */
+    g_download_ready = false;
+    pthread_mutex_unlock(&g_download_ready_mutex);
+
+    return download_ready;
+}
+
+/**
  * @brief OBS callback for animation tick.
  *
  * Updates fade transition animations and delegates achievement display cycle
@@ -257,6 +331,21 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 static void on_source_video_tick(void *data, float seconds) {
 
     UNUSED_PARAMETER(data);
+
+    /* Check if a background download has completed */
+    bool download_ready = lock_and_check_download_status();
+    if (download_ready) {
+        if (g_pending_has_state_changed && g_next_achievement_icon->must_reload) {
+            /* State changed (locked↔unlocked): fade out first, then swap */
+            g_transition.phase   = ICON_TRANSITION_FADE_OUT;
+            g_transition.opacity = 1.0f;
+        } else {
+            /* Same state or fresh icon: swap immediately and fade in */
+            g_transition.phase   = ICON_TRANSITION_FADE_IN;
+            g_transition.opacity = 0.0f;
+            swap_achievement_icons();
+        }
+    }
 
     /* Update fade transition animations */
     float duration = g_transition.duration;
@@ -298,7 +387,7 @@ static void on_source_video_tick(void *data, float seconds) {
 /**
  * @brief OBS callback constructing the properties UI for the achievement icon source.
  *
- * Shows connection status to Xbox Live. Currently provides no editable settings.
+ * Shows connection status to Xbox Live. Currently, provides no editable settings.
  *
  * @param data Source instance data (unused).
  * @return Newly created obs_properties_t structure containing the UI controls.
@@ -363,7 +452,7 @@ static const struct obs_source_info *xbox_achievement_icon_source_get(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//      Public API
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 void xbox_achievement_icon_source_register(void) {

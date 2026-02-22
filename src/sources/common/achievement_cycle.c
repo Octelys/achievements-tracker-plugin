@@ -3,6 +3,7 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
+#include "common/achievement.h"
 #include "xbox/xbox_monitor.h"
 
 /** Duration to show the last unlocked achievement (seconds). */
@@ -36,7 +37,7 @@ static float g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
 /** Time remaining for the current locked achievement display (seconds). */
 static float g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
 
-/** Cached copy of the last unlocked achievement (owned by this module). */
+/** The last unlocked achievement (owned by this module). */
 static achievement_t *g_last_unlocked = NULL;
 
 /** Currently displayed achievement (pointer into g_last_unlocked or external data). */
@@ -50,6 +51,15 @@ static int g_subscriber_count = 0;
 
 /** Whether the module has been initialized. */
 static bool g_initialized = false;
+
+/**
+ * @brief Whether the session is fully ready (achievements fetched + icons prefetched).
+ *
+ * Set to true by on_session_ready, reset to false by on_xbox_game_played.
+ * While false, achievement_cycle_tick and reset_display_cycle are no-ops so
+ * the cycle does not start before all icons are available in the local cache.
+ */
+static bool g_session_ready = false;
 
 //  --------------------------------------------------------------------------------------------------------------------
 //  Internal helpers
@@ -80,12 +90,16 @@ static void notify_subscribers(const achievement_t *achievement) {
  */
 static void reset_display_cycle(void) {
 
-    const achievement_t *achievements = get_current_game_achievements();
+    if (!g_session_ready) {
+        return;
+    }
 
     /* Free the old cached copy */
     free_achievement(&g_last_unlocked);
 
-    /* Find and deep copy the last unlocked achievement */
+    const achievement_t *achievements = get_current_game_achievements();
+
+    /* Find the last unlocked achievement */
     const achievement_t *latest_unlocked = find_latest_unlocked_achievement(achievements);
     if (latest_unlocked) {
         g_last_unlocked = copy_achievement(latest_unlocked);
@@ -120,13 +134,21 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 /**
  * @brief Event handler called when a new game starts being played.
  *
+ * Clears the current display while we wait for the session to become ready
+ * (icons prefetched). The actual cycle restart happens in on_session_ready.
+ *
  * @param game Currently played game information.
  */
 static void on_xbox_game_played(const game_t *game) {
 
     UNUSED_PARAMETER(game);
 
-    reset_display_cycle();
+    /* Mark the session as not ready until icons are prefetched */
+    g_session_ready = false;
+
+    /* Clear the display while icons are being prefetched */
+    g_last_unlocked = NULL;
+    notify_subscribers(NULL);
 }
 
 /**
@@ -140,6 +162,19 @@ static void on_achievements_progressed(const gamerscore_t *gamerscore, const ach
     UNUSED_PARAMETER(gamerscore);
     UNUSED_PARAMETER(progress);
 
+    reset_display_cycle();
+}
+
+/**
+ * @brief Xbox monitor callback invoked when the session is fully ready.
+ *
+ * Called from the prefetch background thread once all achievement icons have
+ * been downloaded to the local cache.  This is the signal to start (or restart)
+ * the achievement display cycle.
+ */
+static void on_session_ready(void) {
+
+    g_session_ready = true;
     reset_display_cycle();
 }
 
@@ -163,6 +198,7 @@ void achievement_cycle_init(void) {
     xbox_subscribe_connected_changed(&on_connection_changed);
     xbox_subscribe_game_played(&on_xbox_game_played);
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
+    xbox_subscribe_session_ready(&on_session_ready);
 
     g_initialized = true;
 }
@@ -225,7 +261,7 @@ void achievement_cycle_unsubscribe(achievement_cycle_callback_t callback) {
 
 void achievement_cycle_tick(float seconds) {
 
-    if (!g_initialized) {
+    if (!g_initialized || !g_session_ready) {
         return;
     }
 

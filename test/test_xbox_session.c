@@ -174,7 +174,7 @@ static void xbox_session_change_game__session_is_null__no_game_selected(void) {
     game_t *game = NULL;
 
     //  Act.
-    xbox_session_change_game(session, game);
+    xbox_session_change_game(session, game, NULL);
 
     //  Assert.
     TEST_ASSERT_NULL(session);
@@ -185,7 +185,7 @@ static void xbox_session_change_game__session_has_no_game_and_game_is_null__no_g
     game_t *game = NULL;
 
     //  Act.
-    xbox_session_change_game(session, game);
+    xbox_session_change_game(session, game, NULL);
 
     //  Assert.
     TEST_ASSERT_NULL(session->game);
@@ -200,7 +200,7 @@ static void xbox_session_change_game__session_has_game_and_game_is_null__no_game
     game_t *game = NULL;
 
     //  Act.
-    xbox_session_change_game(session, game);
+    xbox_session_change_game(session, game, NULL);
 
     //  Assert.
     TEST_ASSERT_NULL(session->game);
@@ -214,7 +214,7 @@ static void xbox_session_change_game__session_has_no_game_and_game_is_not_null__
     game_t *game = copy_game(game_fallout_4);
 
     //  Act.
-    xbox_session_change_game(session, game);
+    xbox_session_change_game(session, game, NULL);
 
     //  Assert.
     TEST_ASSERT_NOT_NULL(session->game);
@@ -234,7 +234,7 @@ static void xbox_session_change_game__session_has_game_and_game_is_not_null__new
     game_t *game = copy_game(game_fallout_4);
 
     //  Act.
-    xbox_session_change_game(session, game);
+    xbox_session_change_game(session, game, NULL);
 
     //  Assert.
     TEST_ASSERT_NOT_NULL(session->game);
