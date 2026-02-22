@@ -485,16 +485,16 @@ static void xbox_change_game(game_t *game) {
     /* First, let's make sure we unsubscribe from the previous achievements */
     xbox_achievements_progress_unsubscribe(&g_current_session);
 
+    /* Change the game which includes getting the new list of achievements
+     * and spawning a background thread to prefetch icons. */
+    xbox_session_change_game(&g_current_session, game, &notify_session_ready);
+
     /*
      * Notify subscribers that a new game is being loaded BEFORE starting the
      * session change.  This ensures achievement_cycle sets g_session_ready=false
      * before the prefetch thread can complete and fire the session-ready event.
      */
     notify_game_played(game);
-
-    /* Change the game which includes getting the new list of achievements
-     * and spawning a background thread to prefetch icons. */
-    xbox_session_change_game(&g_current_session, game, &notify_session_ready);
 
     /* Now let's subscribe to the new achievements */
     xbox_achievements_progress_subscribe(&g_current_session);
