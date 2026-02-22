@@ -2,7 +2,6 @@
 
 #include <obs-module.h>
 #include <pthread.h>
-#include <stdatomic.h>
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
@@ -51,12 +50,14 @@ static icon_transition_state_t g_transition = {
 };
 
 /**
- * @brief Atomic flag set by the download thread when image_source_download completes.
+ * @brief Flag set by the download thread when image_source_download completes.
  *
  * The OBS video tick checks this flag and applies the transition state on the
  * render thread, avoiding any blocking I/O on the graphics pipeline.
+ * Protected by g_download_ready_mutex for cross-platform compatibility.
  */
-static atomic_bool g_download_ready = false;
+static pthread_mutex_t g_download_ready_mutex = PTHREAD_MUTEX_INITIALIZER;
+static volatile bool   g_download_ready       = false;
 
 /**
  * @brief Whether the achievement whose icon is being downloaded was unlocked.
@@ -80,7 +81,9 @@ static bool g_pending_has_state_changed = false;
 static void *download_thread_func(void *arg) {
     image_t *image = arg;
     image_source_download(image);
-    atomic_store(&g_download_ready, true);
+    pthread_mutex_lock(&g_download_ready_mutex);
+    g_download_ready = true;
+    pthread_mutex_unlock(&g_download_ready_mutex);
     return NULL;
 }
 
@@ -291,7 +294,11 @@ static void on_source_video_tick(void *data, float seconds) {
     UNUSED_PARAMETER(data);
 
     /* Check if a background download has completed */
-    if (atomic_exchange(&g_download_ready, false)) {
+    pthread_mutex_lock(&g_download_ready_mutex);
+    bool download_ready = g_download_ready;
+    g_download_ready    = false;
+    pthread_mutex_unlock(&g_download_ready_mutex);
+    if (download_ready) {
         if (g_pending_has_state_changed && g_next_achievement_icon->must_reload) {
             /* State changed (locked↔unlocked): fade out first, then swap */
             g_transition.phase   = ICON_TRANSITION_FADE_OUT;
