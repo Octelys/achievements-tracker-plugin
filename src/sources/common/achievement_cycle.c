@@ -38,7 +38,7 @@ static float g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
 static float g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
 
 /** The last unlocked achievement (owned by this module). */
-static const achievement_t *g_last_unlocked = NULL;
+static achievement_t *g_last_unlocked = NULL;
 
 /** Currently displayed achievement (pointer into g_last_unlocked or external data). */
 static const achievement_t *g_current_achievement = NULL;
@@ -94,12 +94,15 @@ static void reset_display_cycle(void) {
         return;
     }
 
+    /* Free the old cached copy */
+    free_achievement(&g_last_unlocked);
+
     const achievement_t *achievements = get_current_game_achievements();
 
     /* Find the last unlocked achievement */
     const achievement_t *latest_unlocked = find_latest_unlocked_achievement(achievements);
     if (latest_unlocked) {
-        g_last_unlocked = latest_unlocked;
+        g_last_unlocked = copy_achievement(latest_unlocked);
     }
 
     /* Reset display cycle to show the last unlocked achievement */
@@ -208,7 +211,9 @@ void achievement_cycle_destroy(void) {
 
     /* TODO: Add xbox_unsubscribe_* functions if available */
 
-    g_last_unlocked       = NULL;
+    /* Free the owned achievement copy */
+    free_achievement(&g_last_unlocked);
+
     g_subscriber_count    = 0;
     g_current_achievement = NULL;
     g_initialized         = false;
@@ -325,7 +330,7 @@ void achievement_cycle_tick(float seconds) {
                 /* If we don't have a cached copy, refresh it */
                 const achievement_t *latest_unlocked = find_latest_unlocked_achievement(achievements);
                 if (latest_unlocked) {
-                    g_last_unlocked = latest_unlocked;
+                    g_last_unlocked = copy_achievement(latest_unlocked);
                     notify_subscribers(g_last_unlocked);
                 }
             }
