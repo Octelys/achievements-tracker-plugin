@@ -212,9 +212,9 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  * Provides sign-in / sign-out buttons.
  */
 static obs_properties_t *source_get_properties(void *data) {
-    xbox_account_source_t *s           = data;
+    xbox_account_source_t *s             = data;
     xbox_identity_t       *xbox_identity = xbox_live_get_identity();
-    obs_properties_t      *p           = obs_properties_create();
+    obs_properties_t      *p             = obs_properties_create();
 
     // Push the live sign-in state into obs_data so the read-only field
     // always shows the real value, not the stale default.
@@ -232,12 +232,10 @@ static obs_properties_t *source_get_properties(void *data) {
         }
     }
 
-    obs_property_t *status_prop =
-        obs_properties_add_text(p, "xbox_status", "Xbox Account", OBS_TEXT_DEFAULT);
+    obs_property_t *status_prop = obs_properties_add_text(p, "xbox_status", "Xbox Account", OBS_TEXT_DEFAULT);
     obs_property_set_enabled(status_prop, false);
 
-    obs_property_t *version_prop =
-        obs_properties_add_text(p, "plugin_version", "Plugin version", OBS_TEXT_DEFAULT);
+    obs_property_t *version_prop = obs_properties_add_text(p, "plugin_version", "Plugin version", OBS_TEXT_DEFAULT);
     obs_property_set_enabled(version_prop, false);
 
     if (xbox_identity != NULL) {
