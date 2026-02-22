@@ -5,6 +5,9 @@ on:
       pluginName:
         description: Project name detected by parsing build spec file
         value: ${{ jobs.check-event.outputs.pluginName }}
+      pluginVersion:
+        description: Computed plugin version (YY.MMDD.BuildNumber)
+        value: ${{ jobs.check-event.outputs.pluginVersion }}
 jobs:
   check-event:
     name: Check GitHub Event Data 🔎
@@ -19,6 +22,7 @@ jobs:
       config: ${{ steps.setup.outputs.config }}
       commitHash: ${{ steps.setup.outputs.commitHash }}
       pluginName: ${{ steps.setup.outputs.pluginName }}
+      pluginVersion: ${{ steps.setup.outputs.pluginVersion }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,7 +46,7 @@ jobs:
               ;;
             push)
               config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
-              if [[ ${GITHUB_REF_NAME} =~ [0-9]+.[0-9]+.[0-9]+(-(rc|beta).+)? ]]; then
+              if [[ ${GITHUB_REF_NAME} =~ ^[0-9]{2}\.[0-9]{3,4}\.[0-9]+(-(rc|beta).+)?$ ]]; then
                 config_data[1]='notarize:true'
                 config_data[3]='config:Release'
               fi
@@ -70,6 +74,10 @@ jobs:
           else
             echo "pluginName=${plugin_name}" >> $GITHUB_OUTPUT
           fi
+
+          # Compute version: YY.MMDD.BuildNumber
+          plugin_version="$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}"
+          echo "pluginVersion=${plugin_version}" >> $GITHUB_OUTPUT
 
   macos-build:
     name: Build for macOS 
@@ -105,12 +113,12 @@ jobs:
           print '::endgroup::'
 
           local product_name
-          local product_version
-          read -r product_name product_version <<< \
-            "$(jq -r '. | {name, version} | join(" ")' buildspec.json)"
+          read -r product_name <<< \
+            "$(jq -r '.name' buildspec.json)"
 
           print "pluginName=${product_name}" >> $GITHUB_OUTPUT
-          print "pluginVersion=${product_version}" >> $GITHUB_OUTPUT
+          # Compute version: YY.MMDD.BuildNumber
+          print "pluginVersion=$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
 
       - uses: actions/cache/restore@v4
         id: ccache-cache
@@ -235,11 +243,12 @@ jobs:
           : Set Up Environment 🔧
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
 
-          read -r product_name product_version <<< \
-            "$(jq -r '. | {name, version} | join(" ")' buildspec.json)"
+          read -r product_name <<< \
+            "$(jq -r '.name' buildspec.json)"
 
           echo "pluginName=${product_name}" >> $GITHUB_OUTPUT
-          echo "pluginVersion=${product_version}" >> $GITHUB_OUTPUT
+          # Compute version: YY.MMDD.BuildNumber
+          echo "pluginVersion=$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
 
       - uses: actions/cache/restore@v4
         id: ccache-cache
@@ -339,7 +348,12 @@ jobs:
 
           $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
           $ProductName = $BuildSpec.name
-          $ProductVersion = $BuildSpec.version
+
+          # Compute version: YY.MMDD.BuildNumber
+          $Now = [System.DateTime]::UtcNow
+          $YY   = $Now.ToString("yy")
+          $MMDD = $Now.Month.ToString() + $Now.Day.ToString("D2")
+          $ProductVersion = "${YY}.${MMDD}.${{ github.run_number }}"
 
           "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
           "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
