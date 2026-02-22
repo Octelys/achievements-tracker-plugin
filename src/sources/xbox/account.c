@@ -39,9 +39,28 @@ static void start_monitoring_if_needed(void) {
 static void refresh_properties_on_main(void *data) {
     obs_source_t *source = data;
 
-    if (source) {
-        obs_source_update_properties(source);
+    if (!source)
+        return;
+
+    // Update the xbox_status field in the source settings so the read-only
+    // text field reflects the current sign-in state after the UI rebuilds.
+    xbox_identity_t *identity = xbox_live_get_identity();
+    obs_data_t      *settings = obs_source_get_settings(source);
+
+    if (settings) {
+        if (identity) {
+            char status[1024];
+            snprintf(status, sizeof(status), "Signed in as %s", identity->gamertag);
+            obs_data_set_string(settings, "xbox_status", status);
+        } else {
+            obs_data_set_string(settings, "xbox_status", "Not connected.");
+        }
+        obs_data_release(settings);
     }
+
+    free_identity(&identity);
+
+    obs_source_update_properties(source);
 }
 
 /**
@@ -193,44 +212,54 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  * Provides sign-in / sign-out buttons.
  */
 static obs_properties_t *source_get_properties(void *data) {
-    UNUSED_PARAMETER(data);
+    xbox_account_source_t *s           = data;
+    xbox_identity_t       *xbox_identity = xbox_live_get_identity();
+    obs_properties_t      *p           = obs_properties_create();
 
-    /* Gets or refreshes the token */
-    xbox_identity_t *xbox_identity = xbox_live_get_identity();
+    // Push the live sign-in state into obs_data so the read-only field
+    // always shows the real value, not the stale default.
+    if (s && s->source) {
+        obs_data_t *settings = obs_source_get_settings(s->source);
+        if (settings) {
+            if (xbox_identity) {
+                char status[1024];
+                snprintf(status, sizeof(status), "Signed in as %s", xbox_identity->gamertag);
+                obs_data_set_string(settings, "xbox_status", status);
+            } else {
+                obs_data_set_string(settings, "xbox_status", "Not connected.");
+            }
+            obs_data_release(settings);
+        }
+    }
 
-    /* Lists all the UI components of the properties page */
-    obs_properties_t *p = obs_properties_create();
+    obs_property_t *status_prop =
+        obs_properties_add_text(p, "xbox_status", "Xbox Account", OBS_TEXT_DEFAULT);
+    obs_property_set_enabled(status_prop, false);
+
+    obs_property_t *version_prop =
+        obs_properties_add_text(p, "plugin_version", "Plugin version", OBS_TEXT_DEFAULT);
+    obs_property_set_enabled(version_prop, false);
 
     if (xbox_identity != NULL) {
-        char status[4096];
-        snprintf(status, 4096, "Signed in as %s", xbox_identity->gamertag);
-
-        int64_t gamerscore = 0;
-        xbox_fetch_gamerscore(&gamerscore);
-
-        char gamerscore_text[4096];
-        snprintf(gamerscore_text, 4096, "Gamerscore %lld", (long long)gamerscore);
-
-        obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
-        obs_properties_add_text(p, "gamerscore_info", gamerscore_text, OBS_TEXT_INFO);
-
-        const game_t *game = get_current_game();
-
-        if (game) {
-            char game_played[4096];
-            snprintf(game_played, sizeof(game_played), "Playing %s (%s)", game->title, game->id);
-            obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
-        }
-
         obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
     } else {
-        obs_properties_add_text(p, "disconnected_status_info", "You are not connected.", OBS_TEXT_INFO);
         obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
     }
 
     free_identity(&xbox_identity);
 
     return p;
+}
+
+/**
+ * @brief OBS source defaults callback.
+ *
+ * Pre-fills the read-only "Plugin version" field with the current version string
+ * so OBS displays it in the bordered text field without requiring user input.
+ */
+static void source_get_defaults(obs_data_t *settings) {
+    obs_data_set_default_string(settings, "xbox_status", "Not connected.");
+    obs_data_set_default_string(settings, "plugin_version", PLUGIN_VERSION);
 }
 
 /**
@@ -249,6 +278,7 @@ static struct obs_source_info xbox_account_source = {
     .get_name       = source_get_name,
     .create         = on_source_create,
     .destroy        = on_source_destroy,
+    .get_defaults   = source_get_defaults,
     .update         = on_source_update,
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
