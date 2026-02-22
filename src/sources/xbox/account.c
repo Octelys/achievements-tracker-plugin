@@ -115,17 +115,6 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
     return true;
 }
 
-/**
- * @brief Callback invoked when the monitor detects a game is being played.
- *
- * Currently, logs the game name/id.
- */
-static void on_xbox_game_played(const game_t *game) {
-    char text[4096];
-    snprintf(text, 4096, "Playing game '%s' (%s)", game->title, game->id);
-    obs_log(LOG_INFO, text);
-}
-
 //  --------------------------------------------------------------------------------------------------------------------
 //	Source callbacks
 //  --------------------------------------------------------------------------------------------------------------------
@@ -279,8 +268,6 @@ static const struct obs_source_info *xbox_source_get(void) {
 void xbox_account_source_register(void) {
 
     obs_register_source(xbox_source_get());
-
-    xbox_subscribe_game_played(&on_xbox_game_played);
 
     start_monitoring_if_needed();
 }

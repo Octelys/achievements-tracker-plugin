@@ -34,7 +34,7 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
     /* Already cached — nothing to do */
     struct stat st;
     if (stat(path_buf, &st) == 0) {
-        obs_log(LOG_INFO, "[Cache] Hit: %s", path_buf);
+        obs_log(LOG_DEBUG, "[Cache] Hit: %s", path_buf);
         return false;
     }
 

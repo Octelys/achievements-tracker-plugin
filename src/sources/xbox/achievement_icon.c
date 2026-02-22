@@ -100,7 +100,7 @@ static void swap_achievement_icons(void) {
  */
 static void update_achievement_icon(const achievement_t *achievement) {
 
-    if (!achievement || achievement->icon_url[0] == '\0') {
+    if (!achievement || !achievement->icon_url || achievement->icon_url[0] == '\0') {
         image_source_clear(g_achievement_icon);
         g_is_achievement_unlocked = false;
         g_transition.phase        = ICON_TRANSITION_NONE;
@@ -132,7 +132,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
     if (pthread_create(&thread, NULL, download_thread_func, g_next_achievement_icon) == 0) {
         pthread_detach(thread);
     } else {
-        obs_log(LOG_ERROR, "Achievement Icon: failed to create download thread");
+        obs_log(LOG_ERROR, "[Achievement Icon] Failed to create download thread");
     }
 }
 

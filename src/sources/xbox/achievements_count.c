@@ -8,7 +8,7 @@
  * played Xbox game. The count is updated when the game changes.
  *
  * Data flow:
- *  - The Xbox monitor notifies this module when connection state changes or
+ *  - The Xbox monitor notifies this module when the connection state changes or
  *    when the game changes.
  *  - The module counts total achievements and stores the result in a global.
  *  - During rendering, the count is formatted to text and rendered.
@@ -55,24 +55,7 @@ static void update_count(void) {
     snprintf(g_total_count, sizeof(g_total_count), "%d / %d", unlocked, total);
     g_must_reload = true;
 
-    obs_log(LOG_INFO, "%d achievements unlocked out of %d", unlocked, total);
-}
-
-/**
- * @brief Xbox monitor callback invoked when connection state changes.
- *
- * @param is_connected Whether the account is currently connected.
- * @param error_message Optional error message if disconnected (ignored here).
- */
-static void on_connection_changed(bool is_connected, const char *error_message) {
-    UNUSED_PARAMETER(error_message);
-
-    if (is_connected) {
-        update_count();
-    } else {
-        g_total_count[0] = '\0';
-        g_must_reload    = true;
-    }
+    obs_log(LOG_INFO, "[Achievements Counter] %d achievements unlocked out of %d", unlocked, total);
 }
 
 /**
@@ -81,9 +64,13 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
  * @param game Current game information.
  */
 static void on_game_played(const game_t *game) {
-    UNUSED_PARAMETER(game);
 
-    update_count();
+    if (game) {
+        update_count();
+    } else {
+        g_total_count[0] = '\0';
+        g_must_reload    = true;
+    }
 }
 
 /**
@@ -241,7 +228,6 @@ void xbox_achievements_count_source_register(void) {
 
     obs_register_source(xbox_source_get());
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
     xbox_subscribe_game_played(&on_game_played);
 }

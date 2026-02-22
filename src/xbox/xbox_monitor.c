@@ -48,6 +48,7 @@
 #define RTA_HOST "rta.xboxlive.com"
 #define RTA_PATH "/connect"
 #define RTA_PORT 443
+#define PRESENCE_SUBSCRIPTION_MESSAGE "[%d,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]"
 
 #define PROTOCOL "rta.xboxlive.com.V2"
 
@@ -125,6 +126,8 @@ typedef struct monitoring_context {
     /** True once websocket has reached the "established" state */
     bool connected;
 
+    bool last_status_notified;
+
     /**
      * Current identity used.
      *
@@ -149,6 +152,11 @@ static monitoring_context_t *g_monitoring_context = NULL;
 
 /* Keeps track of the game, achievements and gamerscore */
 static xbox_session_t g_current_session;
+
+static const lws_retry_bo_t retry_policy = {
+    .secs_since_valid_ping   = 10, /* send ping after 10s idle */
+    .secs_since_valid_hangup = 20, /* hang up if no response after 20s */
+};
 
 /**
  * @brief Build the WebSocket "Authorization" header value for a given Xbox identity.
@@ -205,11 +213,10 @@ static void refresh_token_if_needed() {
 static void notify_game_played(const game_t *game) {
 
     if (!game) {
-        obs_log(LOG_DEBUG, "[Monitoring] No notification to be sent: no game is being played");
-        return;
+        obs_log(LOG_DEBUG, "[Monitoring] No game is being played");
+    } else {
+        obs_log(LOG_INFO, "[Monitoring] Notifying game played: %s (%s)", game->title, game->id);
     }
-
-    obs_log(LOG_INFO, "[Monitoring] Notifying game played: %s (%s)", game->title, game->id);
 
     game_played_subscription_t *subscriptions = g_game_played_subscriptions;
 
@@ -237,11 +244,15 @@ static void notify_achievements_progressed(const achievement_progress_t *achieve
 /**
  * @brief Invoke all registered connection state subscribers.
  */
-static void notify_connection_changed(bool is_connected, const char *error_message) {
+static void notify_connection_changed(const char *error_message) {
+
+    if (g_monitoring_context->last_status_notified == g_monitoring_context->connected) {
+        return;
+    }
 
     obs_log(LOG_INFO,
             "[Monitoring] Notifying of a connection changed: %s",
-            is_connected ? "Connected" : "Not connected");
+            g_monitoring_context->connected ? "Connected" : "Not connected");
 
     if (error_message) {
         obs_log(LOG_ERROR, "[Monitoring] Connection error: %s", error_message);
@@ -250,9 +261,11 @@ static void notify_connection_changed(bool is_connected, const char *error_messa
     connection_changed_subscription_t *node = g_connection_changed_subscriptions;
 
     while (node) {
-        node->callback(is_connected, error_message);
+        node->callback(g_monitoring_context->connected, error_message);
         node = node->next;
     }
+
+    g_monitoring_context->last_status_notified = g_monitoring_context->connected;
 }
 
 /**
@@ -280,32 +293,40 @@ static void notify_session_ready(void) {
  */
 static bool send_websocket_message(const char *message) {
 
+    unsigned char *buf       = NULL;
+    bool           succeeded = false;
+
     if (!g_monitoring_context || !g_monitoring_context->wsi || !g_monitoring_context->connected) {
         obs_log(LOG_ERROR, "[Monitoring] Cannot send message - not connected");
-        return false;
+        goto cleanup;
     }
 
     size_t len = strlen(message);
 
     /* Allocate buffer with LWS_PRE padding */
-    unsigned char *buf = (unsigned char *)bmalloc(LWS_PRE + len);
+    buf = bmalloc(LWS_PRE + len);
+
     if (!buf) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to allocate send buffer");
-        return false;
+        goto cleanup;
     }
 
     memcpy(buf + LWS_PRE, message, len);
 
     int written = lws_write(g_monitoring_context->wsi, buf + LWS_PRE, len, LWS_WRITE_TEXT);
-    bfree(buf);
 
     if (written < (int)len) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to send message (wrote %d of %zu bytes)", written, len);
-        return false;
+        goto cleanup;
     }
 
     obs_log(LOG_DEBUG, "[Monitoring] Sent message: %s", message);
-    return true;
+    succeeded = true;
+
+cleanup:
+    free_memory((void **)&buf);
+
+    return succeeded;
 }
 
 /**
@@ -328,11 +349,7 @@ static bool xbox_presence_subscribe() {
     }
 
     char message[512];
-    snprintf(message,
-             sizeof(message),
-             "[%d,1,\"https://userpresence.xboxlive.com/users/xuid(%s)/richpresence\"]",
-             SUBSCRIBE,
-             identity->xid);
+    snprintf(message, sizeof(message), PRESENCE_SUBSCRIPTION_MESSAGE, SUBSCRIBE, identity->xid);
 
     obs_log(LOG_DEBUG, "[Monitoring] Subscribing for presence changes for XUID %s", identity->xid);
     result = send_websocket_message(message);
@@ -390,13 +407,6 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
 
     const char *service_config_id = achievements->service_config_id;
 
-    xbox_identity_t *identity = state_get_xbox_identity();
-
-    if (!identity) {
-        obs_log(LOG_ERROR, "[Monitoring] Invalid Xbox identity for subscription");
-        return false;
-    }
-
     if (!g_monitoring_context || !g_monitoring_context->connected) {
         obs_log(LOG_ERROR, "[Monitoring] Cannot subscribe - not connected");
         return false;
@@ -407,13 +417,13 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
              sizeof(message),
              "[%d,1,\"https://achievements.xboxlive.com/users/xuid(%s)/achievements/%s\"]",
              SUBSCRIBE,
-             identity->xid,
+             g_monitoring_context->identity->xid,
              service_config_id);
 
     obs_log(LOG_DEBUG,
             "[Monitoring] Subscribing for achievement updates for service config id %s (XUID %s)",
             service_config_id,
-            identity->xid);
+            g_monitoring_context->identity->xid);
 
     return send_websocket_message(message);
 }
@@ -440,13 +450,6 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
         return false;
     }
 
-    xbox_identity_t *identity = state_get_xbox_identity();
-
-    if (!identity) {
-        obs_log(LOG_ERROR, "[Monitoring] Invalid Xbox identity for subscription");
-        return false;
-    }
-
     if (!g_monitoring_context || !g_monitoring_context->connected) {
         obs_log(LOG_ERROR, "[Monitoring] Cannot subscribe - not connected");
         return false;
@@ -457,13 +460,13 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
              sizeof(message),
              "[%d,1,\"https://achievements.xboxlive.com/users/xuid(%s)/achievements/%s\"]",
              UNSUBSCRIBE,
-             identity->xid,
+             g_monitoring_context->identity->xid,
              achievements->service_config_id);
 
     obs_log(LOG_DEBUG,
             "[Monitoring] Unsubscribing from achievement updates for service config id %s (XUID %s)",
             achievements->service_config_id,
-            identity->xid);
+            g_monitoring_context->identity->xid);
 
     return send_websocket_message(message);
 }
@@ -473,16 +476,11 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
  *
  * This:
  *  - unsubscribes from previous achievements
- *  - refreshes the session (fetch achievements for new game)
+ *  - refreshes the session (fetch achievements for a new game)
  *  - subscribes to achievement updates for the new game (if any)
  *  - notifies listeners
  */
 static void xbox_change_game(game_t *game) {
-
-    if (game && xbox_session_is_game_played(&g_current_session, game)) {
-        /* No change */
-        return;
-    }
 
     /* First, let's make sure we unsubscribe from the previous achievements */
     xbox_achievements_progress_unsubscribe(&g_current_session);
@@ -534,6 +532,8 @@ static void on_achievement_progress_received(const achievement_progress_t *progr
  */
 static void on_websocket_connected() {
 
+    g_monitoring_context->connected = true;
+
     int64_t gamerscore_value;
     xbox_fetch_gamerscore(&gamerscore_value);
 
@@ -544,11 +544,17 @@ static void on_websocket_connected() {
 
     xbox_presence_subscribe();
 
+    /* Immediately retrieves the game being played, if any */
+    game_t *current_game = xbox_get_current_game();
+    xbox_change_game(current_game);
+    free_game(&current_game);
+
+    /* And retrieves the achievements, if any */
     if (g_current_session.game != NULL) {
         xbox_achievements_progress_subscribe(&g_current_session);
     }
 
-    notify_connection_changed(true, NULL);
+    notify_connection_changed(NULL);
 }
 
 /**
@@ -556,9 +562,25 @@ static void on_websocket_connected() {
  */
 static void on_websocket_disconnected() {
 
+    g_monitoring_context->connected = false;
+    g_monitoring_context->wsi       = NULL;
+
     xbox_session_clear(&g_current_session);
 
-    notify_connection_changed(false, NULL);
+    notify_connection_changed(NULL);
+
+    notify_game_played(NULL);
+}
+
+/**
+ * @brief Called when the websocket throws an error.
+ */
+static void on_websocket_error(const char *in) {
+
+    g_monitoring_context->connected = false;
+    g_monitoring_context->wsi       = NULL;
+
+    notify_connection_changed(in ? (char *)in : "Connection error");
 }
 
 /**
@@ -663,7 +685,6 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
 
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
         obs_log(LOG_DEBUG, "[Monitoring] WebSocket connection established");
-        ctx->connected = true;
         on_websocket_connected();
         break;
 
@@ -714,14 +735,11 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         break;
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
         obs_log(LOG_ERROR, "[Monitoring] Connection error: %s", in ? (char *)in : "unknown");
-        ctx->connected = false;
-        notify_connection_changed(false, in ? (char *)in : "Connection error");
+        on_websocket_error(in ? (char *)in : "Connection error");
         break;
 
     case LWS_CALLBACK_CLIENT_CLOSED:
         obs_log(LOG_DEBUG, "[Monitoring] Connection closed");
-        ctx->connected = false;
-        ctx->wsi       = NULL;
         on_websocket_disconnected();
         break;
 
@@ -739,7 +757,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
 /**
  * @brief libwebsockets protocol table.
  *
- * libwebsockets requires a NULL-terminated array of protocols. We register a
+ * `libwebsockets` requires a NULL-terminated array of protocols. We register a
  * single protocol that forwards events to websocket_callback().
  */
 static const struct lws_protocols protocols[] = {
@@ -770,21 +788,23 @@ static void *monitoring_thread(void *arg) {
 
     if (!ctx->context) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to create WebSocket context");
-        notify_connection_changed(false, "Failed to create WebSocket context");
+        g_monitoring_context->connected = false;
+        notify_connection_changed("Failed to create WebSocket context");
         return (void *)1;
     }
 
     struct lws_client_connect_info ccinfo;
     memset(&ccinfo, 0, sizeof(ccinfo));
 
-    ccinfo.context        = ctx->context;
-    ccinfo.address        = RTA_HOST;
-    ccinfo.port           = RTA_PORT;
-    ccinfo.path           = RTA_PATH;
-    ccinfo.host           = ccinfo.address;
-    ccinfo.origin         = ccinfo.address;
-    ccinfo.protocol       = PROTOCOL;
-    ccinfo.ssl_connection = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    ccinfo.context               = ctx->context;
+    ccinfo.address               = RTA_HOST;
+    ccinfo.port                  = RTA_PORT;
+    ccinfo.path                  = RTA_PATH;
+    ccinfo.host                  = ccinfo.address;
+    ccinfo.origin                = ccinfo.address;
+    ccinfo.protocol              = PROTOCOL;
+    ccinfo.retry_and_idle_policy = &retry_policy;
+    ccinfo.ssl_connection        = LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
 
     obs_log(LOG_DEBUG, "[Monitoring] Connecting to wss://%s:%d%s", RTA_HOST, RTA_PORT, RTA_PATH);
 
@@ -792,16 +812,12 @@ static void *monitoring_thread(void *arg) {
 
     if (!ctx->wsi) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to connect");
-        notify_connection_changed(false, "Failed to connect");
+        g_monitoring_context->connected = false;
+        notify_connection_changed("Failed to connect");
         lws_context_destroy(ctx->context);
         ctx->context = NULL;
         return (void *)1;
     }
-
-    /* Immediately retrieves the game */
-    game_t *current_game = xbox_get_current_game();
-    xbox_change_game(current_game);
-    free_game(&current_game);
 
     /* Start at 1 second */
     int retry_delay_ms = INITIAL_RETRY_DELAY_MS;
@@ -817,13 +833,10 @@ static void *monitoring_thread(void *arg) {
             /* Sleep for retry_delay_ms while keeping lws alive (50ms increments) */
             int iterations = retry_delay_ms / LOOP_CHECK_MS;
             for (int i = 0; i < iterations && ctx->running; i++) {
-                lws_service(ctx->context, LOOP_CHECK_MS);
+                sleep_ms(LOOP_CHECK_MS);
             }
 
-            if (!ctx->running) {
-                obs_log(LOG_ERROR, "[Monitoring] NOT RUNNING - aborting reconnect");
-                break;
-            }
+            obs_log(LOG_INFO, "[Monitoring] Reconnecting...");
 
             ctx->wsi = lws_client_connect_via_info(&ccinfo);
 
@@ -854,7 +867,7 @@ static void *monitoring_thread(void *arg) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//  Public functions
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
 bool xbox_monitoring_start() {
@@ -864,7 +877,6 @@ bool xbox_monitoring_start() {
         return false;
     }
 
-    /* Get the authorization token from state */
     xbox_identity_t *identity = xbox_live_get_identity();
 
     if (!identity) {
@@ -929,16 +941,9 @@ void xbox_monitoring_stop(void) {
 
     pthread_join(g_monitoring_context->thread, NULL);
 
-    if (g_monitoring_context->auth_token) {
-        bfree(g_monitoring_context->auth_token);
-    }
-
-    if (g_monitoring_context->rx_buffer) {
-        bfree(g_monitoring_context->rx_buffer);
-    }
-
-    bfree(g_monitoring_context);
-    g_monitoring_context = NULL;
+    free_memory((void **)&g_monitoring_context->auth_token);
+    free_memory((void **)&g_monitoring_context->rx_buffer);
+    free_memory((void **)&g_monitoring_context);
 
     obs_log(LOG_INFO, "[Monitoring] Monitoring stopped");
 }

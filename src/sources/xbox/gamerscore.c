@@ -57,7 +57,7 @@ static void update_gamerscore(const gamerscore_t *gamerscore) {
     snprintf(g_gamerscore, sizeof(g_gamerscore), "%dG", total_gamerscore);
     g_must_reload = true;
 
-    obs_log(LOG_INFO, "Gamerscore is %" PRId64, total_gamerscore);
+    obs_log(LOG_INFO, "[Gamerscore] Gamerscore is %" PRId64, total_gamerscore);
 }
 
 /**

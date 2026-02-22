@@ -47,7 +47,13 @@ static image_t g_game_cover;
  */
 static void on_xbox_game_played(const game_t *game) {
 
-    obs_log(LOG_DEBUG, "Playing game %s (%s)", game->title, game->id);
+    if (!game) {
+        obs_log(LOG_DEBUG, "[Game Cover] No game played");
+        image_source_clear(&g_game_cover);
+        return;
+    }
+
+    obs_log(LOG_DEBUG, "[Game Cover] Playing game %s (%s)", game->title, game->id);
 
     char *game_cover_url = xbox_get_game_cover(game);
     snprintf(g_game_cover.url, sizeof(g_game_cover.url), "%s", game_cover_url);
@@ -56,25 +62,6 @@ static void on_xbox_game_played(const game_t *game) {
     image_source_download(&g_game_cover);
 
     free_memory((void **)&game_cover_url);
-}
-
-/**
- * @brief Xbox monitor callback invoked when connection state changes.
- *
- * When connected, this refreshes the gamerscore display.
- *
- * @param is_connected Whether the account is currently connected.
- * @param error_message Optional error message if disconnected (ignored here).
- */
-static void on_connection_changed(bool is_connected, const char *error_message) {
-
-    UNUSED_PARAMETER(error_message);
-
-    if (is_connected) {
-        obs_log(LOG_INFO, "Connected to Xbox Live - waiting for game played events");
-    } else {
-        image_source_clear(&g_game_cover);
-    }
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -253,7 +240,6 @@ void xbox_game_cover_source_register(void) {
     obs_register_source(xbox_game_cover_source_get());
 
     xbox_subscribe_game_played(&on_xbox_game_played);
-    xbox_subscribe_connected_changed(&on_connection_changed);
 }
 
 void xbox_game_cover_source_cleanup(void) {
