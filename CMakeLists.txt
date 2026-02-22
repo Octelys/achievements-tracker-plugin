@@ -583,6 +583,7 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
+    test/stubs/io/cache_stub.c
   )
 
   add_test(NAME test_xbox_session COMMAND test_xbox_session)
@@ -622,6 +623,7 @@ if(BUILD_TESTING)
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
+    test/stubs/io/cache_stub.c
   )
 
   add_test(NAME test_types COMMAND test_types)
