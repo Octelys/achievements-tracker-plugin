@@ -15,4 +15,3 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
     (void)path_size;
     return true;
 }
-
