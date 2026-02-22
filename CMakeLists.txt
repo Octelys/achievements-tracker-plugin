@@ -13,7 +13,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalOpenSSL.cmake")
 # Prefer universal FreeType when present (macOS)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalFreeType.cmake")
 
-project(${_name} VERSION ${_version})
+project(${_name} VERSION ${PLUGIN_VERSION})
 
 option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
 option(ENABLE_QT "Use Qt functionality" OFF)

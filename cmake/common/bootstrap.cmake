@@ -49,22 +49,31 @@ string(JSON _name GET ${buildspec} name)
 string(JSON _website GET ${buildspec} website)
 string(JSON _author GET ${buildspec} author)
 string(JSON _email GET ${buildspec} email)
-string(JSON _version GET ${buildspec} version)
 string(JSON _bundleId GET ${buildspec} platformConfig macos bundleId)
 
 set(PLUGIN_AUTHOR ${_author})
 set(PLUGIN_WEBSITE ${_website})
 set(PLUGIN_EMAIL ${_email})
-set(PLUGIN_VERSION ${_version})
 set(MACOS_BUNDLEID ${_bundleId})
 
-string(REPLACE "." ";" _version_canonical "${_version}")
-list(GET _version_canonical 0 PLUGIN_VERSION_MAJOR)
-list(GET _version_canonical 1 PLUGIN_VERSION_MINOR)
-list(GET _version_canonical 2 PLUGIN_VERSION_PATCH)
-unset(_version_canonical)
-
+# Resolve build number first (needed for version computation)
 include(buildnumber)
+
+# Compute version as YY.MMDD.BuildNumber from the current date
+string(TIMESTAMP _year "%Y")
+string(TIMESTAMP _month "%m")
+string(TIMESTAMP _day "%d")
+math(EXPR PLUGIN_VERSION_MAJOR "${_year} % 100")
+set(PLUGIN_VERSION_MINOR "${_month}${_day}")
+set(PLUGIN_VERSION_PATCH "${PLUGIN_BUILD_NUMBER}")
+# Strip leading zeros from minor (MMDD) so CMake treats it as a plain integer
+math(EXPR PLUGIN_VERSION_MINOR "${PLUGIN_VERSION_MINOR} + 0")
+set(PLUGIN_VERSION "${PLUGIN_VERSION_MAJOR}.${PLUGIN_VERSION_MINOR}.${PLUGIN_VERSION_PATCH}")
+
+unset(_year)
+unset(_month)
+unset(_day)
+
 include(osconfig)
 
 # Allow selection of common build types via UI

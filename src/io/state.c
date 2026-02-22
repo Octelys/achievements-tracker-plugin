@@ -642,72 +642,12 @@ xbox_identity_t *state_get_xbox_identity(void) {
     return identity;
 }
 
-void state_free_device(device_t **device) {
-    if (!device || !*device) {
-        return;
-    }
-
-    if ((*device)->keys) {
-        EVP_PKEY_free((EVP_PKEY *)(*device)->keys);
-    }
-
-    bfree(*device);
-    *device = NULL;
-}
-
-void state_free_token(token_t **token) {
-    if (!token || !*token) {
-        return;
-    }
-
-    if ((*token)->value) {
-        bfree((void *)(*token)->value);
-    }
-
-    bfree(*token);
-    *token = NULL;
-}
-
-void state_free_xbox_identity(xbox_identity_t **identity) {
-    if (!identity || !*identity) {
-        return;
-    }
-
-    if ((*identity)->gamertag) {
-        bfree((void *)(*identity)->gamertag);
-    }
-
-    if ((*identity)->xid) {
-        bfree((void *)(*identity)->xid);
-    }
-
-    if ((*identity)->uhs) {
-        bfree((void *)(*identity)->uhs);
-    }
-
-    if ((*identity)->token) {
-        state_free_token(&(*identity)->token);
-    }
-
-    bfree(*identity);
-    *identity = NULL;
-}
-
 void state_free_gamerscore_configuration(gamerscore_configuration_t **config) {
     if (!config || !*config) {
         return;
     }
 
-    if ((*config)->font_face) {
-        bfree((void *)(*config)->font_face);
-    }
-
-    if ((*config)->font_style) {
-        bfree((void *)(*config)->font_style);
-    }
-
-    bfree(*config);
-    *config = NULL;
+    free_memory((void **)config);
 }
 
 void state_free_gamertag_configuration(gamertag_configuration_t **config) {
@@ -715,16 +655,7 @@ void state_free_gamertag_configuration(gamertag_configuration_t **config) {
         return;
     }
 
-    if ((*config)->font_face) {
-        bfree((void *)(*config)->font_face);
-    }
-
-    if ((*config)->font_style) {
-        bfree((void *)(*config)->font_style);
-    }
-
-    bfree(*config);
-    *config = NULL;
+    free_memory((void **)config);
 }
 
 void state_free_achievement_name_configuration(achievement_name_configuration_t **config) {
@@ -732,16 +663,7 @@ void state_free_achievement_name_configuration(achievement_name_configuration_t 
         return;
     }
 
-    if ((*config)->font_face) {
-        bfree((void *)(*config)->font_face);
-    }
-
-    if ((*config)->font_style) {
-        bfree((void *)(*config)->font_style);
-    }
-
-    bfree(*config);
-    *config = NULL;
+    free_memory((void **)config);
 }
 
 void state_free_achievement_description_configuration(achievement_description_configuration_t **config) {
@@ -749,16 +671,7 @@ void state_free_achievement_description_configuration(achievement_description_co
         return;
     }
 
-    if ((*config)->font_face) {
-        bfree((void *)(*config)->font_face);
-    }
-
-    if ((*config)->font_style) {
-        bfree((void *)(*config)->font_style);
-    }
-
-    bfree(*config);
-    *config = NULL;
+    free_memory((void **)config);
 }
 
 void state_free_achievements_count_configuration(achievements_count_configuration_t **config) {
@@ -766,14 +679,5 @@ void state_free_achievements_count_configuration(achievements_count_configuratio
         return;
     }
 
-    if ((*config)->font_face) {
-        bfree((void *)(*config)->font_face);
-    }
-
-    if ((*config)->font_style) {
-        bfree((void *)(*config)->font_style);
-    }
-
-    bfree(*config);
-    *config = NULL;
+    free_memory((void **)config);
 }
