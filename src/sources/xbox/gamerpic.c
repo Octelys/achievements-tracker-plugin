@@ -34,7 +34,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
     UNUSED_PARAMETER(error_message);
 
     if (!is_connected) {
-        obs_log(LOG_INFO, "[Gamerpic] Not connected - clearing");
+        obs_log(LOG_DEBUG, "[Gamerpic] Not connected - clearing");
         image_source_clear(&g_gamerpic);
         return;
     }
