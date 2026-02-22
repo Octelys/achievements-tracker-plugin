@@ -74,7 +74,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 
     if (!is_connected) {
         g_gamerscore[0] = '\0';
-        g_must_reload = true;
+        g_must_reload   = true;
         return;
     }
 
