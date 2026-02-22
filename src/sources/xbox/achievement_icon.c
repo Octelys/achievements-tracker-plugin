@@ -87,6 +87,13 @@ static void *download_thread_func(void *arg) {
     return NULL;
 }
 
+/**
+ * @brief Swap the current and next achievement icons, and sync the unlock status.
+ *
+ * Exchanges g_achievement_icon and g_next_achievement_icon, then copies the
+ * pending unlock flag into g_is_achievement_unlocked so the render thread
+ * reflects the correct visual state after the swap.
+ */
 static void swap_achievement_icons(void) {
     /* Swap the images */
     image_t *tmp              = g_achievement_icon;
@@ -99,7 +106,16 @@ static void swap_achievement_icons(void) {
 /**
  * @brief Update the achievement icon display.
  *
- * @param achievement Achievement to display icon for. If NULL, it clears the display.
+ * Compares the incoming achievement's icon URL and unlock state against the
+ * currently displayed icon.  If nothing has changed and no transition is in
+ * progress, the function returns early to avoid redundant downloads.
+ * Otherwise it stages the next icon into g_next_achievement_icon, records
+ * whether the unlock state changed, and spawns a detached background thread
+ * to download the new icon without blocking the OBS render thread.
+ *
+ * @param achievement Achievement whose icon should be displayed.
+ *                    Pass NULL (or an achievement with no icon URL) to clear
+ *                    the display and reset the transition state.
  */
 static void update_achievement_icon(const achievement_t *achievement) {
 
@@ -284,6 +300,29 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 /**
+ * @brief Atomically read and clear the download-ready flag.
+ *
+ * Acquires g_download_ready_mutex, snapshots g_download_ready, resets it to
+ * false, then releases the lock.  The caller receives the value that was set
+ * by the download thread, without holding the lock during subsequent
+ * transition logic.
+ *
+ * @return true if a download completed since the last call; false otherwise.
+ */
+static bool lock_and_check_download_status(void) {
+
+    pthread_mutex_lock(&g_download_ready_mutex);
+
+    bool download_ready = g_download_ready;
+
+    /* Get current and deactivate the flag for the next download */
+    g_download_ready    = false;
+    pthread_mutex_unlock(&g_download_ready_mutex);
+
+    return download_ready;
+}
+
+/**
  * @brief OBS callback for animation tick.
  *
  * Updates fade transition animations and delegates achievement display cycle
@@ -294,10 +333,7 @@ static void on_source_video_tick(void *data, float seconds) {
     UNUSED_PARAMETER(data);
 
     /* Check if a background download has completed */
-    pthread_mutex_lock(&g_download_ready_mutex);
-    bool download_ready = g_download_ready;
-    g_download_ready    = false;
-    pthread_mutex_unlock(&g_download_ready_mutex);
+    bool download_ready = lock_and_check_download_status();
     if (download_ready) {
         if (g_pending_has_state_changed && g_next_achievement_icon->must_reload) {
             /* State changed (locked↔unlocked): fade out first, then swap */
