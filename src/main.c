@@ -23,6 +23,7 @@ bool obs_module_load(void) {
     io_load();
 
     xbox_account_source_register();
+
     xbox_gamerpic_source_register();
     xbox_game_cover_source_register();
     xbox_gamerscore_source_register();

@@ -227,38 +227,38 @@ The plugin implements the Xbox Live authentication flow with Proof-of-Possession
 #### macOS
 
 1. Install dependencies via Homebrew:
-   ```bash
-   brew install cmake openssl@3 curl freetype
-   ```
+```bash
+brew install cmake openssl@3 curl freetype
+```
 
 2. Clone and configure:
-   ```bash
-   git clone https://github.com/your-org/achievements-tracker-plugin.git
-   cd achievements-tracker-plugin
-   cmake --preset macos-dev
-   ```
+```bash
+git clone https://github.com/your-org/achievements-tracker-plugin.git
+cd achievements-tracker-plugin
+cmake --preset macos-dev
+```
 
 3. Build:
-   ```bash
-   xcodebuild -configuration RelWithDebInfo -scheme achievements-tracker -parallelizeTargets -destination "generic/platform=macOS,name=Any Mac"
-   ```
+```bash
+xcodebuild -configuration RelWithDebInfo -scheme achievements-tracker -parallelizeTargets -destination "generic/platform=macOS,name=Any Mac"
+```
    
 Or maybe:
 
-    ```bash
-    cmake --build build_macos_dev --config Debug
-    ```
+```bash
+cmake --build build_macos_dev --config Debug
+```
 
 4. The plugin bundle will be at:
-   ```
-   build_macos_dev/Debug/achievements-tracker.plugin
-   ```
+```bash
+build_macos_dev/Debug/achievements-tracker.plugin
+```
 
 5. Copy to OBS plugins folder:
-   ```bash
-   cp -r build_macos_dev/Debug/achievements-tracker.plugin \
-      ~/Library/Application\ Support/obs-studio/plugins/
-   ```
+```bash
+cp -r build_macos_dev/Debug/achievements-tracker.plugin \
+  ~/Library/Application\ Support/obs-studio/plugins/
+```
 
 ##### Building Universal Binary for CI
 
@@ -277,28 +277,28 @@ The CI workflow automatically builds universal FreeType before building the plug
 #### Windows (Untested)
 
 1. Install dependencies via vcpkg:
-   ```powershell
-   vcpkg install openssl:x64-windows curl:x64-windows freetype:x64-windows
-   ```
+```powershell
+vcpkg install openssl:x64-windows curl:x64-windows freetype:x64-windows
+```
 
 2. Configure and build:
-   ```powershell
-   cmake --preset windows-x64
-   cmake --build build_windows --config Release
-   ```
+```powershell
+cmake --preset windows-x64
+cmake --build build_windows --config Release
+```
 
 #### Linux (Untested)
 
 1. Install dependencies:
-   ```bash
-   sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6-dev
-   ```
+```bash
+sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6-dev
+```
 
 2. Configure and build:
-   ```bash
-   cmake --preset linux-x64
-   cmake --build build_linux --config Release
-   ```
+```bash
+cmake --preset linux-x64
+cmake --build build_linux --config Release
+```
 
 ---
 
@@ -347,6 +347,20 @@ cmake --build build_macos_dev --target test_crypto --config Debug
 cmake --build build_macos_dev --target test_time --config Debug
 ./build_macos_dev/Debug/test_time
 ```
+
+---
+
+## Profiling
+
+### macOS
+
+Quick notes
+ - Ensure the plugin is build in `Debug`
+ - Ensure the xcodeproj of the plugin has the option
+ - Copy both the plugin and the dSYM in the `Debug/OBS/Contents/PlugIns` folder
+
+Open obs in Xcode
+ - Ensure  `Debug` is chosen for `Profile` 
 
 ---
 

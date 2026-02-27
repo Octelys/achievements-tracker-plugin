@@ -90,6 +90,7 @@
 #include "crypto/crypto.h"
 #include "encoding/base64.h"
 #include "io/state.h"
+#include "common/device.h"
 #include "text/convert.h"
 #include "time/time.h"
 
@@ -1080,6 +1081,7 @@ cleanup:
         complete(ctx);
     }
 
+    free_device(&ctx->device);
     free_memory((void **)&ctx);
 
     return (void *)false;
@@ -1258,18 +1260,20 @@ xbox_identity_t *xbox_live_get_identity(void) {
     ctx->allow_cache          = false;
     ctx->refresh_token        = state_get_user_refresh_token();
 
+    free_identity(&identity);
+
     /* All the tokens (User, Device and Sisu) will be retrieved */
     if (!refresh_user_token(ctx)) {
-        identity = NULL;
         goto cleanup;
     }
 
     identity = state_get_xbox_identity();
 
 cleanup:
-    free_memory((void **)&ctx->device);
-    free_memory((void **)&ctx->user_token);
-    free_memory((void **)&ctx->device_token);
+    free_device(&ctx->device);
+    free_token(&ctx->user_token);
+    free_token(&ctx->device_token);
+    free_token(&ctx->refresh_token);
     free_memory((void **)&ctx);
 
     return identity;

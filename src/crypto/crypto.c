@@ -468,7 +468,7 @@ EVP_PKEY *crypto_from_string(const char *key_json, bool expect_private) {
     EVP_PKEY_CTX_free(ctx);
 
 done:
-    FREE_JSON(json_root);
+    free_json_memory((void**)&json_root);
 
     return pkey;
 }
