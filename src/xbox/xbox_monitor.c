@@ -624,8 +624,6 @@ static void on_buffer_received(const char *buffer) {
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "[Monitoring] Message is %s", message);
-
     if (is_presence_message(message)) {
         obs_log(LOG_DEBUG, "[Monitoring] Message is a presence message");
         game = parse_game(message);
@@ -872,23 +870,25 @@ static void *monitoring_thread(void *arg) {
 
 bool xbox_monitoring_start() {
 
+    bool succeeded = false;
+
     if (g_monitoring_context) {
         obs_log(LOG_WARNING, "[Monitoring] Monitoring already active");
-        return false;
+        goto error;
     }
 
     xbox_identity_t *identity = xbox_live_get_identity();
 
     if (!identity) {
         obs_log(LOG_ERROR, "[Monitoring] No identity available");
-        return false;
+        goto error;
     }
 
     g_monitoring_context = (monitoring_context_t *)bzalloc(sizeof(monitoring_context_t));
 
     if (!g_monitoring_context) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to allocate context");
-        return false;
+        goto error;
     }
 
     char *authorization_header = build_authorization_header(identity);
@@ -905,24 +905,28 @@ bool xbox_monitoring_start() {
 
     if (!g_monitoring_context->rx_buffer) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to allocate receive buffer");
-        bfree(g_monitoring_context->auth_token);
-        bfree(g_monitoring_context);
-        g_monitoring_context = NULL;
-        return false;
+        goto error;
     }
 
     if (pthread_create(&g_monitoring_context->thread, NULL, monitoring_thread, g_monitoring_context) != 0) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to create monitoring thread");
-        bfree(g_monitoring_context->rx_buffer);
-        bfree(g_monitoring_context->auth_token);
-        bfree(g_monitoring_context);
-        g_monitoring_context = NULL;
-        return false;
+
+        goto error;
     }
 
     obs_log(LOG_INFO, "[Monitoring] Monitoring started");
+    succeeded = true;
+    goto done;
 
-    return true;
+error:
+    free_identity(&identity);
+    free_identity(&g_monitoring_context->identity);
+    free_memory((void **)&g_monitoring_context->rx_buffer);
+    free_memory((void **)&g_monitoring_context->auth_token);
+    free_memory((void **)&g_monitoring_context);
+
+done:
+    return succeeded;
 }
 
 void xbox_monitoring_stop(void) {
@@ -939,10 +943,13 @@ void xbox_monitoring_stop(void) {
         lws_cancel_service(g_monitoring_context->context);
     }
 
-    pthread_join(g_monitoring_context->thread, NULL);
+    if (g_monitoring_context->thread) {
+        pthread_join(g_monitoring_context->thread, NULL);
+    }
 
-    free_memory((void **)&g_monitoring_context->auth_token);
+    free_identity(&g_monitoring_context->identity);
     free_memory((void **)&g_monitoring_context->rx_buffer);
+    free_memory((void **)&g_monitoring_context->auth_token);
     free_memory((void **)&g_monitoring_context);
 
     obs_log(LOG_INFO, "[Monitoring] Monitoring stopped");

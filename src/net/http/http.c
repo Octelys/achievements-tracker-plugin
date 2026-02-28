@@ -62,6 +62,7 @@ static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *use
  *         to libcurl.
  */
 static size_t curl_write_image_cb(void *contents, size_t size, size_t nmemb, void *userp) {
+
     size_t               realsize = size * nmemb;
     struct image_buffer *buf      = userp;
 
@@ -87,30 +88,6 @@ static size_t curl_write_image_cb(void *contents, size_t size, size_t nmemb, voi
     return realsize;
 }
 
-/**
- * @brief libcurl debug callback used when CURLOPT_VERBOSE is enabled.
- *
- * Logs text and HTTP headers at LOG_DEBUG. Data payloads are intentionally
- * omitted because they can be large/noisy.
- */
-static int curl_debug_cb(CURL *handle, curl_infotype type, char *data, size_t size, void *userptr) {
-    (void)handle;
-    (void)userptr;
-
-    /* data is not guaranteed NUL-terminated */
-    switch (type) {
-    case CURLINFO_TEXT:
-    case CURLINFO_HEADER_IN:
-    case CURLINFO_HEADER_OUT:
-        obs_log(LOG_DEBUG, "curl: %.*s", (int)size, data);
-        break;
-    default:
-        /* CURLINFO_DATA_IN/OUT can be noisy; omit by default */
-        break;
-    }
-    return 0;
-}
-
 char *http_post_form(const char *url, const char *post_fields, long *out_http_code) {
     if (out_http_code)
         *out_http_code = 0;
@@ -126,10 +103,6 @@ char *http_post_form(const char *url, const char *post_fields, long *out_http_co
 
     struct curl_slist *headers = NULL;
     headers                    = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
-
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
-    curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -208,10 +181,6 @@ char *http_post(const char *url, const char *body, const char *extra_headers, lo
         bfree(dup);
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
-    curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
-
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -288,10 +257,6 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
         bfree(dup);
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
-    curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
-
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -325,6 +290,7 @@ char *http_post_json(const char *url, const char *json_body, const char *extra_h
 }
 
 char *http_get(const char *url, const char *extra_headers, const char *post_fields, long *out_http_code) {
+
     if (out_http_code)
         *out_http_code = 0;
 
@@ -332,6 +298,8 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
 
     if (!curl)
         return NULL;
+
+    char *ptr = NULL;
 
     struct http_buffer chunk = {0};
     chunk.ptr                = bzalloc(1);
@@ -369,10 +337,6 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
         bfree(dup);
     }
 
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, VERBOSE);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug_cb);
-    curl_easy_setopt(curl, CURLOPT_DEBUGDATA, NULL);
-
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
@@ -389,10 +353,9 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
 
     if (res != CURLE_OK) {
         obs_log(LOG_WARNING, "curl GET failed: %s", curl_easy_strerror(res));
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
         bfree(chunk.ptr);
-        return NULL;
+        chunk.ptr = NULL;
+        goto cleanup;
     }
 
     long http_code = 0;
@@ -401,13 +364,17 @@ char *http_get(const char *url, const char *extra_headers, const char *post_fiel
     if (out_http_code)
         *out_http_code = http_code;
 
+    ptr = chunk.ptr;
+
+cleanup:
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    return chunk.ptr;
+    return ptr;
 }
 
 char *http_urlencode(const char *in) {
+
     if (!in)
         return NULL;
 
@@ -436,6 +403,7 @@ bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
     *out_size = 0;
 
     CURL *curl = curl_easy_init();
+
     if (!curl) {
         obs_log(LOG_ERROR, "Failed to init curl for download");
         return false;
@@ -451,6 +419,7 @@ bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
     curl_easy_setopt(curl, CURLOPT_USERAGENT, DEFAULT_USER_AGENT);
 
     CURLcode res = curl_easy_perform(curl);
+
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
