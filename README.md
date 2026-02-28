@@ -354,13 +354,23 @@ cmake --build build_macos_dev --target test_time --config Debug
 
 ### macOS
 
-Quick notes
- - Ensure the plugin is build in `Debug`
- - Ensure the xcodeproj of the plugin has the option
- - Copy both the plugin and the dSYM in the `Debug/OBS/Contents/PlugIns` folder
+Ensure the plugin is build in `Debug`:
+ 
+```bash
+xcodebuild -configuration Debug -scheme achievements-tracker -parallelizeTargets -destination "generic/platform=macOS,name=Any Mac"
+```
 
-Open obs in Xcode
- - Ensure  `Debug` is chosen for `Profile` 
+Ensure the `xcodeproj` of the plugin has the option `DWARF with dSYM file` enabled:
+
+![plugin-xcode-dsym-configuration.png](images/plugin-xcode-dsym-configuration.png)
+
+Copy both the plugin and the dSYM in the `Debug/OBS/Contents/PlugIns` folder of OBS Studio:
+
+![plugin-debug-folders.png](images/plugin-debug-folders.png)
+
+Open `obs-studio` in Xcode and ensure  `Debug` configuration is chosen for `Profile`:
+
+![obs-xcode-profile-debug-scheme.png](images/obs-xcode-profile-debug-scheme.png)
 
 ---
 
