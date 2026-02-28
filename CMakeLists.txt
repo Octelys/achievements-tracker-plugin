@@ -58,8 +58,8 @@ if(NOT WIN32)
   endif()
 endif()
 
-# HTTP client for OAuth + XBL/XSTS flows
-find_package(CURL REQUIRED)
+# HTTP client for OAuth + XBL/XSTS flowsmessage(STATUS "Found cURL version: ${CURL_VERSION_STRING}")
+find_package(CURL 8.18.0 REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 # WebSocket client for Xbox Live RTA monitoring
