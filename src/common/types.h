@@ -26,38 +26,6 @@
 extern "C" {
 #endif
 
-/**
- * @brief Frees a cJSON object safely.
- *
- * Convenience macro around @c cJSON_Delete().
- *
- * @note Safe to pass NULL.
- * @note Does not set the pointer to NULL after freeing.
- *
- * @param p Pointer to a cJSON object to be freed.
- */
-#define FREE_JSON(p) \
-    if (p)            \
-    cJSON_Delete(p);
-
-/**
- * @brief Transfers ownership of an allocated pointer to an output parameter or frees it.
- *
- * If @p dst is non-NULL, assigns @p src to @c *dst. Otherwise, frees @p src
- * using @ref FREE.
- *
- * This is typically used to return a freshly allocated object either via an
- * out-parameter or to clean it up when the caller isn't interested.
- *
- * @param src Pointer to transfer to the caller or free.
- * @param dst Address of the destination pointer, or NULL to trigger cleanup.
- */
-#define COPY_OR_FREE(src, dst) \
-    if (dst)                  \
-        *dst = src;           \
-    else                      \
-        FREE(src);
-
 #if defined(_WIN32)
 #include <windows.h>
 

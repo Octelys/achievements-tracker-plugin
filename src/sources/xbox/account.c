@@ -5,7 +5,6 @@
 
 #include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "xbox/xbox_client.h"
 #include "xbox/xbox_monitor.h"
 
 typedef struct xbox_account_source {
