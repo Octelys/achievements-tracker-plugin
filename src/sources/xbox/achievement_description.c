@@ -302,7 +302,7 @@ static struct obs_source_info xbox_achievement_description_source = {
  *
  * @return Pointer to the xbox_achievement_description_source structure.
  */
-static const struct obs_source_info *xbox_source_get(void) {
+static const struct obs_source_info *steam_source_get(void) {
     return &xbox_achievement_description_source;
 }
 
@@ -317,7 +317,7 @@ void xbox_achievement_description_source_register(void) {
 
     update_render_config();
 
-    obs_register_source(xbox_source_get());
+    obs_register_source(steam_source_get());
 
     achievement_cycle_subscribe(&on_achievement_changed);
 }

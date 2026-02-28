@@ -1,11 +1,11 @@
-#include "xbox/xbox_session.h"
+#include "integrations/xbox/xbox_session.h"
 
 #include <diagnostics/log.h>
 
 #include "common/types.h"
 #include "io/cache.h"
 #include "util/bmem.h"
-#include "xbox/xbox_client.h"
+#include "integrations/xbox/xbox_client.h"
 
 #include <errno.h>
 #include <util/thread_compat.h>

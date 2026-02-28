@@ -6,8 +6,8 @@
 #include "oauth/xbox-live.h"
 #include "sources/common/image_source.h"
 #include "common/memory.h"
-#include "xbox/xbox_client.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/xbox_client.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 /**
  * @brief Global singleton gamerpic cache.

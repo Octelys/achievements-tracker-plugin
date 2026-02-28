@@ -28,7 +28,7 @@
 #include "common/achievement.h"
 #include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
 
@@ -213,7 +213,7 @@ static struct obs_source_info xbox_achievements_count_source = {
 /**
  * @brief Get the obs_source_info for registration.
  */
-static const struct obs_source_info *xbox_source_get(void) {
+static const struct obs_source_info *steam_source_get(void) {
     return &xbox_achievements_count_source;
 }
 
@@ -226,7 +226,7 @@ void xbox_achievements_count_source_register(void) {
     g_configuration = state_get_achievements_count_configuration();
     state_set_achievements_count_configuration(g_configuration);
 
-    obs_register_source(xbox_source_get());
+    obs_register_source(steam_source_get());
 
     xbox_subscribe_achievements_progressed(&on_achievements_progressed);
     xbox_subscribe_game_played(&on_game_played);

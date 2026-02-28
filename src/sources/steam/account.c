@@ -5,29 +5,19 @@
 
 #include "io/state.h"
 #include "oauth/xbox-live.h"
-#include "integrations/xbox/xbox_monitor.h"
+#include "xbox/xbox_monitor.h"
 
-typedef struct xbox_account_source {
+typedef struct steam_account_source {
     obs_source_t *source;
     uint32_t      width;
     uint32_t      height;
-} xbox_account_source_t;
+} steam_account_source_t;
 
 /**
  * @brief Starts the monitoring if the user is logged in.
  */
 static void start_monitoring_if_needed(void) {
 
-    xbox_identity_t *identity = xbox_live_get_identity();
-
-    if (!identity) {
-        obs_log(LOG_INFO, "Monitoring will not be started: no identity signed-in");
-        return;
-    }
-
-    xbox_monitoring_start();
-
-    free_identity(&identity);
 }
 
 /**
@@ -41,23 +31,23 @@ static void refresh_properties_on_main(void *data) {
     if (!source)
         return;
 
-    // Update the xbox_status field in the source settings so the read-only
-    // text field reflects the current sign-in state after the UI rebuilds.
-    xbox_identity_t *identity = xbox_live_get_identity();
-    obs_data_t      *settings = obs_source_get_settings(source);
-
-    if (settings) {
-        if (identity) {
-            char status[1024];
-            snprintf(status, sizeof(status), "Signed in as %s", identity->gamertag);
-            obs_data_set_string(settings, "xbox_status", status);
-        } else {
-            obs_data_set_string(settings, "xbox_status", "Not connected.");
-        }
-        obs_data_release(settings);
-    }
-
-    free_identity(&identity);
+    // // Update the xbox_status field in the source settings so the read-only
+    // // text field reflects the current sign-in state after the UI rebuilds.
+    // xbox_identity_t *identity = xbox_live_get_identity();
+    // obs_data_t      *settings = obs_source_get_settings(source);
+    //
+    // if (settings) {
+    //     if (identity) {
+    //         char status[1024];
+    //         snprintf(status, sizeof(status), "Signed in as %s", identity->gamertag);
+    //         obs_data_set_string(settings, "xbox_status", status);
+    //     } else {
+    //         obs_data_set_string(settings, "xbox_status", "Not connected.");
+    //     }
+    //     obs_data_release(settings);
+    // }
+    //
+    // free_identity(&identity);
 
     obs_source_update_properties(source);
 }
@@ -71,7 +61,7 @@ static void refresh_properties_on_main(void *data) {
  * @param data Pointer to the @c xbox_account_source_t instance.
  */
 static void schedule_refresh_properties(void *data) {
-    xbox_account_source_t *s = data;
+    steam_account_source_t *s = data;
 
     if (!s || !s->source)
         return;
@@ -96,7 +86,7 @@ static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *propert
 
     schedule_refresh_properties(data);
 
-    xbox_monitoring_stop();
+    //xbox_monitoring_stop();
 
     return true;
 }
@@ -108,7 +98,7 @@ static bool on_sign_out_clicked(obs_properties_t *props, obs_property_t *propert
  */
 static void on_xbox_signed_in(void *data) {
 
-    start_monitoring_if_needed();
+    //start_monitoring_if_needed();
 
     schedule_refresh_properties(data);
 }
@@ -125,10 +115,10 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
     UNUSED_PARAMETER(property);
     UNUSED_PARAMETER(data);
 
-    if (!xbox_live_authenticate(data, &on_xbox_signed_in)) {
-        obs_log(LOG_WARNING, "Xbox sign-in failed");
-        return false;
-    }
+    //if (!xbox_live_authenticate(data, &on_xbox_signed_in)) {
+    //    obs_log(LOG_WARNING, "Xbox sign-in failed");
+    //    return false;
+    //}
 
     return true;
 }
@@ -142,13 +132,13 @@ static bool on_sign_in_xbox_clicked(obs_properties_t *props, obs_property_t *pro
  *
  * Allocates and initializes the per-source context.
  *
- * @return Newly allocated @c xbox_account_source_t instance.
+ * @return Newly allocated @c steam_account_source_t instance.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
     UNUSED_PARAMETER(settings);
 
-    xbox_account_source_t *s = bzalloc(sizeof(*s));
+    steam_account_source_t *s = bzalloc(sizeof(*s));
     s->source                = source;
     s->width                 = 10;
     s->height                = 10;
@@ -163,7 +153,7 @@ static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
  */
 static void on_source_destroy(void *data) {
 
-    xbox_account_source_t *source = data;
+    steam_account_source_t *source = data;
 
     if (!source) {
         return;
@@ -176,7 +166,7 @@ static void on_source_destroy(void *data) {
  * @brief OBS source callback returning the current width.
  */
 static uint32_t source_get_width(void *data) {
-    const xbox_account_source_t *s = data;
+    const steam_account_source_t *s = data;
     return s->width;
 }
 
@@ -184,7 +174,7 @@ static uint32_t source_get_width(void *data) {
  * @brief OBS source callback returning the current height.
  */
 static uint32_t source_get_height(void *data) {
-    const xbox_account_source_t *s = data;
+    const steam_account_source_t *s = data;
     return s->height;
 }
 
@@ -211,39 +201,20 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  * Provides sign-in / sign-out buttons.
  */
 static obs_properties_t *source_get_properties(void *data) {
-    xbox_account_source_t *s             = data;
-    xbox_identity_t       *xbox_identity = xbox_live_get_identity();
+
     obs_properties_t      *p             = obs_properties_create();
 
-    // Push the live sign-in state into obs_data so the read-only field
-    // always shows the real value, not the stale default.
-    if (s && s->source) {
-        obs_data_t *settings = obs_source_get_settings(s->source);
-        if (settings) {
-            if (xbox_identity) {
-                char status[1024];
-                snprintf(status, sizeof(status), "Signed in as %s", xbox_identity->gamertag);
-                obs_data_set_string(settings, "xbox_status", status);
-            } else {
-                obs_data_set_string(settings, "xbox_status", "Not connected.");
-            }
-            obs_data_release(settings);
-        }
-    }
-
-    obs_property_t *status_prop = obs_properties_add_text(p, "xbox_status", "Xbox Account", OBS_TEXT_DEFAULT);
+    obs_property_t *status_prop = obs_properties_add_text(p, "steam_status", "Steam Account", OBS_TEXT_DEFAULT);
     obs_property_set_enabled(status_prop, false);
 
     obs_property_t *version_prop = obs_properties_add_text(p, "plugin_version", "Plugin version", OBS_TEXT_DEFAULT);
     obs_property_set_enabled(version_prop, false);
 
-    if (xbox_identity != NULL) {
-        obs_properties_add_button(p, "sign_out_xbox", "Sign out from Xbox", &on_sign_out_clicked);
-    } else {
-        obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
-    }
-
-    free_identity(&xbox_identity);
+    //if (xbox_identity != NULL) {
+        obs_properties_add_button(p, "sign_out_steeam", "Sign out from Steam", &on_sign_out_clicked);
+    //} else {
+    //    obs_properties_add_button(p, "sign_in_xbox", "Sign in with Xbox", &on_sign_in_xbox_clicked);
+    //}
 
     return p;
 }
@@ -255,7 +226,7 @@ static obs_properties_t *source_get_properties(void *data) {
  * so OBS displays it in the bordered text field without requiring user input.
  */
 static void source_get_defaults(obs_data_t *settings) {
-    obs_data_set_default_string(settings, "xbox_status", "Not connected.");
+    obs_data_set_default_string(settings, "steam_status", "Not connected.");
     obs_data_set_default_string(settings, "plugin_version", PLUGIN_VERSION);
 }
 
@@ -265,11 +236,11 @@ static void source_get_defaults(obs_data_t *settings) {
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Account";
+    return "Steam Account";
 }
 
-static struct obs_source_info xbox_account_source = {
-    .id             = "xbox_account_source",
+static struct obs_source_info steam_account_source = {
+    .id             = "steam_account_source",
     .type           = OBS_SOURCE_TYPE_INPUT,
     .output_flags   = OBS_SOURCE_VIDEO,
     .get_name       = source_get_name,
@@ -284,17 +255,17 @@ static struct obs_source_info xbox_account_source = {
     .video_render   = on_source_video_render,
 };
 
-static const struct obs_source_info *xbox_source_get(void) {
-    return &xbox_account_source;
+static const struct obs_source_info *steam_source_get(void) {
+    return &steam_account_source;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//      Public functions
+//  Public API
 //  --------------------------------------------------------------------------------------------------------------------
 
-void xbox_account_source_register(void) {
+void steam_account_source_register(void) {
 
-    obs_register_source(xbox_source_get());
+    obs_register_source(steam_source_get());
 
     start_monitoring_if_needed();
 }
