@@ -58,9 +58,6 @@ if(NOT WIN32)
   endif()
 endif()
 
-# HTTP client for OAuth + XBL/XSTS flowsmessage(STATUS "Found cURL version: ${CURL_VERSION_STRING}")
-find_package(CURL 8.18.0 REQUIRED)
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 # WebSocket client for Xbox Live RTA monitoring
 # Try multiple methods to find libwebsockets
@@ -206,6 +203,13 @@ else()
   target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_INCLUDE_DIR})
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
 endif()
+
+# HTTP client for OAuth + XBL/XSTS flows
+# Fetch and build cURL 8.18.0 from source so the correct version is used on all platforms.
+# Must come after OpenSSL is resolved so cURL picks up the same OpenSSL targets.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FetchCURL.cmake)
+message(STATUS "Using cURL version: 8.18.0 (via FetchContent)")
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 if(ENABLE_FRONTEND_API)
   find_package(obs-frontend-api REQUIRED)
