@@ -2,6 +2,7 @@
 #include <diagnostics/log.h>
 
 #include "sources/common/achievement_cycle.h"
+#include "sources/play-lab/account.h"
 #include "sources/xbox/account.h"
 #include "sources/xbox/gamerpic.h"
 #include "sources/xbox/game_cover.h"
@@ -14,6 +15,7 @@
 #include "sources/xbox/achievement_icon.h"
 #include "sources/xbox/achievements_count.h"
 #include "drawing/image.h"
+#include "sources/google/account.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -23,6 +25,8 @@ bool obs_module_load(void) {
     io_load();
 
     xbox_account_source_register();
+    playlab_account_source_register();
+    google_account_source_register();
 
     xbox_gamerpic_source_register();
     xbox_game_cover_source_register();
