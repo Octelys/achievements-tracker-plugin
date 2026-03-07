@@ -5,14 +5,44 @@
 
 #include <stdlib.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 bool open_url(const char *url) {
     if (!url || !*url)
         return false;
 
-#ifdef __APPLE__
+#ifdef _WIN32
+
+    /* Support for Windows */
+    HINSTANCE result = ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+    if ((INT_PTR)result <= 32) {
+        obs_log(LOG_WARNING, "Failed to open browser (ShellExecute error=%ld)", (long)(INT_PTR)result);
+        return false;
+    }
+
+    return true;
+
+#else
+
 
     char cmd[2048];
-    int  n = snprintf(cmd, sizeof(cmd), "open '%s'", url);
+    int n = 0;
+
+#ifdef __APPLE__
+
+    /* Support for Apple */
+    n = snprintf(cmd, sizeof(cmd), "open '%s'", url);
+
+#else
+
+    /* Support for Linux. */
+    n = snprintf(cmd, sizeof(cmd), "xdg-open '%s'", url);
+
+#endif
+
     if (n <= 0 || (size_t)n >= sizeof(cmd)) {
         obs_log(LOG_WARNING, "Failed to build browser launch command");
         return false;
@@ -26,11 +56,6 @@ bool open_url(const char *url) {
     }
 
     return true;
-
-#else
-
-    obs_log(LOG_WARNING, "Open-browser not implemented for this OS yet. Please open: %s", url);
-    return false;
 
 #endif
 }
