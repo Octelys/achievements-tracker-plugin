@@ -27,9 +27,8 @@ bool open_url(const char *url) {
 
 #else
 
-
     char cmd[2048];
-    int n = 0;
+    int  n = 0;
 
 #ifdef __APPLE__
 
