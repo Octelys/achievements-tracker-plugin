@@ -1,0 +1,55 @@
+name: Check OBS Studio Update
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check-obs-update:
+    name: Check for new OBS Studio release 🔎
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get current OBS version from buildspec.json
+        id: current
+        run: |
+          : Get current OBS version from buildspec.json
+          version="$(jq -r '.dependencies["obs-studio"].version' buildspec.json)"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
+      - name: Get latest OBS Studio release
+        id: latest
+        run: |
+          : Get latest OBS Studio release
+          version="$(curl -fsSL https://api.github.com/repos/obsproject/obs-studio/releases/latest \
+            | jq -r '.tag_name' | sed 's/^v//')"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+
+      - name: Open PR if outdated
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: bump OBS Studio to ${{ steps.latest.outputs.version }}"
+          branch: chore/obs-studio-${{ steps.latest.outputs.version }}
+          title: "chore: bump OBS Studio to ${{ steps.latest.outputs.version }}"
+          body: |
+            OBS Studio **${{ steps.latest.outputs.version }}** is available.
+            Current pinned version: **${{ steps.current.outputs.version }}**
+
+            ### Required manual steps
+            1. Update `dependencies.obs-studio.version` in `buildspec.json`
+            2. Recompute and update the `hashes` for each platform:
+               - `macos`
+               - `windows-x64`
+               - `windows-arm64`
+
+            Release page: https://github.com/obsproject/obs-studio/releases/tag/${{ steps.latest.outputs.version }}
+          labels: dependencies
+

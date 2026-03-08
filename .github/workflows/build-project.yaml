@@ -413,6 +413,18 @@ jobs:
           "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
           "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
 
+      - name: Install OpenSSL for ARM64 🔐
+        run: |
+          # Install OpenSSL for ARM64 via vcpkg.
+          # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
+          # The system OpenSSL is x64-only; we need an arm64-windows build.
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows
+          $opensslRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows"
+          # CMake reads CMAKE_PREFIX_PATH from the environment and prepends it to
+          # its search path, so both find_package(OpenSSL CONFIG) and module mode
+          # will find the ARM64 libraries without any changes to the preset or script.
+          "CMAKE_PREFIX_PATH=$opensslRoot" >> $env:GITHUB_ENV
+
       - name: Build Plugin 🧱
         uses: ./.github/actions/build-plugin
         with:
