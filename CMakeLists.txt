@@ -181,6 +181,12 @@ endif()
 
 if(TARGET OpenSSL::Crypto)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OpenSSL::Crypto)
+  if(WIN32)
+    # Static OpenSSL requires ws2_32 (Winsock) and crypt32 (Windows certificate
+    # store) which the shared/system build pulls in automatically but the static
+    # vcpkg build does not propagate through its imported target.
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 crypt32)
+  endif()
   if(APPLE)
     message(STATUS "Successfully linked OpenSSL::Crypto target")
   endif()
@@ -402,6 +408,9 @@ if(BUILD_TESTING)
       # Ensure headers are available even if the imported targets don't propagate include dirs.
       if(OPENSSL_INCLUDE_DIR)
         target_include_directories(${target_name} PRIVATE ${OPENSSL_INCLUDE_DIR})
+      endif()
+      if(WIN32)
+        target_link_libraries(${target_name} PRIVATE ws2_32 crypt32)
       endif()
     else()
       target_include_directories(${target_name} PRIVATE ${OPENSSL_INCLUDE_DIR})
