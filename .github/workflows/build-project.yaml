@@ -421,8 +421,10 @@ jobs:
           # Install OpenSSL for ARM64 via vcpkg.
           # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
           # The system OpenSSL is x64-only; we need an arm64-windows build.
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows
-          $opensslRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows"
+          # Use the static triplet so OpenSSL is linked into the plugin DLL directly,
+          # avoiding a runtime dependency on libssl/libcrypto DLLs that OBS won't ship.
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows-static
+          $opensslRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static"
           # CMake reads CMAKE_PREFIX_PATH from the environment and prepends it to
           # its search path, so both find_package(OpenSSL CONFIG) and module mode
           # will find the ARM64 libraries without any changes to the preset or script.

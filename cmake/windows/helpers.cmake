@@ -22,19 +22,7 @@ function(set_target_properties_plugin target)
 
   set_target_properties(${target} PROPERTIES VERSION 0 SOVERSION ${PLUGIN_VERSION})
 
-  # Resolve the OBS plugin bin subdirectory for the target architecture.
-  # OBS uses "64bit" for x64 and "ARM64" for ARM64.
-  if(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64")
-    set(_obs_bin_dir "ARM64")
-  else()
-    set(_obs_bin_dir "64bit")
-  endif()
-
-  install(
-    TARGETS ${target}
-    RUNTIME DESTINATION "${target}/bin/${_obs_bin_dir}"
-    LIBRARY DESTINATION "${target}/bin/${_obs_bin_dir}"
-  )
+  install(TARGETS ${target} RUNTIME DESTINATION "${target}/bin/64bit" LIBRARY DESTINATION "${target}/bin/64bit")
 
   install(
     FILES "$<TARGET_PDB_FILE:${target}>"
