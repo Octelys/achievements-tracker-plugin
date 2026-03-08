@@ -291,7 +291,7 @@ cmake --build build_windows --config Release
 
 1. Install dependencies:
 ```bash
-sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6-dev
+sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6-dev libwebsockets-dev
 ```
 
 2. Configure and build:
