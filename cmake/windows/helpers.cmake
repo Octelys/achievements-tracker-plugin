@@ -30,7 +30,11 @@ function(set_target_properties_plugin target)
     set(_obs_bin_dir "64bit")
   endif()
 
-  install(TARGETS ${target} RUNTIME DESTINATION "${target}/bin/${_obs_bin_dir}" LIBRARY DESTINATION "${target}/bin/${_obs_bin_dir}")
+  install(
+    TARGETS ${target}
+    RUNTIME DESTINATION "${target}/bin/${_obs_bin_dir}"
+    LIBRARY DESTINATION "${target}/bin/${_obs_bin_dir}"
+  )
 
   install(
     FILES "$<TARGET_PDB_FILE:${target}>"
