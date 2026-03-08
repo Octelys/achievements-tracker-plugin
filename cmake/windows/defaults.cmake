@@ -6,6 +6,7 @@ include_guard(GLOBAL)
 set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL TRUE)
 
 include(buildspec)
+include(installer)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(

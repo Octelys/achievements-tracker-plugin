@@ -4,7 +4,8 @@ param(
     [string] $Target = 'x64',
     [ValidateSet('Debug', 'RelWithDebInfo', 'Release', 'MinSizeRel')]
     [string] $Configuration = 'RelWithDebInfo',
-    [string] $ProductVersion = ''
+    [string] $ProductVersion = '',
+    [switch] $Package
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,6 +71,46 @@ function Package {
     }
     Compress-Archive -Force @CompressArgs
     Log-Group
+
+    if ( $Package ) {
+        Log-Group "Building NSIS installer for ${ProductName} (${Target})..."
+
+        # Install NSIS if not already present (CI)
+        if ( -not ( Get-Command makensis -ErrorAction SilentlyContinue ) ) {
+            Log-Group "Installing NSIS..."
+            choco install nsis --no-progress --yes
+            $env:PATH += ";C:\Program Files (x86)\NSIS"
+        }
+
+        # Run cmake --install first to populate the release prefix
+        Invoke-External cmake `
+            --install "build_${Target}" `
+            --prefix "${ProjectRoot}/release/${Configuration}" `
+            --config $Configuration
+
+        # Build the installer via the package-installer CMake target
+        Invoke-External cmake `
+            --build "build_${Target}" `
+            --target package-installer `
+            --config $Configuration
+
+        # Move the generated .exe to the release root alongside the .zip
+        $InstallerExe = Get-ChildItem `
+            -Path "${ProjectRoot}/build_${Target}" `
+            -Filter "${ProductName}-*-windows-*.exe" `
+            -Recurse `
+            -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+
+        if ( $InstallerExe ) {
+            Move-Item -Force $InstallerExe.FullName "${ProjectRoot}/release/${OutputName}.exe"
+            Write-Output "Installer: ${ProjectRoot}/release/${OutputName}.exe"
+        } else {
+            Write-Warning "Installer .exe not found after build"
+        }
+
+        Log-Group
+    }
 }
 
 Package

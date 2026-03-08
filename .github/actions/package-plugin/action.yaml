@@ -120,4 +120,8 @@ runs:
           $PackageArgs['ProductVersion'] = '${{ inputs.version }}'
         }
 
+        if ( '${{ inputs.package }}' -eq 'true' ) {
+          $PackageArgs['Package'] = $true
+        }
+
         .github/scripts/Package-Windows.ps1 @PackageArgs
