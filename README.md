@@ -20,12 +20,23 @@ A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement
 
 ### Installation
 
-1. Download the latest release for your platform from the [Releases](https://github.com/your-org/achievements-tracker-plugin/releases) page
-2. Extract the archive to your OBS Studio plugins directory:
-   - **Windows**: `%ProgramFiles%\obs-studio\obs-plugins\64bit\`
-   - **macOS**: `~/Library/Application Support/obs-studio/plugins/`
-   - **Linux**: `~/.config/obs-studio/plugins/`
-3. Restart OBS Studio
+1. Download the latest release for your platform from the [Releases](https://github.com/your-org/achievements-tracker-plugin/releases) page:
+   - **Windows x64**: `achievements-tracker-<version>-windows-x64.exe` (installer) or `.zip` (manual)
+   - **Windows ARM64**: `achievements-tracker-<version>-windows-arm64.exe` (installer) or `.zip` (manual)
+   - **macOS**: `achievements-tracker-<version>-macos-universal.pkg` (installer) or `.tar.xz` (manual)
+   - **Linux**: `achievements-tracker-<version>-x86_64-ubuntu-gnu.tar.xz`
+
+2. **Windows**: Run the `.exe` installer — it will automatically detect your OBS Studio installation and place the plugin in the correct directory. Alternatively, extract the `.zip` manually:
+   - `obs-plugins\64bit\achievements-tracker.dll` → `%ProgramFiles%\obs-studio\obs-plugins\64bit\`
+   - `data\obs-plugins\achievements-tracker\` → `%ProgramFiles%\obs-studio\data\obs-plugins\achievements-tracker\`
+
+3. **macOS**: Run the `.pkg` installer, or extract the `.tar.xz` and copy `achievements-tracker.plugin` to:
+   - `~/Library/Application Support/obs-studio/plugins/`
+
+4. **Linux**: Extract the `.tar.xz` and copy files to:
+   - `~/.config/obs-studio/plugins/`
+
+5. Restart OBS Studio.
 
 ### Configuration
 
@@ -212,15 +223,26 @@ The plugin implements the Xbox Live authentication flow with Proof-of-Possession
 ### Prerequisites
 
 - **CMake** 3.28 or later
-- **OBS Studio** 30.0+ (headers + libraries)
+- **OBS Studio** 31.0+ (headers + libraries)
 - **OpenSSL** 3.x (for cryptographic operations)
 - **libcurl** (for HTTP requests)
+- **libwebsockets** (for Xbox Live real-time activity monitoring via WebSocket)
 - **FreeType** 2.x (for text rendering)
 - **zlib** (required by FreeType, usually available by default)
 - **libuuid** (Linux/BSD only, for UUID generation)
 - C compiler with C11 support
 
 **Note on zlib:** zlib is required by FreeType for font compression support and is typically pre-installed on all platforms (macOS SDK, Windows via vcpkg/obs-deps, Linux system packages).
+
+#### Linking strategy per platform
+
+The project uses a deliberate per-platform linking strategy for OpenSSL and libwebsockets:
+
+| Platform | Linking | Reason |
+|---|---|---|
+| **Windows** | Static (`*-windows-static-md`) | OBS does not ship OpenSSL or libwebsockets on Windows. Static linking makes the plugin DLL fully self-contained with no extra runtime dependencies to distribute. The `-md` suffix ensures the static libraries use the dynamic CRT (`/MD`), matching OBS and avoiding `LNK4098` conflicts. |
+| **macOS** | Dynamic (Homebrew / obs-deps) | OBS deps and Homebrew provide universal binaries. Dynamic linking keeps the plugin bundle small and follows macOS conventions. |
+| **Linux** | Dynamic (system packages) | Linux distributions ship OpenSSL and libwebsockets as system `.so` files. Static linking against `glibc`-dependent libraries (such as those used by libwebsockets) can break resolver APIs (`getaddrinfo`, NSS). Dynamic linking follows distro conventions and ensures security patches are picked up automatically. |
 
 ### Platform-Specific Setup
 
@@ -274,20 +296,56 @@ cmake --preset macos-ci
 
 The CI workflow automatically builds universal FreeType before building the plugin.
 
-#### Windows (Untested)
+#### Windows
+
+Dependencies are installed via **vcpkg** using the `*-windows-static-md` triplet, which produces static libraries linked against the dynamic CRT (`/MD`). This keeps the plugin DLL self-contained while remaining compatible with OBS's runtime.
 
 1. Install dependencies via vcpkg:
 ```powershell
-vcpkg install openssl:x64-windows curl:x64-windows freetype:x64-windows
+# x64
+vcpkg install openssl:x64-windows-static-md libwebsockets:x64-windows-static-md
+
+# ARM64
+vcpkg install openssl:arm64-windows-static-md libwebsockets:arm64-windows-static-md
 ```
 
-2. Configure and build:
+> **Note:** `libcurl` and `FreeType` are provided by the obs-deps prebuilt package, which the CMake build system downloads automatically via `buildspec.json`. You do not need to install them manually.
+
+> **Note:** The following Windows SDK libraries are linked automatically by CMake as transitive dependencies of the static vcpkg packages: `ws2_32` (Winsock, required by OpenSSL and libwebsockets), `crypt32` (Windows certificate store, required by OpenSSL), and `dbghelp` (required by libuv, which libwebsockets depends on).
+
+2. Configure, passing the vcpkg install path via `CMAKE_PREFIX_PATH`:
 ```powershell
+# x64
+$env:CMAKE_PREFIX_PATH = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md"
 cmake --preset windows-x64
-cmake --build build_windows --config Release
+
+# ARM64
+$env:CMAKE_PREFIX_PATH = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static-md"
+cmake --preset windows-arm64
 ```
 
-#### Linux (Untested)
+3. Build:
+```powershell
+cmake --build build_x64 --config RelWithDebInfo
+# or
+cmake --build build_arm64 --config RelWithDebInfo
+```
+
+4. Build the NSIS installer (requires [NSIS](https://nsis.sourceforge.io/) to be installed):
+```powershell
+cmake --build build_x64 --target package-installer --config RelWithDebInfo
+```
+The installer will be placed in `build_x64/` as `achievements-tracker-<version>-windows-x64.exe`.
+
+5. Or install directly into OBS:
+```powershell
+cmake --install build_x64 --config RelWithDebInfo
+```
+This installs to `%ALLUSERSPROFILE%\obs-studio\plugins\` by default.
+
+#### Linux
+
+Dependencies are installed from system packages and linked **dynamically**. Static linking is avoided on Linux because `glibc`-dependent libraries (such as those used by libwebsockets) can break resolver APIs (`getaddrinfo`, NSS) when statically linked.
 
 1. Install dependencies:
 ```bash
@@ -296,8 +354,13 @@ sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6
 
 2. Configure and build:
 ```bash
-cmake --preset linux-x64
-cmake --build build_linux --config Release
+cmake --preset ubuntu-x86_64
+cmake --build build_x86_64 --config RelWithDebInfo
+```
+
+3. Install directly into OBS:
+```bash
+cmake --install build_x86_64 --config RelWithDebInfo
 ```
 
 ---

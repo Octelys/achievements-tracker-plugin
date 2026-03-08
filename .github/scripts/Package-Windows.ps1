@@ -82,10 +82,14 @@ function Package {
             $env:PATH += ";C:\Program Files (x86)\NSIS"
         }
 
-        # Run cmake --install first to populate the release prefix
+        # Run cmake --install to populate the staging directory.
+        # The NSIS script sources files from this exact path:
+        #   build_${Target}/../release/${Configuration}
+        #   = ${ProjectRoot}/release/${Configuration}
+        $StageDir = "${ProjectRoot}/release/${Configuration}"
         Invoke-External cmake `
-            --install "build_${Target}" `
-            --prefix "${ProjectRoot}/release/${Configuration}" `
+            --install "${ProjectRoot}/build_${Target}" `
+            --prefix $StageDir `
             --config $Configuration
 
         # Build the installer via the package-installer CMake target
