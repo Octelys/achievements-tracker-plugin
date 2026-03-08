@@ -361,6 +361,16 @@ jobs:
           "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
           "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
 
+      - name: Install Dependencies 🔐
+        run: |
+          # Install libwebsockets for x64 via vcpkg.
+          # The obs-deps prebuilt package does not ship libwebsockets on Windows;
+          # the system has no libwebsockets either, so install it from vcpkg.
+          # Use the static triplet to avoid runtime DLL dependencies.
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install libwebsockets:x64-windows-static
+          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static"
+          "CMAKE_PREFIX_PATH=$depsRoot" >> $env:GITHUB_ENV
+
       - name: Build Plugin 🧱
         uses: ./.github/actions/build-plugin
         with:
@@ -418,17 +428,17 @@ jobs:
 
       - name: Install OpenSSL for ARM64 🔐
         run: |
-          # Install OpenSSL for ARM64 via vcpkg.
+          # Install OpenSSL and libwebsockets for ARM64 via vcpkg.
           # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
           # The system OpenSSL is x64-only; we need an arm64-windows build.
           # Use the static triplet so OpenSSL is linked into the plugin DLL directly,
           # avoiding a runtime dependency on libssl/libcrypto DLLs that OBS won't ship.
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows-static
-          $opensslRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static"
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows-static libwebsockets:arm64-windows-static
+          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static"
           # CMake reads CMAKE_PREFIX_PATH from the environment and prepends it to
           # its search path, so both find_package(OpenSSL CONFIG) and module mode
           # will find the ARM64 libraries without any changes to the preset or script.
-          "CMAKE_PREFIX_PATH=$opensslRoot" >> $env:GITHUB_ENV
+          "CMAKE_PREFIX_PATH=$depsRoot" >> $env:GITHUB_ENV
 
       - name: Build Plugin 🧱
         uses: ./.github/actions/build-plugin
