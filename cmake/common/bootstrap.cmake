@@ -51,9 +51,16 @@ string(JSON _author GET ${buildspec} author)
 string(JSON _email GET ${buildspec} email)
 string(JSON _bundleId GET ${buildspec} platformConfig macos bundleId)
 
+# displayName is optional — fall back to name if absent
+string(JSON _displayName ERROR_VARIABLE _displayName_error GET ${buildspec} displayName)
+if(_displayName_error OR NOT _displayName)
+  set(_displayName ${_name})
+endif()
+
 set(PLUGIN_AUTHOR ${_author})
 set(PLUGIN_WEBSITE ${_website})
 set(PLUGIN_EMAIL ${_email})
+set(PLUGIN_DISPLAY_NAME ${_displayName})
 set(MACOS_BUNDLEID ${_bundleId})
 
 # Resolve build number first (needed for version computation)
