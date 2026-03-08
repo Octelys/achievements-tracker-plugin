@@ -81,7 +81,7 @@ jobs:
 
 
   macos-build:
-    name: Build for macOS 
+    name: Build for macOS Universal 🍎
     runs-on: macos-15
     needs: check-event
     defaults:
@@ -223,7 +223,7 @@ jobs:
           key: ${{ runner.os }}-ccache-${{ needs.check-event.outputs.config }}
 
   ubuntu-build:
-    name: Build for Ubuntu 🐧
+    name: Build for Ubuntu x86_64 🐧
     strategy:
       matrix:
         os: [ubuntu-24.04]
@@ -327,7 +327,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.os }}-ccache-x86_64-${{ needs.check-event.outputs.config }}
 
   windows-build:
-    name: Build for Windows 🪟
+    name: Build for Windows x64 🪟
     runs-on: windows-2022
     needs: check-event
     defaults:
