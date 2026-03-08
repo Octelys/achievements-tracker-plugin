@@ -40,6 +40,10 @@ inputs:
     description: Create Windows or macOS installation package
     required: false
     default: 'false'
+  version:
+    description: Plugin version string to embed in the output filename (Windows only)
+    required: false
+    default: ''
   workingDirectory:
     description: Working directory for packaging
     required: false
@@ -108,6 +112,10 @@ runs:
         $PackageArgs = @{
           Target = '${{ inputs.target }}'
           Configuration = '${{ inputs.config }}'
+        }
+
+        if ( '${{ inputs.version }}' -ne '' ) {
+          $PackageArgs['ProductVersion'] = '${{ inputs.version }}'
         }
 
         .github/scripts/Package-Windows.ps1 @PackageArgs
