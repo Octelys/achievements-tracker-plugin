@@ -1,9 +1,10 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('x64')]
+    [ValidateSet('x64', 'arm64')]
     [string] $Target = 'x64',
     [ValidateSet('Debug', 'RelWithDebInfo', 'Release', 'MinSizeRel')]
-    [string] $Configuration = 'RelWithDebInfo'
+    [string] $Configuration = 'RelWithDebInfo',
+    [string] $ProductVersion = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,7 +46,9 @@ function Package {
 
     $BuildSpec = Get-Content -Path ${BuildSpecFile} -Raw | ConvertFrom-Json
     $ProductName = $BuildSpec.name
-    $ProductVersion = $BuildSpec.version
+    if ( $ProductVersion -eq '' ) {
+        $ProductVersion = $BuildSpec.version
+    }
 
     $OutputName = "${ProductName}-${ProductVersion}-windows-${Target}"
 

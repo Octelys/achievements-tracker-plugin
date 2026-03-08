@@ -45,6 +45,13 @@ add_compile_definitions(
   _UNICODE
   _CRT_SECURE_NO_WARNINGS
   _CRT_NONSTDC_NO_WARNINGS
+  # Prevent windows.h from including winsock.h (v1). Any code that needs
+  # Winsock must include winsock2.h (or a header that does so, e.g.
+  # libwebsockets.h) before including windows.h, or rely on this define to
+  # keep windows.h lean. Without this, winsock.h and winsock2.h both get
+  # included, causing struct redefinition errors (sockaddr, fd_set, etc.).
+  WIN32_LEAN_AND_MEAN
+  VC_EXTRA_LEAN
   $<$<CONFIG:DEBUG>:DEBUG>
   $<$<CONFIG:DEBUG>:_DEBUG>
 )

@@ -40,6 +40,10 @@ inputs:
     description: Create Windows or macOS installation package
     required: false
     default: 'false'
+  version:
+    description: Plugin version string to embed in the output filename (Windows only)
+    required: false
+    default: ''
   workingDirectory:
     description: Working directory for packaging
     required: false
@@ -66,6 +70,7 @@ runs:
         if [[ '${{ inputs.codesign }}' == 'true' ]] package_args+=(--codesign)
         if [[ '${{ inputs.notarize }}' == 'true' ]] package_args+=(--notarize)
         if [[ '${{ inputs.package }}' == 'true' ]] package_args+=(--package)
+        if [[ -n '${{ inputs.version }}' ]] package_args+=(--version '${{ inputs.version }}')
 
         .github/scripts/package-macos ${package_args}
 
@@ -93,6 +98,7 @@ runs:
         if (( ${+RUNNER_DEBUG} )) build_args+=(--debug)
 
         if [[ '${{ inputs.package }}' == 'true' ]] package_args+=(--package)
+        if [[ -n '${{ inputs.version }}' ]] package_args+=(--plugin-version '${{ inputs.version }}')
 
         .github/scripts/package-ubuntu ${package_args}
 
@@ -108,6 +114,10 @@ runs:
         $PackageArgs = @{
           Target = '${{ inputs.target }}'
           Configuration = '${{ inputs.config }}'
+        }
+
+        if ( '${{ inputs.version }}' -ne '' ) {
+          $PackageArgs['ProductVersion'] = '${{ inputs.version }}'
         }
 
         .github/scripts/Package-Windows.ps1 @PackageArgs

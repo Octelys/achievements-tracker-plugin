@@ -59,6 +59,7 @@ package() {
   local -i codesign=0
   local -i notarize=0
   local -i package=0
+  local version=''
 
   local -a args
   while (( # )) {
@@ -80,6 +81,14 @@ package() {
         config=${2}
         shift 2
         ;;
+      -v|--version)
+        if (( # == 1 )) || [[ ${2:0:1} == '-' ]] {
+          log_error "Missing value for option %B${1}%b"
+          exit 2
+        }
+        version=${2}
+        shift 2
+        ;;
       -s|--codesign) typeset -g codesign=1; shift ;;
       -n|--notarize) typeset -g notarize=1; typeset -g codesign=1; shift ;;
       -p|--package) typeset -g package=1; shift ;;
@@ -96,6 +105,10 @@ package() {
   local product_version
   read -r product_name product_version <<< \
     "$(jq -r '. | {name, version} | join(" ")' ${buildspec_file})"
+
+  if [[ -n ${version} ]] {
+    product_version=${version}
+  }
 
   local output_name="${product_name}-${product_version}-${host_os}-universal"
 

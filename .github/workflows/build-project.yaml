@@ -79,8 +79,9 @@ jobs:
           plugin_version="$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}"
           echo "pluginVersion=${plugin_version}" >> $GITHUB_OUTPUT
 
+
   macos-build:
-    name: Build for macOS 
+    name: Build for macOS Universal 🍎
     runs-on: macos-15
     needs: check-event
     defaults:
@@ -174,6 +175,7 @@ jobs:
           notarize: ${{ fromJSON(needs.check-event.outputs.notarize) && fromJSON(steps.codesign.outputs.haveNotarizationUser) }}
           codesignUser: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
           codesignPass: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+          version: ${{ steps.setup.outputs.pluginVersion }}
 
       - name: Upload Coverage Report (macOS) 📊
         uses: actions/upload-artifact@v4
@@ -222,7 +224,7 @@ jobs:
           key: ${{ runner.os }}-ccache-${{ needs.check-event.outputs.config }}
 
   ubuntu-build:
-    name: Build for Ubuntu 🐧
+    name: Build for Ubuntu x86_64 🐧
     strategy:
       matrix:
         os: [ubuntu-24.04]
@@ -272,6 +274,7 @@ jobs:
           target: x86_64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
+          version: ${{ steps.setup.outputs.pluginVersion }}
 
       - name: Upload Coverage Report 📊
         uses: actions/upload-artifact@v4
@@ -326,7 +329,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.os }}-ccache-x86_64-${{ needs.check-event.outputs.config }}
 
   windows-build:
-    name: Build for Windows 🪟
+    name: Build for Windows x64 🪟
     runs-on: windows-2022
     needs: check-event
     defaults:
@@ -358,6 +361,20 @@ jobs:
           "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
           "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
 
+      - name: Install Dependencies 🔐
+        run: |
+          # Install OpenSSL and libwebsockets for x64 via vcpkg.
+          # The obs-deps prebuilt package does not ship either on Windows.
+          # The system OpenSSL must be replaced with the vcpkg one: the system
+          # build was compiled without WIN32_LEAN_AND_MEAN, causing winsock.h
+          # (v1) to be included before winsock2.h (v2) → struct redefinition
+          # errors when libwebsockets.h is included in the same translation unit.
+          # Use the static-md triplet: static libraries linked against the dynamic
+          # CRT (/MD), matching what the OBS plugin itself is built with.
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:x64-windows-static-md libwebsockets:x64-windows-static-md
+          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md"
+          "CMAKE_PREFIX_PATH=$depsRoot" >> $env:GITHUB_ENV
+
       - name: Build Plugin 🧱
         uses: ./.github/actions/build-plugin
         with:
@@ -372,9 +389,79 @@ jobs:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
+          version: ${{ steps.setup.outputs.pluginVersion }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
           path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
+
+  windows-arm64-build:
+    name: Build for Windows ARM64 🪟
+    runs-on: windows-2022
+    needs: check-event
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set Up Environment 🔧
+        id: setup
+        run: |
+          # Set Up Environment 🔧
+          if ( $Env:RUNNER_DEBUG -ne $null ) {
+            Set-PSDebug -Trace 1
+          }
+
+          $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
+          $ProductName = $BuildSpec.name
+
+          # Compute version: YY.MMDD.BuildNumber
+          $Now = [System.DateTime]::UtcNow
+          $YY   = $Now.ToString("yy")
+          $MMDD = $Now.Month.ToString() + $Now.Day.ToString("D2")
+          $ProductVersion = "${YY}.${MMDD}.${{ github.run_number }}"
+
+          "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
+          "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
+
+      - name: Install OpenSSL for ARM64 🔐
+        run: |
+          # Install OpenSSL and libwebsockets for ARM64 via vcpkg.
+          # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
+          # The system OpenSSL is x64-only; we need an arm64-windows build.
+          # Use the static-md triplet: static libraries linked against the dynamic
+          # CRT (/MD), matching what the OBS plugin itself is built with.
+          # (arm64-windows-static uses /MT which conflicts with /MD → LNK4098)
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows-static-md libwebsockets:arm64-windows-static-md
+          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static-md"
+          # CMake reads CMAKE_PREFIX_PATH from the environment and prepends it to
+          # its search path, so both find_package(OpenSSL CONFIG) and module mode
+          # will find the ARM64 libraries without any changes to the preset or script.
+          "CMAKE_PREFIX_PATH=$depsRoot" >> $env:GITHUB_ENV
+
+      - name: Build Plugin 🧱
+        uses: ./.github/actions/build-plugin
+        with:
+          target: arm64
+          config: ${{ needs.check-event.outputs.config }}
+
+      - name: Package Plugin 📀
+        uses: ./.github/actions/package-plugin
+        with:
+          target: arm64
+          config: ${{ needs.check-event.outputs.config }}
+          package: ${{ fromJSON(needs.check-event.outputs.package) }}
+          version: ${{ steps.setup.outputs.pluginVersion }}
+
+      - name: Upload Artifacts 📡
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-arm64*.*
+

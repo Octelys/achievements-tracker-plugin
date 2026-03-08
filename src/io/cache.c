@@ -6,15 +6,59 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#define CACHE_MAX_PATH MAX_PATH
+#else
+#include <limits.h>
+#define CACHE_MAX_PATH PATH_MAX
+#endif
+
 #include <diagnostics/log.h>
 #include <net/http/http.h>
 
 #include "common/memory.h"
 
+static const char *get_temp_dir(char *buf, size_t buf_size) {
+    // TMPDIR  — macOS and most Linux distros
+    const char *dir = getenv("TMPDIR");
+    if (dir && dir[0] != '\0')
+        return dir;
+
+    // TEMP / TMP — Windows (and some Linux environments)
+    dir = getenv("TEMP");
+    if (dir && dir[0] != '\0')
+        return dir;
+
+    dir = getenv("TMP");
+    if (dir && dir[0] != '\0')
+        return dir;
+
+#ifdef _WIN32
+    // Last resort on Windows: ask the OS directly
+    DWORD len = GetTempPathA((DWORD)buf_size, buf);
+    if (len > 0 && len < buf_size)
+        return buf;
+#endif
+    UNUSED_PARAMETER(buf);
+    UNUSED_PARAMETER(buf_size);
+    // Last resort on POSIX
+    return "/tmp/";
+}
+
 void cache_build_path(const char *type, const char *id, char *out_path, size_t path_size) {
 
-    const char *tmpdir = getenv("TMPDIR");
-    snprintf(out_path, path_size, "%sobs_achievement_tracker_%s_%s.png", tmpdir ? tmpdir : "/tmp/", type, id);
+    char        tmpbuf[CACHE_MAX_PATH] = {0};
+    const char *tmpdir                 = get_temp_dir(tmpbuf, sizeof(tmpbuf));
+
+    // Ensure the temp dir ends with a separator
+    size_t dirlen = strlen(tmpdir);
+    char   sep    = (dirlen > 0 && (tmpdir[dirlen - 1] == '/' || tmpdir[dirlen - 1] == '\\')) ? '\0' : '/';
+
+    if (sep)
+        snprintf(out_path, path_size, "%s%cobs_achievement_tracker_%s_%s.png", tmpdir, sep, type, id);
+    else
+        snprintf(out_path, path_size, "%sobs_achievement_tracker_%s_%s.png", tmpdir, type, id);
 }
 
 bool cache_download(const char *url, const char *type, const char *id, char *out_path, size_t path_size) {

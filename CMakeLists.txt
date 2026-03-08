@@ -77,6 +77,11 @@ if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
     else()
       target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE websockets)
     endif()
+    # Static libwebsockets on Windows requires Winsock; link it explicitly since
+    # the imported target does not always propagate it as a dependency.
+    if(WIN32)
+      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 dbghelp)
+    endif()
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
     message(STATUS "Found libwebsockets via CMake package")
   endif()
@@ -120,6 +125,7 @@ if(NOT LIBWEBSOCKETS_FOUND)
   message(WARNING "To enable RTA monitoring, install libwebsockets:")
   message(WARNING "  macOS: brew install libwebsockets")
   message(WARNING "  Linux: apt-get install libwebsockets-dev (or dnf install libwebsockets-devel)")
+  message(WARNING "  Windows: vcpkg install libwebsockets:x64-windows-static (or arm64-windows-static)")
 endif()
 
 if(APPLE)
@@ -181,6 +187,12 @@ endif()
 
 if(TARGET OpenSSL::Crypto)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OpenSSL::Crypto)
+  if(WIN32)
+    # Static OpenSSL requires ws2_32 (Winsock) and crypt32 (Windows certificate
+    # store) which the shared/system build pulls in automatically but the static
+    # vcpkg build does not propagate through its imported target.
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 crypt32)
+  endif()
   if(APPLE)
     message(STATUS "Successfully linked OpenSSL::Crypto target")
   endif()
@@ -402,6 +414,9 @@ if(BUILD_TESTING)
       # Ensure headers are available even if the imported targets don't propagate include dirs.
       if(OPENSSL_INCLUDE_DIR)
         target_include_directories(${target_name} PRIVATE ${OPENSSL_INCLUDE_DIR})
+      endif()
+      if(WIN32)
+        target_link_libraries(${target_name} PRIVATE ws2_32 crypt32 dbghelp)
       endif()
     else()
       target_include_directories(${target_name} PRIVATE ${OPENSSL_INCLUDE_DIR})
