@@ -1,5 +1,31 @@
 name: Build Project
 on:
+  workflow_dispatch:
+    inputs:
+      build-macos:
+        description: Build for macOS Universal
+        type: boolean
+        default: true
+      build-ubuntu:
+        description: Build for Ubuntu x86_64
+        type: boolean
+        default: true
+      build-windows-x64:
+        description: Build for Windows x64
+        type: boolean
+        default: true
+      build-windows-arm64:
+        description: Build for Windows ARM64
+        type: boolean
+        default: true
+      package:
+        description: Create installer / package
+        type: choice
+        default: 'auto'
+        options:
+          - 'auto'
+          - 'true'
+          - 'false'
   workflow_call:
     inputs:
       build-macos:

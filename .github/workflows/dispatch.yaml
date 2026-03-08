@@ -1,21 +1,11 @@
 name: Dispatch
 run-name: >-
-  ${{ inputs.job == 'build'
-    && format('Build [macos={0} ubuntu={1} win-x64={2} win-arm64={3}] package={4} 🏗️',
-        inputs.build-macos, inputs.build-ubuntu,
-        inputs.build-windows-x64, inputs.build-windows-arm64,
-        inputs.package)
-    || format('Dispatched: {0} ⌛️', inputs.job) }}
+  Build [macos=${{ inputs.build-macos }} ubuntu=${{ inputs.build-ubuntu }}
+  win-x64=${{ inputs.build-windows-x64 }} win-arm64=${{ inputs.build-windows-arm64 }}]
+  package=${{ inputs.package }} 🏗️
 on:
   workflow_dispatch:
     inputs:
-      job:
-        description: Action to run
-        required: true
-        type: choice
-        default: build
-        options:
-          - build
       build-macos:
         description: Build for macOS Universal
         type: boolean
@@ -44,8 +34,7 @@ on:
 permissions:
   contents: write
 jobs:
-  check-and-build:
-    if: inputs.job == 'build'
+  build:
     uses: ./.github/workflows/build-project.yaml
     with:
       build-macos: ${{ inputs.build-macos }}
