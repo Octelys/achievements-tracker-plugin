@@ -12,10 +12,7 @@ else()
 endif()
 
 # Install NSIS on CI if not already present
-find_program(NSIS_MAKENSIS makensis HINTS
-  "C:/Program Files (x86)/NSIS"
-  "C:/Program Files/NSIS"
-)
+find_program(NSIS_MAKENSIS makensis HINTS "C:/Program Files (x86)/NSIS" "C:/Program Files/NSIS")
 
 if(NOT NSIS_MAKENSIS)
   message(STATUS "makensis not found — installer target will not be available")
@@ -26,9 +23,7 @@ message(STATUS "Found makensis: ${NSIS_MAKENSIS}")
 
 # Configure the .nsi script from the template
 set(CPACK_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
-set(CPACK_PACKAGE_FILE_NAME
-  "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-windows-${INSTALLER_ARCH}"
-)
+set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-windows-${INSTALLER_ARCH}")
 
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/installer.nsi.in"
@@ -42,11 +37,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/resources/installer.ico")
   set(_nsis_icon_flag "/DHAVE_INSTALLER_ICO")
 endif()
 
-add_custom_target(package-installer
-  COMMAND "${NSIS_MAKENSIS}"
-    /V2
-    ${_nsis_icon_flag}
-    "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi"
+add_custom_target(
+  package-installer
+  COMMAND "${NSIS_MAKENSIS}" /V2 ${_nsis_icon_flag} "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi"
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   COMMENT "Building NSIS installer for ${INSTALLER_ARCH}..."
   VERBATIM
@@ -54,4 +47,3 @@ add_custom_target(package-installer
 
 # Ensure the plugin is installed before building the installer
 add_dependencies(package-installer ${CMAKE_PROJECT_NAME})
-
