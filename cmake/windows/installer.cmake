@@ -11,10 +11,7 @@ else()
   set(PLUGIN_BIN_SUBDIR "64bit")
 endif()
 
-find_program(NSIS_MAKENSIS makensis HINTS
-  "C:/Program Files (x86)/NSIS"
-  "C:/Program Files/NSIS"
-)
+find_program(NSIS_MAKENSIS makensis HINTS "C:/Program Files (x86)/NSIS" "C:/Program Files/NSIS")
 
 if(NOT NSIS_MAKENSIS)
   message(STATUS "makensis not found — installer target will not be available")
@@ -23,11 +20,9 @@ endif()
 
 message(STATUS "Found makensis: ${NSIS_MAKENSIS}")
 
-set(CPACK_PACKAGE_FILE_NAME
-  "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-windows-${INSTALLER_ARCH}"
-)
+set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-windows-${INSTALLER_ARCH}")
 
-set(_nsi_template   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/installer.nsi.in")
+set(_nsi_template "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/installer.nsi.in")
 set(_nsi_configured "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi")
 set(_configure_script "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/configure-installer.cmake")
 
@@ -39,24 +34,16 @@ endif()
 # Custom target: cmake --build --target package-installer
 # Step 1 re-runs configure-installer.cmake at build time with the real
 # $<CONFIG> so INSTALL_STAGE_DIR points at the correct staged directory.
-add_custom_target(package-installer
-  COMMAND "${CMAKE_COMMAND}"
-    -DCMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME}
-    -DPLUGIN_DISPLAY_NAME=${PLUGIN_DISPLAY_NAME}
-    -DCMAKE_PROJECT_VERSION=${CMAKE_PROJECT_VERSION}
-    -DPLUGIN_AUTHOR=${PLUGIN_AUTHOR}
-    -DINSTALLER_ARCH=${INSTALLER_ARCH}
-    -DPLUGIN_BIN_SUBDIR=${PLUGIN_BIN_SUBDIR}
-    -DCPACK_PACKAGE_FILE_NAME=${CPACK_PACKAGE_FILE_NAME}
+add_custom_target(
+  package-installer
+  COMMAND
+    "${CMAKE_COMMAND}" -DCMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME} -DPLUGIN_DISPLAY_NAME=${PLUGIN_DISPLAY_NAME}
+    -DCMAKE_PROJECT_VERSION=${CMAKE_PROJECT_VERSION} -DPLUGIN_AUTHOR=${PLUGIN_AUTHOR} -DINSTALLER_ARCH=${INSTALLER_ARCH}
+    -DPLUGIN_BIN_SUBDIR=${PLUGIN_BIN_SUBDIR} -DCPACK_PACKAGE_FILE_NAME=${CPACK_PACKAGE_FILE_NAME}
     -DCMAKE_CURRENT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-    "-DINSTALL_STAGE_DIR=${CMAKE_CURRENT_BINARY_DIR}/../release/$<CONFIG>"
-    -DNSI_TEMPLATE=${_nsi_template}
-    -DNSI_OUTPUT=${_nsi_configured}
-    -P ${_configure_script}
-  COMMAND "${NSIS_MAKENSIS}"
-    /V2
-    ${_nsis_icon_flag}
-    "${_nsi_configured}"
+    "-DINSTALL_STAGE_DIR=${CMAKE_CURRENT_BINARY_DIR}/../release/$<CONFIG>" -DNSI_TEMPLATE=${_nsi_template}
+    -DNSI_OUTPUT=${_nsi_configured} -P ${_configure_script}
+  COMMAND "${NSIS_MAKENSIS}" /V2 ${_nsis_icon_flag} "${_nsi_configured}"
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   COMMENT "Building NSIS installer for ${INSTALLER_ARCH}..."
   VERBATIM

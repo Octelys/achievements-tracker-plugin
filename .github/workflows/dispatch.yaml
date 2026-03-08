@@ -1,18 +1,56 @@
 name: Dispatch
-run-name: Dispatched Repository Actions - ${{ inputs.job }} ⌛️
+run-name: >-
+  ${{ inputs.job == 'build'
+    && format('Build [macos={0} ubuntu={1} win-x64={2} win-arm64={3}] package={4} 🏗️',
+        inputs.build-macos, inputs.build-ubuntu,
+        inputs.build-windows-x64, inputs.build-windows-arm64,
+        inputs.package)
+    || format('Dispatched: {0} ⌛️', inputs.job) }}
 on:
   workflow_dispatch:
     inputs:
       job:
-        description: Dispatch job to run
+        description: Action to run
         required: true
         type: choice
+        default: build
         options:
           - build
+      build-macos:
+        description: Build for macOS Universal
+        type: boolean
+        default: true
+      build-ubuntu:
+        description: Build for Ubuntu x86_64
+        type: boolean
+        default: true
+      build-windows-x64:
+        description: Build for Windows x64
+        type: boolean
+        default: true
+      build-windows-arm64:
+        description: Build for Windows ARM64
+        type: boolean
+        default: true
+      package:
+        description: Create installer / package
+        required: false
+        type: choice
+        default: 'auto'
+        options:
+          - 'auto'
+          - 'true'
+          - 'false'
 permissions:
   contents: write
 jobs:
   check-and-build:
     if: inputs.job == 'build'
     uses: ./.github/workflows/build-project.yaml
+    with:
+      build-macos: ${{ inputs.build-macos }}
+      build-ubuntu: ${{ inputs.build-ubuntu }}
+      build-windows-x64: ${{ inputs.build-windows-x64 }}
+      build-windows-arm64: ${{ inputs.build-windows-arm64 }}
+      package: ${{ inputs.package }}
     secrets: inherit

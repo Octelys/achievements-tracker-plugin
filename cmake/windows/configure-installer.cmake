@@ -17,4 +17,3 @@ file(TO_NATIVE_PATH "${INSTALL_STAGE_DIR}" INSTALL_STAGE_DIR)
 configure_file("${NSI_TEMPLATE}" "${NSI_OUTPUT}" @ONLY)
 message(STATUS "Configured NSIS script: ${NSI_OUTPUT}")
 message(STATUS "  Stage dir : ${INSTALL_STAGE_DIR}")
-
