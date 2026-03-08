@@ -1,6 +1,56 @@
 name: Build Project
 on:
+  workflow_dispatch:
+    inputs:
+      build-macos:
+        description: Build for macOS Universal
+        type: boolean
+        default: true
+      build-ubuntu:
+        description: Build for Ubuntu x86_64
+        type: boolean
+        default: true
+      build-windows-x64:
+        description: Build for Windows x64
+        type: boolean
+        default: true
+      build-windows-arm64:
+        description: Build for Windows ARM64
+        type: boolean
+        default: true
+      package:
+        description: Create installer / package
+        type: choice
+        default: 'auto'
+        options:
+          - 'auto'
+          - 'true'
+          - 'false'
   workflow_call:
+    inputs:
+      build-macos:
+        description: Build for macOS Universal
+        type: boolean
+        default: true
+      build-ubuntu:
+        description: Build for Ubuntu x86_64
+        type: boolean
+        default: true
+      build-windows-x64:
+        description: Build for Windows x64
+        type: boolean
+        default: true
+      build-windows-arm64:
+        description: Build for Windows ARM64
+        type: boolean
+        default: true
+      package:
+        description: >
+          Override the package (installer) flag.
+          'auto' follows the default logic for the event type.
+          'true' forces installer creation. 'false' skips it.
+        type: string
+        default: 'auto'
     outputs:
       pluginName:
         description: Project name detected by parsing build spec file
@@ -23,6 +73,10 @@ jobs:
       commitHash: ${{ steps.setup.outputs.commitHash }}
       pluginName: ${{ steps.setup.outputs.pluginName }}
       pluginVersion: ${{ steps.setup.outputs.pluginVersion }}
+      buildMacos: ${{ steps.setup.outputs.buildMacos }}
+      buildUbuntu: ${{ steps.setup.outputs.buildUbuntu }}
+      buildWindowsX64: ${{ steps.setup.outputs.buildWindowsX64 }}
+      buildWindowsArm64: ${{ steps.setup.outputs.buildWindowsArm64 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,6 +118,22 @@ jobs:
             IFS=':' read -r key value <<< "${config}"
             echo "${key}=${value}" >> $GITHUB_OUTPUT
           done
+
+          # Apply package override from workflow_call input
+          package_override='${{ inputs.package }}'
+          if [[ "${package_override}" == 'true' ]]; then
+            echo "package=true" >> $GITHUB_OUTPUT
+          elif [[ "${package_override}" == 'false' ]]; then
+            echo "package=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Resolve which targets to build from boolean inputs
+          # (default true when called from push/PR/schedule with no inputs)
+          [[ '${{ inputs.build-macos }}'        != 'false' ]] && echo "buildMacos=true"        >> $GITHUB_OUTPUT || echo "buildMacos=false"        >> $GITHUB_OUTPUT
+          [[ '${{ inputs.build-ubuntu }}'       != 'false' ]] && echo "buildUbuntu=true"       >> $GITHUB_OUTPUT || echo "buildUbuntu=false"       >> $GITHUB_OUTPUT
+          [[ '${{ inputs.build-windows-x64 }}'  != 'false' ]] && echo "buildWindowsX64=true"   >> $GITHUB_OUTPUT || echo "buildWindowsX64=false"   >> $GITHUB_OUTPUT
+          [[ '${{ inputs.build-windows-arm64 }}' != 'false' ]] && echo "buildWindowsArm64=true" >> $GITHUB_OUTPUT || echo "buildWindowsArm64=false" >> $GITHUB_OUTPUT
+
           echo "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
 
           plugin_name="$(grep 'name' buildspec.json | sed -E -e 's/^.+"name":[^"]+"(.+)",?$/\1/g')"
@@ -84,6 +154,7 @@ jobs:
     name: Build for macOS Universal 🍎
     runs-on: macos-15
     needs: check-event
+    if: fromJSON(needs.check-event.outputs.buildMacos)
     defaults:
       run:
         shell: zsh --no-rcs --errexit --pipefail {0}
@@ -230,6 +301,7 @@ jobs:
         os: [ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     needs: check-event
+    if: fromJSON(needs.check-event.outputs.buildUbuntu)
     defaults:
       run:
         shell: bash
@@ -332,6 +404,7 @@ jobs:
     name: Build for Windows x64 🪟
     runs-on: windows-2022
     needs: check-event
+    if: fromJSON(needs.check-event.outputs.buildWindowsX64)
     defaults:
       run:
         shell: pwsh
@@ -401,6 +474,7 @@ jobs:
     name: Build for Windows ARM64 🪟
     runs-on: windows-2022
     needs: check-event
+    if: fromJSON(needs.check-event.outputs.buildWindowsArm64)
     defaults:
       run:
         shell: pwsh

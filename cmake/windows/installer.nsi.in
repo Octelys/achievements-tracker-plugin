@@ -73,11 +73,11 @@ Section "Achievements Tracker Plugin" SecPlugin
 
     ; --- Plugin DLL ---
     SetOutPath "$R0\obs-plugins\${PLUGIN_BIN_SUBDIR}"
-    File "@CPACK_INSTALL_PREFIX@\@CMAKE_PROJECT_NAME@\bin\${PLUGIN_BIN_SUBDIR}\${PLUGIN_DLL}"
+    File "@INSTALL_STAGE_DIR@\@CMAKE_PROJECT_NAME@\bin\${PLUGIN_BIN_SUBDIR}\${PLUGIN_DLL}"
 
     ; --- Plugin data (locale, effects, etc.) ---
     SetOutPath "$R0\data\obs-plugins\${PLUGIN_NAME}"
-    File /r "@CPACK_INSTALL_PREFIX@\@CMAKE_PROJECT_NAME@\data\"
+    File /r "@INSTALL_STAGE_DIR@\@CMAKE_PROJECT_NAME@\data\"
 
     ; --- Write uninstaller ---
     WriteUninstaller "$R0\obs-plugins\${PLUGIN_BIN_SUBDIR}\Uninstall-${PLUGIN_NAME}.exe"

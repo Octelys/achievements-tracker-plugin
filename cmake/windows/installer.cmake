@@ -5,13 +5,12 @@ include_guard(GLOBAL)
 # Resolve architecture-specific values
 if(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64")
   set(INSTALLER_ARCH "ARM64")
-  set(PLUGIN_BIN_SUBDIR "64bit") # OBS uses 64bit for all Windows archs
+  set(PLUGIN_BIN_SUBDIR "64bit")
 else()
   set(INSTALLER_ARCH "x64")
   set(PLUGIN_BIN_SUBDIR "64bit")
 endif()
 
-# Install NSIS on CI if not already present
 find_program(NSIS_MAKENSIS makensis HINTS "C:/Program Files (x86)/NSIS" "C:/Program Files/NSIS")
 
 if(NOT NSIS_MAKENSIS)
@@ -21,29 +20,33 @@ endif()
 
 message(STATUS "Found makensis: ${NSIS_MAKENSIS}")
 
-# Configure the .nsi script from the template
-set(CPACK_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-windows-${INSTALLER_ARCH}")
 
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/installer.nsi.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi"
-  @ONLY
-)
+set(_nsi_template "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/installer.nsi.in")
+set(_nsi_configured "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi")
+set(_configure_script "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/configure-installer.cmake")
 
-# Custom target: cmake --build --target package-installer
 set(_nsis_icon_flag "")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/resources/installer.ico")
   set(_nsis_icon_flag "/DHAVE_INSTALLER_ICO")
 endif()
 
+# Custom target: cmake --build --target package-installer
+# Step 1 re-runs configure-installer.cmake at build time with the real
+# $<CONFIG> so INSTALL_STAGE_DIR points at the correct staged directory.
 add_custom_target(
   package-installer
-  COMMAND "${NSIS_MAKENSIS}" /V2 ${_nsis_icon_flag} "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi"
+  COMMAND
+    "${CMAKE_COMMAND}" -DCMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME} -DPLUGIN_DISPLAY_NAME=${PLUGIN_DISPLAY_NAME}
+    -DCMAKE_PROJECT_VERSION=${CMAKE_PROJECT_VERSION} -DPLUGIN_AUTHOR=${PLUGIN_AUTHOR} -DINSTALLER_ARCH=${INSTALLER_ARCH}
+    -DPLUGIN_BIN_SUBDIR=${PLUGIN_BIN_SUBDIR} -DCPACK_PACKAGE_FILE_NAME=${CPACK_PACKAGE_FILE_NAME}
+    -DCMAKE_CURRENT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+    "-DINSTALL_STAGE_DIR=${CMAKE_CURRENT_BINARY_DIR}/../release/$<CONFIG>" -DNSI_TEMPLATE=${_nsi_template}
+    -DNSI_OUTPUT=${_nsi_configured} -P ${_configure_script}
+  COMMAND "${NSIS_MAKENSIS}" /V2 ${_nsis_icon_flag} "${_nsi_configured}"
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   COMMENT "Building NSIS installer for ${INSTALLER_ARCH}..."
   VERBATIM
 )
 
-# Ensure the plugin is installed before building the installer
 add_dependencies(package-installer ${CMAKE_PROJECT_NAME})
