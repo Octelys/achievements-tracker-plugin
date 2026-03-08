@@ -70,6 +70,7 @@ runs:
         if [[ '${{ inputs.codesign }}' == 'true' ]] package_args+=(--codesign)
         if [[ '${{ inputs.notarize }}' == 'true' ]] package_args+=(--notarize)
         if [[ '${{ inputs.package }}' == 'true' ]] package_args+=(--package)
+        if [[ -n '${{ inputs.version }}' ]] package_args+=(--version '${{ inputs.version }}')
 
         .github/scripts/package-macos ${package_args}
 
@@ -97,6 +98,7 @@ runs:
         if (( ${+RUNNER_DEBUG} )) build_args+=(--debug)
 
         if [[ '${{ inputs.package }}' == 'true' ]] package_args+=(--package)
+        if [[ -n '${{ inputs.version }}' ]] package_args+=(--plugin-version '${{ inputs.version }}')
 
         .github/scripts/package-ubuntu ${package_args}
 
