@@ -366,9 +366,11 @@ jobs:
           # Install libwebsockets for x64 via vcpkg.
           # The obs-deps prebuilt package does not ship libwebsockets on Windows;
           # the system has no libwebsockets either, so install it from vcpkg.
-          # Use the static triplet to avoid runtime DLL dependencies.
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install libwebsockets:x64-windows-static
-          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static"
+          # Use the static-md triplet: static library linked against the dynamic
+          # CRT (/MD), matching what the OBS plugin itself is built with.
+          # (x64-windows-static uses /MT which conflicts with /MD → LNK4098)
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install libwebsockets:x64-windows-static-md
+          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md"
           "CMAKE_PREFIX_PATH=$depsRoot" >> $env:GITHUB_ENV
 
       - name: Build Plugin 🧱
@@ -431,10 +433,11 @@ jobs:
           # Install OpenSSL and libwebsockets for ARM64 via vcpkg.
           # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
           # The system OpenSSL is x64-only; we need an arm64-windows build.
-          # Use the static triplet so OpenSSL is linked into the plugin DLL directly,
-          # avoiding a runtime dependency on libssl/libcrypto DLLs that OBS won't ship.
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows-static libwebsockets:arm64-windows-static
-          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static"
+          # Use the static-md triplet: static libraries linked against the dynamic
+          # CRT (/MD), matching what the OBS plugin itself is built with.
+          # (arm64-windows-static uses /MT which conflicts with /MD → LNK4098)
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:arm64-windows-static-md libwebsockets:arm64-windows-static-md
+          $depsRoot = "$env:VCPKG_INSTALLATION_ROOT\installed\arm64-windows-static-md"
           # CMake reads CMAKE_PREFIX_PATH from the environment and prepends it to
           # its search path, so both find_package(OpenSSL CONFIG) and module mode
           # will find the ARM64 libraries without any changes to the preset or script.
