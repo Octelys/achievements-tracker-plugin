@@ -19,8 +19,7 @@
 
 #include "common/memory.h"
 
-static const char *get_temp_dir(char *buf, size_t buf_size)
-{
+static const char *get_temp_dir(char *buf, size_t buf_size) {
     // TMPDIR  — macOS and most Linux distros
     const char *dir = getenv("TMPDIR");
     if (dir && dir[0] != '\0')
@@ -41,19 +40,20 @@ static const char *get_temp_dir(char *buf, size_t buf_size)
     if (len > 0 && len < buf_size)
         return buf;
 #endif
-
+    UNUSED_PARAMETER(buf);
+    UNUSED_PARAMETER(buf_size);
     // Last resort on POSIX
     return "/tmp/";
 }
 
 void cache_build_path(const char *type, const char *id, char *out_path, size_t path_size) {
 
-    char tmpbuf[CACHE_MAX_PATH] = {0};
-    const char *tmpdir = get_temp_dir(tmpbuf, sizeof(tmpbuf));
+    char        tmpbuf[CACHE_MAX_PATH] = {0};
+    const char *tmpdir                 = get_temp_dir(tmpbuf, sizeof(tmpbuf));
 
     // Ensure the temp dir ends with a separator
     size_t dirlen = strlen(tmpdir);
-    char sep = (dirlen > 0 && (tmpdir[dirlen - 1] == '/' || tmpdir[dirlen - 1] == '\\')) ? '\0' : '/';
+    char   sep    = (dirlen > 0 && (tmpdir[dirlen - 1] == '/' || tmpdir[dirlen - 1] == '\\')) ? '\0' : '/';
 
     if (sep)
         snprintf(out_path, path_size, "%s%cobs_achievement_tracker_%s_%s.png", tmpdir, sep, type, id);
