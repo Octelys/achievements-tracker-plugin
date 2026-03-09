@@ -75,8 +75,20 @@ set(PLUGIN_VERSION_MINOR "${_month}${_day}")
 set(PLUGIN_VERSION_PATCH "${PLUGIN_BUILD_NUMBER}")
 # Strip leading zeros from minor (MMDD) so CMake treats it as a plain integer
 math(EXPR PLUGIN_VERSION_MINOR "${PLUGIN_VERSION_MINOR} + 0")
-set(PLUGIN_VERSION "${PLUGIN_VERSION_MAJOR}.${PLUGIN_VERSION_MINOR}.${PLUGIN_VERSION_PATCH}")
+set(_computed_version "${PLUGIN_VERSION_MAJOR}.${PLUGIN_VERSION_MINOR}.${PLUGIN_VERSION_PATCH}")
 
+# Allow the CI to inject a tag-based version (e.g. "1.4.0" from a Git tag).
+# If PLUGIN_VERSION_OVERRIDE is set and non-empty, use it; otherwise fall back
+# to the date-based computed version.
+if(DEFINED PLUGIN_VERSION_OVERRIDE AND NOT "${PLUGIN_VERSION_OVERRIDE}" STREQUAL "")
+  set(PLUGIN_VERSION "${PLUGIN_VERSION_OVERRIDE}")
+  message(STATUS "Plugin version: ${PLUGIN_VERSION} (from tag override)")
+else()
+  set(PLUGIN_VERSION "${_computed_version}")
+  message(STATUS "Plugin version: ${PLUGIN_VERSION} (computed from date)")
+endif()
+
+unset(_computed_version)
 unset(_year)
 unset(_month)
 unset(_day)

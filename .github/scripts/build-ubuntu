@@ -60,6 +60,7 @@ build() {
   local -r -a _valid_configs=(Debug RelWithDebInfo Release MinSizeRel)
   local -i codesign=0
   local -i coverage=0
+  local version_override=''
 
   local -r -a _valid_generators=(Ninja 'Unix Makefiles')
   local generator='Ninja'
@@ -99,7 +100,7 @@ ${_usage_host:-}"
   local -a args
   while (( # )) {
     case ${1} {
-      -t|--target|-c|--config|--generator)
+      -t|--target|-c|--config|--generator|--version-override)
         if (( # == 1 )) || [[ ${2:0:1} == '-' ]] {
           log_error "Missing value for option %B${1}%b"
           log_output ${_usage}
@@ -133,6 +134,10 @@ ${_usage_host:-}"
         ;;
       -s|--codesign) codesign=1; shift ;;
       --coverage) coverage=1; shift ;;
+      --version-override)
+        version_override=${2}
+        shift 2
+        ;;
       -q|--quiet) (( verbosity -= 1 )) || true; shift ;;
       -v|--verbose) (( verbosity += 1 )); shift ;;
       -h|--help) log_output ${_usage}; exit 0 ;;
@@ -207,6 +212,11 @@ ${_usage_host:-}"
         # Add coverage flags
         if (( coverage )) {
           cmake_args+=(-DBUILD_TESTING=ON -DENABLE_COVERAGE=ON)
+        }
+
+        # Inject tag-based version override if provided
+        if [[ -n ${version_override} ]] {
+          cmake_args+=(-DPLUGIN_VERSION_OVERRIDE=${version_override})
         }
 
         local cmake_version
