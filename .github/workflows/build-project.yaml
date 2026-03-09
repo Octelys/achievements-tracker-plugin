@@ -56,8 +56,18 @@ on:
         description: Project name detected by parsing build spec file
         value: ${{ jobs.check-event.outputs.pluginName }}
       pluginVersion:
-        description: Computed plugin version (YY.MMDD.BuildNumber)
+        description: Computed plugin version
         value: ${{ jobs.check-event.outputs.pluginVersion }}
+      buildMacos:
+        value: ${{ jobs.check-event.outputs.buildMacos }}
+      buildUbuntu:
+        value: ${{ jobs.check-event.outputs.buildUbuntu }}
+      buildWindowsX64:
+        value: ${{ jobs.check-event.outputs.buildWindowsX64 }}
+      buildWindowsArm64:
+        value: ${{ jobs.check-event.outputs.buildWindowsArm64 }}
+      versionOverride:
+        value: ${{ jobs.check-event.outputs.versionOverride }}
 jobs:
   check-event:
     name: Check GitHub Event Data 🔎
@@ -77,6 +87,7 @@ jobs:
       buildUbuntu: ${{ steps.setup.outputs.buildUbuntu }}
       buildWindowsX64: ${{ steps.setup.outputs.buildWindowsX64 }}
       buildWindowsArm64: ${{ steps.setup.outputs.buildWindowsArm64 }}
+      versionOverride: ${{ steps.setup.outputs.versionOverride }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,9 +110,11 @@ jobs:
               fi
               ;;
             push)
-              config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
-              if [[ ${GITHUB_REF_NAME} =~ ^[0-9]{2}\.[0-9]{3,4}\.[0-9]+(-(rc|beta).+)?$ ]]; then
+              # Only create packages on tagged releases, not on every branch push
+              config_data=('codesign:true' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
+              if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
                 config_data[1]='notarize:true'
+                config_data[2]='package:true'
                 config_data[3]='config:Release'
               fi
               ;;
@@ -109,7 +122,8 @@ jobs:
               config_data=('codesign:true' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
               ;;
             schedule)
-              config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
+              # Nightly builds: build all but don't create installers
+              config_data=('codesign:true' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
               ;;
             *) ;;
           esac
@@ -119,7 +133,7 @@ jobs:
             echo "${key}=${value}" >> $GITHUB_OUTPUT
           done
 
-          # Apply package override from workflow_call input
+          # Apply package override from workflow_call/workflow_dispatch input
           package_override='${{ inputs.package }}'
           if [[ "${package_override}" == 'true' ]]; then
             echo "package=true" >> $GITHUB_OUTPUT
@@ -129,24 +143,26 @@ jobs:
 
           # Resolve which targets to build from boolean inputs
           # (default true when called from push/PR/schedule with no inputs)
-          [[ '${{ inputs.build-macos }}'        != 'false' ]] && echo "buildMacos=true"        >> $GITHUB_OUTPUT || echo "buildMacos=false"        >> $GITHUB_OUTPUT
-          [[ '${{ inputs.build-ubuntu }}'       != 'false' ]] && echo "buildUbuntu=true"       >> $GITHUB_OUTPUT || echo "buildUbuntu=false"       >> $GITHUB_OUTPUT
-          [[ '${{ inputs.build-windows-x64 }}'  != 'false' ]] && echo "buildWindowsX64=true"   >> $GITHUB_OUTPUT || echo "buildWindowsX64=false"   >> $GITHUB_OUTPUT
+          [[ '${{ inputs.build-macos }}'         != 'false' ]] && echo "buildMacos=true"        >> $GITHUB_OUTPUT || echo "buildMacos=false"        >> $GITHUB_OUTPUT
+          [[ '${{ inputs.build-ubuntu }}'        != 'false' ]] && echo "buildUbuntu=true"       >> $GITHUB_OUTPUT || echo "buildUbuntu=false"       >> $GITHUB_OUTPUT
+          [[ '${{ inputs.build-windows-x64 }}'   != 'false' ]] && echo "buildWindowsX64=true"   >> $GITHUB_OUTPUT || echo "buildWindowsX64=false"   >> $GITHUB_OUTPUT
           [[ '${{ inputs.build-windows-arm64 }}' != 'false' ]] && echo "buildWindowsArm64=true" >> $GITHUB_OUTPUT || echo "buildWindowsArm64=false" >> $GITHUB_OUTPUT
 
           echo "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
 
-          plugin_name="$(grep 'name' buildspec.json | sed -E -e 's/^.+"name":[^"]+"(.+)",?$/\1/g')"
-          plugin_display_name="$(grep 'displayName' buildspec.json | sed -E -e 's/^.+"displayName":[^"]+"(.+)",?$/\1/g' || echo "")"
+          plugin_name="$(jq -r '.name' buildspec.json)"
+          plugin_display_name="$(jq -r '.displayName // empty' buildspec.json)"
+          echo "pluginName=${plugin_display_name:-${plugin_name}}" >> $GITHUB_OUTPUT
 
-          if [[ "${plugin_display_name}" ]]; then
-            echo "pluginName=${plugin_display_name}" >> $GITHUB_OUTPUT
+          # If running on a Git tag, use the tag as the version (strip leading 'v').
+          # Otherwise compute: YY.MMDD.BuildNumber
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            plugin_version="${GITHUB_REF_NAME#v}"
+            echo "versionOverride=${plugin_version}" >> $GITHUB_OUTPUT
           else
-            echo "pluginName=${plugin_name}" >> $GITHUB_OUTPUT
+            plugin_version="$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}"
+            echo "versionOverride=" >> $GITHUB_OUTPUT
           fi
-
-          # Compute version: YY.MMDD.BuildNumber
-          plugin_version="$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}"
           echo "pluginVersion=${plugin_version}" >> $GITHUB_OUTPUT
 
 
@@ -165,7 +181,6 @@ jobs:
           fetch-depth: 0
 
       - name: Set Up Environment 🔧
-        id: setup
         run: |
           : Set Up Environment 🔧
           if (( ${+RUNNER_DEBUG} )) setopt XTRACE
@@ -180,17 +195,8 @@ jobs:
           for formula (${unwanted_formulas}) {
             if [[ -d ${HOMEBREW_PREFIX}/Cellar/${formula} ]] remove_formulas+=(${formula})
           }
-
           if (( #remove_formulas )) brew uninstall --ignore-dependencies ${remove_formulas}
           print '::endgroup::'
-
-          local product_name
-          read -r product_name <<< \
-            "$(jq -r '.name' buildspec.json)"
-
-          print "pluginName=${product_name}" >> $GITHUB_OUTPUT
-          # Compute version: YY.MMDD.BuildNumber
-          print "pluginVersion=$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
 
       - uses: actions/cache/restore@v4
         id: ccache-cache
@@ -218,7 +224,6 @@ jobs:
         run: |
           : Build Universal FreeType 🔤
           if (( ${+RUNNER_DEBUG} )) setopt XTRACE
-          
           print '::group::Building Universal FreeType'
           ./scripts/build-universal-freetype.sh
           print '::endgroup::'
@@ -232,6 +237,7 @@ jobs:
           codesignIdent: ${{ steps.codesign.outputs.codesignIdent }}
           runTests: 'true'
           coverage: 'true'
+          versionOverride: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -246,7 +252,7 @@ jobs:
           notarize: ${{ fromJSON(needs.check-event.outputs.notarize) && fromJSON(steps.codesign.outputs.haveNotarizationUser) }}
           codesignUser: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
           codesignPass: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
-          version: ${{ steps.setup.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Coverage Report (macOS) 📊
         uses: actions/upload-artifact@v4
@@ -278,15 +284,15 @@ jobs:
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal.*
 
       - name: Upload Debug Symbol Artifacts 🪲
         uses: actions/upload-artifact@v4
         if: ${{ needs.check-event.outputs.config == 'Release' }}
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}-dSYMs
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-macos-universal-dSYMs.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}-dSYMs
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-dSYMs.*
 
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
@@ -311,19 +317,6 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Set Up Environment 🔧
-        id: setup
-        run: |
-          : Set Up Environment 🔧
-          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
-
-          read -r product_name <<< \
-            "$(jq -r '.name' buildspec.json)"
-
-          echo "pluginName=${product_name}" >> $GITHUB_OUTPUT
-          # Compute version: YY.MMDD.BuildNumber
-          echo "pluginVersion=$(date -u +'%y.%-m%d').${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
-
       - uses: actions/cache/restore@v4
         id: ccache-cache
         with:
@@ -339,6 +332,7 @@ jobs:
           config: ${{ needs.check-event.outputs.config }}
           runTests: 'true'
           coverage: 'true'
+          versionOverride: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -346,7 +340,7 @@ jobs:
           target: x86_64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ steps.setup.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Coverage Report 📊
         uses: actions/upload-artifact@v4
@@ -378,21 +372,21 @@ jobs:
       - name: Upload Source Tarball 🗜️
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-${{ matrix.os }}-sources-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-source.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-sources-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-source.*
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-x86_64*.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*.*
 
       - name: Upload debug symbol artifacts 🪲
         uses: actions/upload-artifact@v4
         if: ${{ fromJSON(needs.check-event.outputs.package) }}
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}-dbgsym
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-x86_64*-dbgsym.ddeb
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}-dbgsym
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*-dbgsym.ddeb
 
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
@@ -413,26 +407,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-
-      - name: Set Up Environment 🔧
-        id: setup
-        run: |
-          # Set Up Environment 🔧
-          if ( $Env:RUNNER_DEBUG -ne $null ) {
-            Set-PSDebug -Trace 1
-          }
-
-          $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
-          $ProductName = $BuildSpec.name
-
-          # Compute version: YY.MMDD.BuildNumber
-          $Now = [System.DateTime]::UtcNow
-          $YY   = $Now.ToString("yy")
-          $MMDD = $Now.Month.ToString() + $Now.Day.ToString("D2")
-          $ProductVersion = "${YY}.${MMDD}.${{ github.run_number }}"
-
-          "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
-          "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
 
       - name: Install Dependencies 🔐
         run: |
@@ -455,6 +429,7 @@ jobs:
           config: ${{ needs.check-event.outputs.config }}
           runTests: 'true'
           coverage: 'true'
+          versionOverride: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -462,13 +437,13 @@ jobs:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ steps.setup.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-x64*.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-x64*.*
 
   windows-arm64-build:
     name: Build for Windows ARM64 🪟
@@ -483,26 +458,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-
-      - name: Set Up Environment 🔧
-        id: setup
-        run: |
-          # Set Up Environment 🔧
-          if ( $Env:RUNNER_DEBUG -ne $null ) {
-            Set-PSDebug -Trace 1
-          }
-
-          $BuildSpec = Get-Content -Path buildspec.json -Raw | ConvertFrom-Json
-          $ProductName = $BuildSpec.name
-
-          # Compute version: YY.MMDD.BuildNumber
-          $Now = [System.DateTime]::UtcNow
-          $YY   = $Now.ToString("yy")
-          $MMDD = $Now.Month.ToString() + $Now.Day.ToString("D2")
-          $ProductVersion = "${YY}.${MMDD}.${{ github.run_number }}"
-
-          "pluginName=${ProductName}" >> $env:GITHUB_OUTPUT
-          "pluginVersion=${ProductVersion}" >> $env:GITHUB_OUTPUT
 
       - name: Install OpenSSL for ARM64 🔐
         run: |
@@ -524,6 +479,7 @@ jobs:
         with:
           target: arm64
           config: ${{ needs.check-event.outputs.config }}
+          versionOverride: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
@@ -531,11 +487,10 @@ jobs:
           target: arm64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ steps.setup.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ steps.setup.outputs.pluginName }}-${{ steps.setup.outputs.pluginVersion }}-windows-arm64*.*
-
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-arm64*.*

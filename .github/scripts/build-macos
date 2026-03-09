@@ -58,11 +58,12 @@ build() {
   local -i codesign=0
   local -i run_tests=0
   local -i coverage=0
+  local version_override=''
 
   local -a args
   while (( # )) {
     case ${1} {
-      -c|--config)
+      -c|--config|--version-override)
         if (( # == 1 )) || [[ ${2:0:1} == '-' ]] {
           log_error "Missing value for option %B${1}%b"
           log_output ${_usage}
@@ -78,6 +79,10 @@ build() {
           exit 2
         }
         config=${2}
+        shift 2
+        ;;
+      --version-override)
+        version_override=${2}
         shift 2
         ;;
       -s|--codesign) codesign=1; shift ;;
@@ -115,6 +120,11 @@ build() {
   # Enable coverage if requested
   if (( coverage )) {
     cmake_args+=(-DENABLE_COVERAGE=ON)
+  }
+
+  # Inject tag-based version override if provided
+  if [[ -n ${version_override} ]] {
+    cmake_args+=(-DPLUGIN_VERSION_OVERRIDE=${version_override})
   }
 
   typeset -gx NSUnbufferedIO=YES

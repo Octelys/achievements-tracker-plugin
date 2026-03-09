@@ -3,7 +3,8 @@ param(
     [ValidateSet('x64', 'arm64')]
     [string] $Target = 'x64',
     [ValidateSet('Debug', 'RelWithDebInfo', 'Release', 'MinSizeRel')]
-    [string] $Configuration = 'RelWithDebInfo'
+    [string] $Configuration = 'RelWithDebInfo',
+    [string] $VersionOverride = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,6 +49,10 @@ function Build {
     Ensure-Location $ProjectRoot
 
     $CmakeArgs = @('--preset', "windows-ci-${Target}")
+
+    if ( $VersionOverride -ne '' ) {
+        $CmakeArgs += "-DPLUGIN_VERSION_OVERRIDE=${VersionOverride}"
+    }
     $CmakeBuildArgs = @('--build')
     $CmakeInstallArgs = @()
 
