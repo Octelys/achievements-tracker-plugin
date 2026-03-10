@@ -95,6 +95,10 @@ static char *get_state_path(void) {
     os_mkdirs(dir);
 
     char *path = (char *)bzalloc(1024);
+    if (!path) {
+        bfree(dir);
+        return NULL;
+    }
     snprintf(path, 1024, "%s/%s", dir, PERSIST_FILE);
     bfree(dir);
 
