@@ -114,10 +114,7 @@ runs:
         $PackageArgs = @{
           Target = '${{ inputs.target }}'
           Configuration = '${{ inputs.config }}'
-        }
-
-        if ( '${{ inputs.version }}' -ne '' ) {
-          $PackageArgs['ProductVersion'] = '${{ inputs.version }}'
+          ProductVersion = '${{ inputs.version }}'
         }
 
         if ( '${{ inputs.package }}' -eq 'true' ) {

@@ -58,6 +58,9 @@ on:
       pluginVersion:
         description: Computed plugin version
         value: ${{ jobs.check-event.outputs.pluginVersion }}
+      pluginInternalName:
+        description: Raw internal name from buildspec.json (used for file naming)
+        value: ${{ jobs.check-event.outputs.pluginInternalName }}
       buildMacos:
         value: ${{ jobs.check-event.outputs.buildMacos }}
       buildUbuntu:
@@ -83,6 +86,7 @@ jobs:
       commitHash: ${{ steps.setup.outputs.commitHash }}
       pluginName: ${{ steps.setup.outputs.pluginName }}
       pluginVersion: ${{ steps.setup.outputs.pluginVersion }}
+      pluginInternalName: ${{ steps.setup.outputs.pluginInternalName }}
       buildMacos: ${{ steps.setup.outputs.buildMacos }}
       buildUbuntu: ${{ steps.setup.outputs.buildUbuntu }}
       buildWindowsX64: ${{ steps.setup.outputs.buildWindowsX64 }}
@@ -152,6 +156,7 @@ jobs:
 
           plugin_name="$(jq -r '.name' buildspec.json)"
           plugin_display_name="$(jq -r '.displayName // empty' buildspec.json)"
+          echo "pluginInternalName=${plugin_name}" >> $GITHUB_OUTPUT
           echo "pluginName=${plugin_display_name:-${plugin_name}}" >> $GITHUB_OUTPUT
 
           # If running on a Git tag, use the tag as the version (strip leading 'v').
@@ -340,7 +345,7 @@ jobs:
           target: x86_64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ needs.check-event.outputs.versionOverride }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Coverage Report 📊
         uses: actions/upload-artifact@v4
@@ -437,13 +442,13 @@ jobs:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ needs.check-event.outputs.versionOverride }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-x64*.*
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-x64*.*
 
   windows-arm64-build:
     name: Build for Windows ARM64 🪟
@@ -487,10 +492,10 @@ jobs:
           target: arm64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ needs.check-event.outputs.versionOverride }}
+          version: ${{ needs.check-event.outputs.pluginVersion }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-arm64*.*
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-arm64*.*

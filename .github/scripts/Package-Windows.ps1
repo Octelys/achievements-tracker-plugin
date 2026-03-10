@@ -48,7 +48,7 @@ function Package {
     $BuildSpec = Get-Content -Path ${BuildSpecFile} -Raw | ConvertFrom-Json
     $ProductName = $BuildSpec.name
     if ( $ProductVersion -eq '' ) {
-        $ProductVersion = $BuildSpec.version
+        throw "ProductVersion must be provided — buildspec.json does not contain a version field."
     }
 
     $OutputName = "${ProductName}-${ProductVersion}-windows-${Target}"
