@@ -289,15 +289,15 @@ jobs:
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal.*
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal.*
 
       - name: Upload Debug Symbol Artifacts 🪲
         uses: actions/upload-artifact@v4
         if: ${{ needs.check-event.outputs.config == 'Release' }}
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}-dSYMs
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-dSYMs.*
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-${{ needs.check-event.outputs.commitHash }}-dSYMs
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-macos-universal-dSYMs.*
 
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
@@ -377,21 +377,21 @@ jobs:
       - name: Upload Source Tarball 🗜️
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-sources-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-source.*
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-sources-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-source.*
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*.*
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*.*
 
       - name: Upload debug symbol artifacts 🪲
         uses: actions/upload-artifact@v4
         if: ${{ fromJSON(needs.check-event.outputs.package) }}
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}-dbgsym
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*-dbgsym.ddeb
+          name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}-dbgsym
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*-dbgsym.ddeb
 
       - uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
