@@ -102,8 +102,7 @@ jobs:
           done
 
       - name: Create Release 🛫
-        if: fromJSON(steps.check.outputs.validTag)
-        id: create_release
+        if: fromJSON(steps.check.outputs.validTag) && github.event_name == 'push'
         uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564
         with:
           draft: true
@@ -118,3 +117,19 @@ jobs:
             ${{ github.workspace }}/*.deb
             ${{ github.workspace }}/*.ddeb
             ${{ github.workspace }}/*.tar.xz
+
+      - name: Update Existing Release 🛫
+        if: fromJSON(steps.check.outputs.validTag) && github.event_name == 'release'
+        uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564
+        with:
+          tag_name: ${{ steps.check.outputs.version }}
+          append_body: true
+          body_path: ${{ github.workspace }}/CHECKSUMS.txt
+          files: |
+            ${{ github.workspace }}/*.exe
+            ${{ github.workspace }}/*.zip
+            ${{ github.workspace }}/*.pkg
+            ${{ github.workspace }}/*.deb
+            ${{ github.workspace }}/*.ddeb
+            ${{ github.workspace }}/*.tar.xz
+
