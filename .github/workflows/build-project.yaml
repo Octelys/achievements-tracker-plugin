@@ -340,7 +340,7 @@ jobs:
           target: x86_64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ needs.check-event.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Upload Coverage Report 📊
         uses: actions/upload-artifact@v4
@@ -437,13 +437,13 @@ jobs:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ needs.check-event.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-x64*.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-x64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-x64*.*
 
   windows-arm64-build:
     name: Build for Windows ARM64 🪟
@@ -487,10 +487,10 @@ jobs:
           target: arm64
           config: ${{ needs.check-event.outputs.config }}
           package: ${{ fromJSON(needs.check-event.outputs.package) }}
-          version: ${{ needs.check-event.outputs.pluginVersion }}
+          version: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.pluginVersion }}-windows-arm64*.*
+          name: ${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-arm64-${{ needs.check-event.outputs.commitHash }}
+          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginName }}-${{ needs.check-event.outputs.versionOverride }}-windows-arm64*.*
