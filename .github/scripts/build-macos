@@ -184,6 +184,7 @@ build() {
           --exclude '(^|.*/)external(/|$)' \
           --exclude '(^|.*/)build_macos/_deps(/|$)' \
           --exclude '(^|.*/)test(/|$)' \
+          --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
           --html --html-details -o build_macos/coverage/html/index.html
 
         log_group "Coverage Summary"
@@ -191,6 +192,7 @@ build() {
           --exclude '(^|.*/)external(/|$)' \
           --exclude '(^|.*/)build_macos/_deps(/|$)' \
           --exclude '(^|.*/)test(/|$)' \
+          --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
           --print-summary
       else
         log_info "gcovr not found, skipping coverage report generation"
