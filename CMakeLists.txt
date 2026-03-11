@@ -63,32 +63,46 @@ find_package(CURL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 # WebSocket client for Xbox Live RTA monitoring
-# Try multiple methods to find libwebsockets
-set(LIBWEBSOCKETS_FOUND FALSE)
+# Try multiple methods to find libwebsockets.
+# LIBWEBSOCKETS_LINKED tracks whether we actually linked the library AND defined
+# HAVE_LIBWEBSOCKETS. LIBWEBSOCKETS_FOUND only records that the package was
+# located; the two are kept separate so that a successful find_package() that
+# doesn't produce a usable target doesn't suppress the pkg-config fallback.
+set(LIBWEBSOCKETS_LINKED FALSE)
 
 # Method 1: Try CMake's find_package
 find_package(Libwebsockets QUIET)
 if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
-  set(LIBWEBSOCKETS_FOUND TRUE)
-  if(TARGET websockets OR TARGET websockets_shared)
-    # Use the imported target
-    if(TARGET websockets_shared)
-      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE websockets_shared)
-    else()
-      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE websockets)
+  # Probe all known target names produced by various libwebsockets CMake configs.
+  # Ubuntu's libwebsockets-dev typically installs a config that creates
+  # Libwebsockets::websockets (namespaced), while vcpkg/source builds may
+  # create websockets or websockets_shared.
+  set(_lws_target "")
+  foreach(_candidate IN ITEMS
+      Libwebsockets::websockets
+      websockets_shared
+      websockets)
+    if(TARGET ${_candidate})
+      set(_lws_target ${_candidate})
+      break()
     endif()
+  endforeach()
+
+  if(_lws_target)
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${_lws_target})
     # Static libwebsockets on Windows requires Winsock; link it explicitly since
     # the imported target does not always propagate it as a dependency.
     if(WIN32)
       target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 dbghelp)
     endif()
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
-    message(STATUS "Found libwebsockets via CMake package")
+    set(LIBWEBSOCKETS_LINKED TRUE)
+    message(STATUS "Found libwebsockets via CMake package (target: ${_lws_target})")
   endif()
 endif()
 
-# Method 2: Try pkg-config if CMake method didn't work
-if(NOT LIBWEBSOCKETS_FOUND)
+# Method 2: Try pkg-config when CMake method didn't produce a usable target
+if(NOT LIBWEBSOCKETS_LINKED)
   find_package(PkgConfig QUIET)
   if(PkgConfig_FOUND)
     pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
@@ -96,13 +110,14 @@ if(NOT LIBWEBSOCKETS_FOUND)
       target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
       target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
       target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
+      set(LIBWEBSOCKETS_LINKED TRUE)
       message(STATUS "Found libwebsockets via pkg-config")
     endif()
   endif()
 endif()
 
 # Method 3: Try manual search in common locations (Homebrew, etc.)
-if(NOT LIBWEBSOCKETS_FOUND AND APPLE)
+if(NOT LIBWEBSOCKETS_LINKED AND APPLE)
   # Check common Homebrew paths
   set(HOMEBREW_PREFIXES "/opt/homebrew" "/usr/local")
   foreach(prefix ${HOMEBREW_PREFIXES})
@@ -112,7 +127,7 @@ if(NOT LIBWEBSOCKETS_FOUND AND APPLE)
         target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE "${prefix}/lib")
         target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE websockets)
         target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
-        set(LIBWEBSOCKETS_FOUND TRUE)
+        set(LIBWEBSOCKETS_LINKED TRUE)
         message(STATUS "Found libwebsockets in ${prefix}")
         break()
       endif()
@@ -120,7 +135,7 @@ if(NOT LIBWEBSOCKETS_FOUND AND APPLE)
   endforeach()
 endif()
 
-if(NOT LIBWEBSOCKETS_FOUND)
+if(NOT LIBWEBSOCKETS_LINKED)
   message(WARNING "libwebsockets not found. Xbox Live RTA monitoring will be disabled.")
   message(WARNING "To enable RTA monitoring, install libwebsockets:")
   message(WARNING "  macOS: brew install libwebsockets")
