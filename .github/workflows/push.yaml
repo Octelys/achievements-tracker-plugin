@@ -21,6 +21,8 @@ jobs:
   build-project:
     name: Build Project 🧱
     uses: ./.github/workflows/build-project.yaml
+    with:
+      package: 'auto'
     secrets: inherit
     permissions:
       contents: read
@@ -42,15 +44,15 @@ jobs:
           shopt -s extglob
 
           case "${GITHUB_REF_NAME}" in
-            +([0-9][0-9]).+([0-9]).+([0-9]) )
+            +([0-9]).+([0-9]).+([0-9]) | v+([0-9]).+([0-9]).+([0-9]) )
               echo 'validTag=true' >> $GITHUB_OUTPUT
               echo 'prerelease=false' >> $GITHUB_OUTPUT
-              echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+              echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
               ;;
-            +([0-9][0-9]).+([0-9]).+([0-9])-@(beta|rc)*([0-9]) )
+            +([0-9]).+([0-9]).+([0-9])-@(beta|rc)*([0-9]) | v+([0-9]).+([0-9]).+([0-9])-@(beta|rc)*([0-9]) )
               echo 'validTag=true' >> $GITHUB_OUTPUT
               echo 'prerelease=true' >> $GITHUB_OUTPUT
-              echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+              echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
               ;;
             *) echo 'validTag=false' >> $GITHUB_OUTPUT ;;
           esac
@@ -81,9 +83,7 @@ jobs:
 
           for variant_data in "${variants[@]}"; do
             IFS=';' read -r variant suffix <<< "${variant_data}"
-
             candidates=(*-${variant}-${commit_hash}/@(*|*-dbgsym).@(${suffix}))
-
             for candidate in "${candidates[@]}"; do
               mv "${candidate}" "${root_dir}"
             done
@@ -102,28 +102,13 @@ jobs:
           done
 
       - name: Create Release 🛫
-        if: fromJSON(steps.check.outputs.validTag) && github.event_name == 'push'
+        if: fromJSON(steps.check.outputs.validTag)
         uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564
         with:
-          draft: true
+          draft: false
           prerelease: ${{ fromJSON(steps.check.outputs.prerelease) }}
           tag_name: ${{ steps.check.outputs.version }}
           name: ${{ needs.build-project.outputs.pluginName }} ${{ steps.check.outputs.version }}
-          body_path: ${{ github.workspace }}/CHECKSUMS.txt
-          files: |
-            ${{ github.workspace }}/*.exe
-            ${{ github.workspace }}/*.zip
-            ${{ github.workspace }}/*.pkg
-            ${{ github.workspace }}/*.deb
-            ${{ github.workspace }}/*.ddeb
-            ${{ github.workspace }}/*.tar.xz
-
-      - name: Update Existing Release 🛫
-        if: fromJSON(steps.check.outputs.validTag) && github.event_name == 'release'
-        uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564
-        with:
-          tag_name: ${{ steps.check.outputs.version }}
-          append_body: true
           body_path: ${{ github.workspace }}/CHECKSUMS.txt
           files: |
             ${{ github.workspace }}/*.exe
