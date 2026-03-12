@@ -23,6 +23,32 @@ if (( _loglevel == 0 )) apt_args+=(--quiet)
 if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
   log_group 'Installing obs-studio build dependencies...'
 
+  local buildspec_file="${project_root}/buildspec.json"
+  local obs_version
+  obs_version="$(jq -r '.dependencies["obs-studio"].version // empty' "${buildspec_file}")"
+  if [[ -z ${obs_version} || ${obs_version} == null ]] {
+    log_error "Unable to determine the OBS Studio version from ${buildspec_file}."
+    return 2
+  }
+  obs_version=${obs_version#v}
+
+  _resolve_obs_package_version() {
+    local package_name="${1}"
+    local version_prefix="${2}"
+
+    apt-cache madison "${package_name}" \
+      | awk -v prefix="${version_prefix}" '
+          $3 == prefix ||
+          index($3, prefix "~") == 1 ||
+          index($3, prefix "-") == 1 ||
+          index($3, prefix "+") == 1 ||
+          index($3, prefix ":") == 1 {
+            print $3
+            exit
+          }
+        '
+  }
+
   local suffix
   if [[ ${CPUTYPE} != "${target##*-}" ]] {
     local -A arch_mappings=(
@@ -38,6 +64,16 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
   sudo add-apt-repository --yes ppa:obsproject/obs-studio
   sudo apt update
 
+  local obs_package_version
+  obs_package_version="$(_resolve_obs_package_version obs-studio "${obs_version}")"
+  if [[ -z ${obs_package_version} ]] {
+    log_error "Could not find an obs-studio package matching OBS ${obs_version}. Refusing to build against a newer libobs ABI."
+    apt-cache madison obs-studio || true
+    return 2
+  }
+
+  log_info "Using obs-studio package version ${obs_package_version} (from buildspec OBS ${obs_version})"
+
   sudo apt-get install ${apt_args} \
     build-essential \
     cmake \
@@ -45,7 +81,7 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
     libsimde-dev \
     libssl-dev \
     libcap-dev \
-    obs-studio \
+    obs-studio=${obs_package_version} \
     zip
 
   # Build libwebsockets from source with -fPIC so it can be statically linked
