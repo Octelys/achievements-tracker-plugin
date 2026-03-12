@@ -43,6 +43,7 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
     libgles2-mesa-dev \
     libsimde-dev \
     libwebsockets-dev \
+    libcap-dev \
     obs-studio \
     zip
 
