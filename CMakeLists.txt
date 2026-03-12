@@ -63,20 +63,48 @@ find_package(CURL REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE CURL::libcurl)
 
 # WebSocket client for Xbox Live RTA monitoring
-# Try multiple methods to find libwebsockets.
+#
+# IMPORTANT (Linux): the plugin is a .so loaded at runtime by OBS.  OBS does
+# NOT bundle libwebsockets, so linking it dynamically produces a hard runtime
+# dependency on libwebsockets.so that the end-user must satisfy separately.
+# To avoid that, we always prefer the static archive (libwebsockets.a) on Linux.
+#
 # LIBWEBSOCKETS_LINKED tracks whether we actually linked the library AND defined
-# HAVE_LIBWEBSOCKETS. LIBWEBSOCKETS_FOUND only records that the package was
-# located; the two are kept separate so that a successful find_package() that
-# doesn't produce a usable target doesn't suppress the pkg-config fallback.
+# HAVE_LIBWEBSOCKETS.  It is kept separate from the "package was found" flag so
+# that a successful find_package() that doesn't produce a usable target doesn't
+# suppress the pkg-config fallback.
 set(LIBWEBSOCKETS_LINKED FALSE)
+
+# Helper: given a target, return the path to its static archive on Linux.
+# If the target already points to a .a, returns it directly.
+# Otherwise, looks for a libwebsockets.a beside the shared library.
+function(_lws_resolve_static_lib out_var imported_target)
+  set(_result "")
+  if(UNIX AND NOT APPLE)
+    get_target_property(_loc ${imported_target} IMPORTED_LOCATION)
+    if(NOT _loc)
+      get_target_property(_loc ${imported_target} LOCATION)
+    endif()
+    if(_loc MATCHES "\\.a$")
+      set(_result "${_loc}")
+    elseif(_loc)
+      # e.g. /usr/lib/x86_64-linux-gnu/libwebsockets.so  →  look for .a alongside
+      get_filename_component(_dir  "${_loc}" DIRECTORY)
+      get_filename_component(_name "${_loc}" NAME_WE)   # libwebsockets
+      if(EXISTS "${_dir}/${_name}.a")
+        set(_result "${_dir}/${_name}.a")
+      endif()
+    endif()
+  endif()
+  set(${out_var} "${_result}" PARENT_SCOPE)
+endfunction()
 
 # Method 1: Try CMake's find_package
 find_package(Libwebsockets QUIET)
 if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
   # Probe all known target names produced by various libwebsockets CMake configs.
-  # Ubuntu's libwebsockets-dev typically installs a config that creates
-  # Libwebsockets::websockets (namespaced), while vcpkg/source builds may
-  # create websockets or websockets_shared.
+  # Ubuntu's libwebsockets-dev creates Libwebsockets::websockets (namespaced),
+  # while vcpkg/source builds may create websockets or websockets_shared.
   set(_lws_target "")
   foreach(_candidate IN ITEMS
       Libwebsockets::websockets
@@ -89,7 +117,20 @@ if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
   endforeach()
 
   if(_lws_target)
-    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${_lws_target})
+    if(UNIX AND NOT APPLE)
+      # On Linux prefer the static archive to avoid a runtime .so dependency.
+      _lws_resolve_static_lib(_lws_static_lib ${_lws_target})
+      if(_lws_static_lib)
+        message(STATUS "Found libwebsockets via CMake package — linking static archive: ${_lws_static_lib}")
+        target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE "${_lws_static_lib}")
+      else()
+        message(WARNING "libwebsockets static archive (.a) not found beside shared lib — falling back to dynamic link.")
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${_lws_target})
+      endif()
+    else()
+      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${_lws_target})
+    endif()
     # Static libwebsockets on Windows requires Winsock; link it explicitly since
     # the imported target does not always propagate it as a dependency.
     if(WIN32)
@@ -97,7 +138,9 @@ if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
     endif()
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
     set(LIBWEBSOCKETS_LINKED TRUE)
-    message(STATUS "Found libwebsockets via CMake package (target: ${_lws_target})")
+    if(NOT (UNIX AND NOT APPLE))
+      message(STATUS "Found libwebsockets via CMake package (target: ${_lws_target})")
+    endif()
   endif()
 endif()
 
@@ -105,20 +148,64 @@ endif()
 if(NOT LIBWEBSOCKETS_LINKED)
   find_package(PkgConfig QUIET)
   if(PkgConfig_FOUND)
-    pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
-    if(LIBWEBSOCKETS_FOUND)
-      target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
-      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
-      target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
-      set(LIBWEBSOCKETS_LINKED TRUE)
-      message(STATUS "Found libwebsockets via pkg-config")
+    if(UNIX AND NOT APPLE)
+      # Use STATIC so pkg_check_modules also returns transitive dependencies
+      # (libcap, libssl, …) that the static archive requires at link time.
+      pkg_check_modules(LIBWEBSOCKETS QUIET STATIC libwebsockets)
+      if(LIBWEBSOCKETS_FOUND)
+        # Try to locate the static archive (.a) from the library search dirs.
+        set(_lws_static_lib "")
+        foreach(_lws_lib_dir IN LISTS LIBWEBSOCKETS_LIBRARY_DIRS)
+          if(EXISTS "${_lws_lib_dir}/libwebsockets.a")
+            set(_lws_static_lib "${_lws_lib_dir}/libwebsockets.a")
+            break()
+          endif()
+        endforeach()
+        # Also search well-known system lib dirs if not found above.
+        if(NOT _lws_static_lib)
+          foreach(_sys_dir IN ITEMS
+              /usr/lib/x86_64-linux-gnu
+              /usr/lib/aarch64-linux-gnu
+              /usr/lib
+              /usr/local/lib)
+            if(EXISTS "${_sys_dir}/libwebsockets.a")
+              set(_lws_static_lib "${_sys_dir}/libwebsockets.a")
+              break()
+            endif()
+          endforeach()
+        endif()
+
+        target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
+        if(_lws_static_lib)
+          message(STATUS "Found libwebsockets via pkg-config — linking static archive: ${_lws_static_lib}")
+          # Link the .a directly, then the transitive static deps reported by
+          # pkg-config (libcap, libssl, etc.).  CMake deduplicates automatically.
+          target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+            "${_lws_static_lib}"
+            ${LIBWEBSOCKETS_STATIC_LIBRARIES}
+          )
+        else()
+          message(WARNING "libwebsockets static archive (.a) not found — falling back to dynamic link.")
+          target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+        endif()
+        target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
+        set(LIBWEBSOCKETS_LINKED TRUE)
+      endif()
+    else()
+      pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
+      if(LIBWEBSOCKETS_FOUND)
+        target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})
+        target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_LIBRARIES})
+        target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
+        set(LIBWEBSOCKETS_LINKED TRUE)
+        message(STATUS "Found libwebsockets via pkg-config")
+      endif()
     endif()
   endif()
 endif()
 
-# Method 3: Try manual search in common locations (Homebrew, etc.)
+# Method 3: Try manual search in common locations (Homebrew, etc.) — macOS only
 if(NOT LIBWEBSOCKETS_LINKED AND APPLE)
-  # Check common Homebrew paths
   set(HOMEBREW_PREFIXES "/opt/homebrew" "/usr/local")
   foreach(prefix ${HOMEBREW_PREFIXES})
     if(EXISTS "${prefix}/include/libwebsockets.h")
@@ -138,8 +225,8 @@ endif()
 if(NOT LIBWEBSOCKETS_LINKED)
   message(WARNING "libwebsockets not found. Xbox Live RTA monitoring will be disabled.")
   message(WARNING "To enable RTA monitoring, install libwebsockets:")
-  message(WARNING "  macOS: brew install libwebsockets")
-  message(WARNING "  Linux: apt-get install libwebsockets-dev (or dnf install libwebsockets-devel)")
+  message(WARNING "  macOS:   brew install libwebsockets")
+  message(WARNING "  Linux:   apt-get install libwebsockets-dev (or dnf install libwebsockets-devel)")
   message(WARNING "  Windows: vcpkg install libwebsockets:x64-windows-static (or arm64-windows-static)")
 endif()
 
