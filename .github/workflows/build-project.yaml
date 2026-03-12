@@ -386,7 +386,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-${{ matrix.os }}-x86_64-${{ needs.check-event.outputs.commitHash }}
-          path: ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*.*
+          path: |
+            ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64.zip
+            ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64.tar.xz
+            ${{ github.workspace }}/release/${{ needs.check-event.outputs.pluginInternalName }}-${{ needs.check-event.outputs.pluginVersion }}-x86_64*.deb
 
       - name: Upload debug symbol artifacts 🪲
         uses: actions/upload-artifact@v4

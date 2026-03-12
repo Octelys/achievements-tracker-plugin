@@ -43,7 +43,8 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
     libgles2-mesa-dev \
     libsimde-dev \
     libwebsockets-dev \
-    obs-studio
+    obs-studio \
+    zip
 
   local -a _qt_packages=()
 
