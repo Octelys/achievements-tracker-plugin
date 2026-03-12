@@ -40,12 +40,47 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
 
   sudo apt-get install ${apt_args} \
     build-essential \
+    cmake \
     libgles2-mesa-dev \
     libsimde-dev \
-    libwebsockets-dev \
+    libssl-dev \
     libcap-dev \
     obs-studio \
     zip
+
+  # Build libwebsockets from source with -fPIC so it can be statically linked
+  # into our plugin .so.  The distro package (libwebsockets-dev) ships a .a
+  # compiled WITHOUT -fPIC, which causes a link error when embedded in a shared
+  # object ("relocation can not be used when making a shared object; recompile
+  # with -fPIC").  Building from source is the only reliable fix.
+  log_group 'Building libwebsockets from source (PIC static)...'
+  local lws_version='4.3.3'
+  local lws_build_dir="/tmp/lws-build"
+  mkdir -p ${lws_build_dir}
+  pushd ${lws_build_dir}
+  curl -fsSL "https://github.com/warmcat/libwebsockets/archive/refs/tags/v${lws_version}.tar.gz" \
+    | tar -xz --strip-components=1
+  cmake -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DLWS_WITH_SHARED=OFF \
+    -DLWS_WITH_STATIC=ON \
+    -DLWS_WITH_SSL=ON \
+    -DLWS_WITH_LIBUV=OFF \
+    -DLWS_WITH_LIBEVENT=OFF \
+    -DLWS_WITH_GLIB=OFF \
+    -DLWS_WITHOUT_TESTAPPS=ON \
+    -DLWS_WITHOUT_TEST_SERVER=ON \
+    -DLWS_WITHOUT_TEST_PING=ON \
+    -DLWS_WITHOUT_TEST_CLIENT=ON \
+    -DCMAKE_INSTALL_PREFIX=/usr/local
+  cmake --build build --parallel
+  sudo cmake --install build
+  # Update the linker cache so /usr/local/lib is searched before /usr/lib
+  sudo ldconfig
+  popd
+  rm -rf ${lws_build_dir}
+  log_group
 
   local -a _qt_packages=()
 
@@ -67,3 +102,5 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
   sudo apt-get install ${apt_args} ${_qt_packages}
   log_group
 }
+
+popd
