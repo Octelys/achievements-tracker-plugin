@@ -18,4 +18,3 @@ function(_check_dependencies_linux)
 endfunction()
 
 _check_dependencies_linux()
-

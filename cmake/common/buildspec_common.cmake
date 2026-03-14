@@ -84,9 +84,9 @@ function(_setup_obs_studio)
       COMMAND
         "${CMAKE_COMMAND}" -S "${dependencies_dir}/${_obs_destination}" -B
         "${dependencies_dir}/${_obs_destination}/build_${arch}" -G Xcode
-        "-DCMAKE_OSX_ARCHITECTURES:STRING='arm64;x86_64'" -DOBS_CMAKE_VERSION:STRING=3.0.0
-        -DENABLE_PLUGINS:BOOL=OFF -DENABLE_FRONTEND:BOOL=OFF -DOBS_VERSION_OVERRIDE:STRING=${_obs_version}
-        -DCMAKE_PREFIX_PATH=${_obs_prefix_path} ${_is_fresh} ${_cmake_extra_args}
+        "-DCMAKE_OSX_ARCHITECTURES:STRING='arm64;x86_64'" -DOBS_CMAKE_VERSION:STRING=3.0.0 -DENABLE_PLUGINS:BOOL=OFF
+        -DENABLE_FRONTEND:BOOL=OFF -DOBS_VERSION_OVERRIDE:STRING=${_obs_version} -DCMAKE_PREFIX_PATH=${_obs_prefix_path}
+        ${_is_fresh} ${_cmake_extra_args}
       RESULT_VARIABLE _process_result
       COMMAND_ERROR_IS_FATAL ANY
       OUTPUT_QUIET

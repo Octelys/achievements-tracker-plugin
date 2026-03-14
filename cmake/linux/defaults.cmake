@@ -12,11 +12,7 @@ string(JSON _obs_studio_version GET ${_linux_buildspec} dependencies obs-studio 
 string(REGEX MATCH "^[0-9]+" _obs_studio_major "${_obs_studio_version}")
 math(EXPR _obs_studio_next_major "${_obs_studio_major} + 1")
 
-set(
-  CPACK_DEBIAN_PACKAGE_DEPENDS
-  "obs-studio (>= ${_obs_studio_version})"
-  "obs-studio (<< ${_obs_studio_next_major}~)"
-)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "obs-studio (>= ${_obs_studio_version})" "obs-studio (<< ${_obs_studio_next_major}~)")
 
 if(CMAKE_INSTALL_LIBDIR MATCHES "(CMAKE_SYSTEM_PROCESSOR)")
   string(REPLACE "CMAKE_SYSTEM_PROCESSOR" "${CMAKE_SYSTEM_PROCESSOR}" CMAKE_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
@@ -31,7 +27,6 @@ set(
   "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-studio-${_obs_studio_version}/build_${CMAKE_SYSTEM_PROCESSOR}/libobs"
   "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-studio-${_obs_studio_version}/build_${CMAKE_SYSTEM_PROCESSOR}/frontend/api"
 )
-
 
 # Enable find_package targets to become globally available targets
 set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL TRUE)

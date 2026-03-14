@@ -88,10 +88,7 @@ if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
   # The from-source / vcpkg builds create Libwebsockets::websockets (namespaced),
   # older configs may use websockets or websockets_shared.
   set(_lws_target "")
-  foreach(_candidate IN ITEMS
-      Libwebsockets::websockets
-      websockets_shared
-      websockets)
+  foreach(_candidate IN ITEMS Libwebsockets::websockets websockets_shared websockets)
     if(TARGET ${_candidate})
       set(_lws_target ${_candidate})
       break()
@@ -148,7 +145,10 @@ if(NOT LIBWEBSOCKETS_LINKED)
   message(WARNING "libwebsockets not found. Xbox Live RTA monitoring will be disabled.")
   message(WARNING "To enable RTA monitoring, install libwebsockets:")
   message(WARNING "  macOS:   brew install libwebsockets")
-  message(WARNING "  Linux:   built from source with -fPIC by setup_ubuntu (see .github/scripts/utils.zsh/setup_ubuntu)")
+  message(
+    WARNING
+    "  Linux:   built from source with -fPIC by setup_ubuntu (see .github/scripts/utils.zsh/setup_ubuntu)"
+  )
   message(WARNING "  Windows: vcpkg install libwebsockets:x64-windows-static (or arm64-windows-static)")
 endif()
 
