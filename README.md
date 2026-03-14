@@ -1,18 +1,15 @@
 # OBS Achievements Tracker
 
-A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement progress and gamer score for the currently signed-in Xbox user.
+A cross-platform OBS Studio plugin that displays Xbox Live profile data, current game information, and achievement progress for the signed-in Xbox user.
 
 ## Features
 
-- **Xbox Live Authentication**: Secure OAuth 2.0 authentication flow with Microsoft accounts
-- **Real-time Achievement Tracking**: Monitor achievement unlocks as they happen
-- **Profile Display**: Show gamertag, gamerpic, and gamerscore
-- **Game Information**: Display currently active game cover art
-- **Achievement Details**: Show achievement name, description, icon, and count
-- **Customizable Text Sources**: Configurable font, color, and size for all text-based sources
-- **Customizable Image Sources**: Adjustable dimensions for image-based sources
-- **Automatic Updates**: Real-time synchronization with Xbox Live services
-- **Cross-platform**: Supports Windows, macOS, and Linux
+- **Xbox sign-in source** using Microsoft's device-code flow
+- **Real-time game and achievement tracking** through Xbox Live RTA monitoring when available
+- **Profile sources** for gamertag, gamerpic, and gamerscore
+- **Achievement sources** for name, description, icon, and progress count
+- **Customizable text sources** with persisted font and gradient color settings
+- **Cross-platform builds** for Windows, macOS, and Linux
 
 ---
 
@@ -20,62 +17,77 @@ A cross-platform OBS Studio plugin that displays real-time Xbox Live achievement
 
 ### Installation
 
-1. Download the latest release for your platform from the [Releases](https://github.com/your-org/achievements-tracker-plugin/releases) page:
-   - **Windows x64**: `achievements-tracker-<version>-windows-x64.exe` (installer) or `.zip` (manual)
-   - **Windows ARM64**: `achievements-tracker-<version>-windows-arm64.exe` (installer) or `.zip` (manual)
-   - **macOS**: `achievements-tracker-<version>-macos-universal.pkg` (installer) or `.tar.xz` (manual)
-   - **Linux**: `achievements-tracker-<version>-x86_64-ubuntu-gnu.tar.xz`
+Download the latest release from the [Releases page](https://github.com/Octelys/achievements-tracker-plugin/releases).
 
-2. **Windows**: Run the `.exe` installer — it will automatically detect your OBS Studio installation and place the plugin in the correct directory. Alternatively, extract the `.zip` manually:
-   - `obs-plugins\64bit\achievements-tracker.dll` → `%ProgramFiles%\obs-studio\obs-plugins\64bit\`
-   - `data\obs-plugins\achievements-tracker\` → `%ProgramFiles%\obs-studio\data\obs-plugins\achievements-tracker\`
+- **Windows x64 / ARM64**: installer (`.exe`) and portable archive (`.zip`)
+- **macOS**: installer (`.pkg`) and manual archive (`.tar.xz`)
+- **Linux x86_64**: portable archives (`.zip` / `.tar.xz`) and Debian package assets when produced by the release workflow
 
-3. **macOS**: Run the `.pkg` installer, or extract the `.tar.xz` and copy `achievements-tracker.plugin` to:
-   - `~/Library/Application Support/obs-studio/plugins/`
+#### Windows
 
-4. **Linux**: Extract the `.tar.xz` and copy files to:
-   - `~/.config/obs-studio/plugins/`
+Preferred: run the `.exe` installer.
 
-5. Restart OBS Studio.
+For manual installation from the `.zip`, extract the archive into:
+
+- `%ALLUSERSPROFILE%\obs-studio\plugins\`
+
+The archive is laid out so that files land under:
+
+- `achievements-tracker\bin\64bit\`
+- `achievements-tracker\data\`
+
+#### macOS
+
+Preferred: run the `.pkg` installer.
+
+For manual installation from the `.tar.xz`, copy `achievements-tracker.plugin` to:
+
+- `~/Library/Application Support/obs-studio/plugins/`
+
+#### Linux
+
+If a `.deb` asset is available for the release, that is the easiest installation path.
+
+For manual installation from the `.zip` or `.tar.xz`, preserve the archive layout under your chosen prefix. The release archive contains a `lib/` tree for the plugin binary and a `share/` tree for plugin resources.
+
+After installation, restart OBS Studio.
 
 ### Configuration
 
-1. **Sign in to Xbox Live**:
-   - Open OBS Studio
-   - Add a new **Source** → **Xbox Account**
-   - Click the **Sign in with Xbox Live** button in the source properties
-   - A browser window will open; sign in with your Microsoft account
-   - Grant the requested permissions
-   - The plugin will automatically retrieve and cache your XSTS token
+1. Open OBS Studio.
+2. Add a new **Source** → **Xbox Account**.
+3. In the source properties, click **Sign in with Xbox**.
+4. A browser window opens for Microsoft account authentication.
+5. Once authentication succeeds, add any of the Xbox display sources you want to use in your scene.
 
-### Usage
+### Available OBS Sources
 
-Once configured, the plugin provides the following OBS sources:
+#### Account & profile
 
-#### Account & Profile Sources
+- **Xbox Account**: sign-in / sign-out source
+- **Xbox Gamertag**: text source for the current gamertag
+- **Xbox Gamerpic**: image source for the current gamerpic
+- **Xbox Gamerscore**: text source for the current gamerscore
 
-- **Xbox Account**: Authentication source for signing into Xbox Live. Add this first to authenticate with your Microsoft account.
-- **Xbox Gamertag**: Displays your Xbox gamertag as customizable text.
-- **Xbox Gamerpic**: Shows your Xbox profile picture (avatar).
-- **Xbox Gamerscore**: Displays your total gamerscore as customizable text.
+#### Game
 
-#### Game Sources
+- **Xbox Game Cover**: image source for the currently active game's cover art
 
-- **Xbox Game Cover**: Shows the cover art/box art of the currently active game on your Xbox console.
+#### Achievements
 
-#### Achievement Sources
+- **Xbox Achievement (Name)**: current achievement name, including gamerscore when available
+- **Xbox Achievement (Description)**: current achievement description
+- **Xbox Achievement (Icon)**: current achievement icon
+- **Xbox Achievements Count**: unlocked / total achievements for the current game (for example `12 / 50`)
 
-- **Xbox Achievement (Name)**: Displays the name and gamerscore value of the current achievement (e.g., "50G - Master Explorer").
-- **Xbox Achievement (Description)**: Shows the description text of the current achievement.
-- **Xbox Achievement (Icon)**: Displays the achievement icon/badge image.
-- **Xbox Achievements Count**: Shows the total number of achievements for the current game (e.g., "50 achievements").
+#### Real-time updates
 
-#### Real-time Updates
+When Xbox Live monitoring is available, the plugin subscribes to:
 
-The plugin automatically subscribes to Xbox Live for real-time updates:
-- Currently active game changes
-- Achievement unlock events
-- Profile information updates
+- current game / presence changes
+- achievement progression updates
+
+Profile-derived sources such as gamerscore, gamertag, and gamerpic refresh from the authenticated session data used by the plugin.
 
 ---
 
@@ -83,138 +95,76 @@ The plugin automatically subscribes to Xbox Live for real-time updates:
 
 ### Repository Structure
 
-```
+```text
 achievements-tracker-plugin/
 ├── src/
-│   ├── main.c                          # Plugin entry point, module registration
-│   ├── common/                         # Shared data types and utilities
-│   │   ├── achievement.c/h             # Achievement type (copy/free/count)
-│   │   ├── achievement_progress.c/h    # Achievement progress tracking
-│   │   ├── device.h                    # Device identity (UUID, keys)
-│   │   ├── game.c/h                    # Game descriptor (id, title)
-│   │   ├── gamerscore.c/h              # Gamerscore container & computation
-│   │   ├── memory.h                    # Memory allocation helpers (FREE, free_memory)
-│   │   ├── token.c/h                   # Auth token with expiration
-│   │   ├── types.h                     # Umbrella header, macros, platform helpers
-│   │   ├── unlocked_achievement.c/h    # Unlocked achievement tracking
-│   │   ├── xbox_identity.c/h           # Xbox identity (gamertag, xuid, uhs, token)
-│   │   └── xbox_session.c/h            # Xbox session state container
-│   ├── crypto/
-│   │   └── crypto.c/h                  # EC key generation, signing (Proof-of-Possession)
-│   ├── diagnostics/
-│   │   ├── log.c.in                    # Logging (CMake-configured)
-│   │   └── log.h                       # Logging API
-│   ├── drawing/
-│   │   ├── color.c/h                   # Color handling utilities
-│   │   ├── image.c/h                   # Image rendering helpers
-│   │   └── text.c/h                    # Text rendering helpers
-│   ├── encoding/
-│   │   └── base64.c/h                  # Base64 URL-safe encoding
-│   ├── io/
-│   │   └── state.c/h                   # Persistent state (tokens, device keys)
-│   ├── net/
-│   │   ├── browser/browser.c/h         # Platform-specific browser launch
-│   │   ├── http/http.c/h               # libcurl HTTP GET/POST wrappers
-│   │   └── json/json.c/h               # JSON parsing helpers
-│   ├── oauth/
-│   │   ├── util.c/h                    # OAuth helpers (PKCE, code exchange)
-│   │   └── xbox-live.c/h               # Xbox Live OAuth & XSTS token flows
-│   ├── sources/                        # OBS source implementations
-│   │   ├── common/                     # Shared source utilities
-│   │   │   ├── achievement_cycle.c/h   # Achievement display rotation logic
-│   │   │   ├── image_source.c/h        # Common image source functionality
-│   │   │   └── text_source.c/h         # Common text source functionality
-│   │   └── xbox/                       # Xbox-specific sources
-│   │       ├── account.c/h             # Xbox Account source (authentication)
-│   │       ├── achievement_description.c/h  # Achievement description text source
-│   │       ├── achievement_icon.c/h    # Achievement icon image source
-│   │       ├── achievement_name.c/h    # Achievement name text source
-│   │       ├── achievements_count.c/h  # Achievements count text source
-│   │       ├── game_cover.c/h          # Xbox Game Cover image source
-│   │       ├── gamerpic.c/h            # Xbox Gamerpic image source
-│   │       ├── gamerscore.c/h          # Xbox Gamerscore text source
-│   │       └── gamertag.c/h            # Xbox Gamertag text source
-│   ├── system/
-│   │   └── font.c/h                    # System font discovery
-│   ├── text/
-│   │   ├── convert.c/h                 # Text conversion utilities
-│   │   └── parsers.c/h                 # Text/response parsing utilities
-│   ├── time/
-│   │   └── time.c/h                    # ISO-8601 timestamp parsing
-│   ├── util/
-│   │   └── uuid.c/h                    # Cross-platform UUID generation
-│   └── xbox/
-│       ├── xbox_client.c/h             # Xbox Live API client (profile, achievements)
-│       ├── xbox_monitor.c/h            # Real-time activity monitoring
-│       └── xbox_session.c/h            # Session management
-├── test/
-│   ├── test_convert.c                  # Text conversion tests
-│   ├── test_crypto.c                   # Cryptographic signing tests
-│   ├── test_encoder.c                  # Base64 encoding tests
-│   ├── test_parsers.c                  # Text parser tests
-│   ├── test_types.c                    # Common types tests
-│   ├── test_xbox_session.c             # Xbox session tests
-│   ├── unity_config.h                  # Unity test framework config
-│   └── stubs/                          # Test stubs (bmem_stub.c, mocks, etc.)
-├── cmake/                              # Build configuration helpers
-├── data/locale/                        # Localization files
-├── external/cjson/                     # cJSON library (vendored)
-└── CMakeLists.txt                      # Main build configuration
+│   ├── main.c                      # OBS module entry point
+│   ├── common/                     # Shared types and value objects
+│   ├── crypto/                     # Proof-of-possession signing helpers
+│   ├── diagnostics/                # Logging helpers
+│   ├── drawing/                    # Color and image rendering helpers
+│   ├── encoding/                   # Base64 helpers
+│   ├── io/                         # Persistent state and cache helpers
+│   ├── net/                        # Browser, HTTP, and JSON helpers
+│   ├── oauth/                      # Xbox/Microsoft authentication flow
+│   ├── sources/
+│   │   ├── common/                 # Shared text/image source helpers
+│   │   └── xbox/                   # OBS source implementations
+│   ├── text/                       # Conversion and parsing helpers
+│   ├── time/                       # Time parsing utilities
+│   ├── util/                       # UUID and portability helpers
+│   └── xbox/                       # Xbox client, monitor, and session logic
+├── test/                           # Unity-based unit tests and stubs
+├── data/                           # Locale files and effects/resources
+├── external/cjson/                 # Vendored cJSON
+├── cmake/                          # Platform-specific CMake helpers
+├── .github/                        # CI workflows and composite actions
+├── CMakeLists.txt
+├── CMakePresets.json
+└── buildspec.json
 ```
 
-### OAuth Authentication Sequence
+### Authentication Sequence
 
-The plugin implements the Xbox Live authentication flow with Proof-of-Possession (PoP) signing:
+The plugin implements the Xbox Live authentication flow with proof-of-possession signing:
 
-#### 1. **Microsoft OAuth 2.0 (Device Code Flow)**
-   - POST to `https://login.live.com/oauth20_connect.srf` with:
-     - `client_id`: Application client ID
-     - `response_type`: `device_code`
-     - `scope`: `service::user.auth.xboxlive.com::MBI_SSL`
-   - Receive `device_code`, `user_code`, `interval`, and `expires_in`
-   - Open system browser to `https://login.live.com/oauth20_remoteconnect.srf?otc=<user_code>`
-   - User signs in and enters the displayed code
-   - Plugin polls `https://login.live.com/oauth20_token.srf` at the specified interval until:
-     - User completes authentication → receive **Access Token** and **Refresh Token**
-     - Or timeout expires
+#### 1. Microsoft OAuth device-code flow
 
-#### 2. **Xbox Live Device Token**
-   - Generate an EC P-256 key pair (device Proof-of-Possession key)
-   - POST to `https://device.auth.xboxlive.com/device/authenticate` with:
-     - Device UUID and serial number (random, cached)
-     - Public key (JWK format) in `ProofKey`
-     - `signature` header (request signed with private key)
-   - Receive **Device Token** (JWT) with expiration (`NotAfter`)
+- Request `device_code` and `user_code` from `https://login.live.com/oauth20_connect.srf`
+- Open the browser to `https://login.live.com/oauth20_remoteconnect.srf?otc=<user_code>`
+- Poll `https://login.live.com/oauth20_token.srf` until authorization completes
+- Store the returned Microsoft access token and refresh token
 
-#### 3. **Xbox Live SISU Authorization** (Single Sign-In, Single Sign-Out)
-   - POST to `https://sisu.xboxlive.com/authorize` with:
-     - Microsoft Access Token (as `AccessToken`: `t=<token>`)
-     - Device Token
-     - App ID (client ID)
-     - Public key (JWK) in `ProofKey`
-     - `signature` header (request signed with private key)
-   - Receive:
-     - **Authorization Token** (XSTS token at `AuthorizationToken.Token`)
-     - User identity: `gtg` (gamertag), `xid` (Xbox User ID), `uhs` (User Hash)
-     - Token expiration (`NotAfter`)
+#### 2. Xbox device token
 
-#### 4. **Token Storage & Refresh**
-   - All tokens are cached in `~/.config/obs-studio/plugin_config/achievements-tracker/state.json`
-   - Device keys are persisted (EC private key, PEM format)
-   - On startup:
-     1. If valid **User Token** exists → use it
-     2. Else if **Refresh Token** exists → exchange for new Access Token via token endpoint
-     3. Else → start Device Code Flow from step 1
-   - Device Token is also cached and reused if still valid
+- Generate or reuse a persisted EC P-256 device keypair
+- Authenticate against `https://device.auth.xboxlive.com/device/authenticate`
+- Store the returned device token
 
-#### 5. **Authenticated API Calls**
-   - All Xbox Live API requests include the header:
-     ```
-     Authorization: XBL3.0 x=<uhs>;<xsts_token>
-     ```
-   - Examples:
-     - **Profile**: `GET https://profile.xboxlive.com/users/xuid(<xuid>)/profile/settings?settings=Gamerscore`
-     - **Achievements**: `GET https://achievements.xboxlive.com/users/xuid(<xuid>)/achievements`
+#### 3. SISU authorization
+
+- Call `https://sisu.xboxlive.com/authorize`
+- Exchange the Microsoft token + device token for Xbox identity data
+- Persist the resulting Xbox token and identity fields (`gtg`, `xid`, `uhs`)
+
+#### 4. Token storage and refresh
+
+- Persisted state is stored via `obs_module_config_path("")`
+- The state file name is `achievements-tracker-state.json`
+- On startup the plugin tries, in order:
+  1. cached user token
+  2. refresh-token exchange
+  3. full device-code flow
+
+#### 5. Authenticated API calls
+
+Xbox REST requests use the header:
+
+```text
+Authorization: XBL3.0 x=<uhs>;<xsts_token>
+```
+
+Examples used by the plugin include profile, title art, presence, and achievement endpoints under `*.xboxlive.com`.
 
 ---
 
@@ -222,85 +172,82 @@ The plugin implements the Xbox Live authentication flow with Proof-of-Possession
 
 ### Prerequisites
 
-- **CMake** 3.28 or later
-- **OBS Studio** 31.0+ (headers + libraries)
-- **OpenSSL** 3.x (for cryptographic operations)
-- **libcurl** (for HTTP requests)
-- **libwebsockets** (for Xbox Live real-time activity monitoring via WebSocket)
-- **FreeType** 2.x (for text rendering)
-- **zlib** (required by FreeType, usually available by default)
-- **libuuid** (Linux/BSD only, for UUID generation)
-- C compiler with C11 support
+- **CMake** 3.28+
+- **OBS Studio** development headers and libraries compatible with the version pinned in `buildspec.json` (currently `31.1.1`)
+- **OpenSSL** 3.x
+- **libcurl**
+- **FreeType** 2.x
+- **zlib**
+- **libuuid** on Linux/BSD
+- A C11-capable compiler
 
-**Note on zlib:** zlib is required by FreeType for font compression support and is typically pre-installed on all platforms (macOS SDK, Windows via vcpkg/obs-deps, Linux system packages).
+`libwebsockets` is also needed for Xbox Live RTA monitoring. The exact strategy differs by platform.
 
-#### Linking strategy per platform
+### Dependency / linking notes
 
-The project uses a deliberate per-platform linking strategy for OpenSSL and libwebsockets:
+| Platform | Current approach |
+| --- | --- |
+| **Windows** | Uses static vcpkg packages such as `*-windows-static-md` for dependencies like OpenSSL and libwebsockets. |
+| **macOS** | Uses Homebrew / obs-deps style libraries for local and CI builds; universal builds require universal-compatible dependencies. |
+| **Linux** | CI/package builds deliberately prefer a PIC static `libwebsockets` build on Ubuntu so the plugin can link cleanly as an OBS-loaded shared object. |
 
-| Platform | Linking | Reason |
-|---|---|---|
-| **Windows** | Static (`*-windows-static-md`) | OBS does not ship OpenSSL or libwebsockets on Windows. Static linking makes the plugin DLL fully self-contained with no extra runtime dependencies to distribute. The `-md` suffix ensures the static libraries use the dynamic CRT (`/MD`), matching OBS and avoiding `LNK4098` conflicts. |
-| **macOS** | Dynamic (Homebrew / obs-deps) | OBS deps and Homebrew provide universal binaries. Dynamic linking keeps the plugin bundle small and follows macOS conventions. |
-| **Linux** | Dynamic (system packages) | Linux distributions ship OpenSSL and libwebsockets as system `.so` files. Static linking against `glibc`-dependent libraries (such as those used by libwebsockets) can break resolver APIs (`getaddrinfo`, NSS). Dynamic linking follows distro conventions and ensures security patches are picked up automatically. |
-
-### Platform-Specific Setup
+### Platform-specific setup
 
 #### macOS
 
-1. Install dependencies via Homebrew:
+1. Install local build dependencies:
+
 ```bash
-brew install cmake openssl@3 curl freetype
+brew install cmake openssl@3 curl freetype libwebsockets
 ```
 
-2. Clone and configure:
+2. Clone and configure the local development preset:
+
 ```bash
-git clone https://github.com/your-org/achievements-tracker-plugin.git
+git clone https://github.com/Octelys/achievements-tracker-plugin.git
 cd achievements-tracker-plugin
 cmake --preset macos-dev
 ```
 
 3. Build:
-```bash
-xcodebuild -configuration RelWithDebInfo -scheme achievements-tracker -parallelizeTargets -destination "generic/platform=macOS,name=Any Mac"
-```
-   
-Or maybe:
 
 ```bash
 cmake --build build_macos_dev --config Debug
 ```
 
-4. The plugin bundle will be at:
+or 
+
 ```bash
+xcodebuild -configuration Debug -scheme achievements-tracker -parallelizeTargets -destination "generic/platform=macOS,name=Any Mac"
+```
+
+4. The plugin bundle is produced at:
+
+```text
 build_macos_dev/Debug/achievements-tracker.plugin
 ```
 
-5. Copy to OBS plugins folder:
+5. Copy it into OBS's plugin folder:
+
 ```bash
 cp -r build_macos_dev/Debug/achievements-tracker.plugin \
   ~/Library/Application\ Support/obs-studio/plugins/
 ```
 
-##### Building Universal Binary for CI
+##### Universal macOS build notes
 
-For universal (arm64+x86_64) builds, you'll need a universal FreeType binary:
+The CI workflow uses the `macos-ci` preset and prepares universal dependencies before packaging. If you want to experiment locally with the CI-style build:
 
 ```bash
-# Build universal FreeType (this will be done automatically in CI)
 ./scripts/build-universal-freetype.sh
-
-# Then configure for universal build
 cmake --preset macos-ci
+cmake --build build_macos --config RelWithDebInfo
 ```
-
-The CI workflow automatically builds universal FreeType before building the plugin.
 
 #### Windows
 
-Dependencies are installed via **vcpkg** using the `*-windows-static-md` triplet, which produces static libraries linked against the dynamic CRT (`/MD`). This keeps the plugin DLL self-contained while remaining compatible with OBS's runtime.
+1. Install dependency packages with vcpkg:
 
-1. Install dependencies via vcpkg:
 ```powershell
 # x64
 vcpkg install openssl:x64-windows-static-md libwebsockets:x64-windows-static-md
@@ -309,11 +256,8 @@ vcpkg install openssl:x64-windows-static-md libwebsockets:x64-windows-static-md
 vcpkg install openssl:arm64-windows-static-md libwebsockets:arm64-windows-static-md
 ```
 
-> **Note:** `libcurl` and `FreeType` are provided by the obs-deps prebuilt package, which the CMake build system downloads automatically via `buildspec.json`. You do not need to install them manually.
+2. Point `CMAKE_PREFIX_PATH` at the corresponding vcpkg installation and configure:
 
-> **Note:** The following Windows SDK libraries are linked automatically by CMake as transitive dependencies of the static vcpkg packages: `ws2_32` (Winsock, required by OpenSSL and libwebsockets), `crypt32` (Windows certificate store, required by OpenSSL), and `dbghelp` (required by libuv, which libwebsockets depends on).
-
-2. Configure, passing the vcpkg install path via `CMAKE_PREFIX_PATH`:
 ```powershell
 # x64
 $env:CMAKE_PREFIX_PATH = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md"
@@ -325,53 +269,105 @@ cmake --preset windows-arm64
 ```
 
 3. Build:
+
 ```powershell
 cmake --build build_x64 --config RelWithDebInfo
 # or
 cmake --build build_arm64 --config RelWithDebInfo
 ```
 
-4. Build the NSIS installer (requires [NSIS](https://nsis.sourceforge.io/) to be installed):
-```powershell
-cmake --build build_x64 --target package-installer --config RelWithDebInfo
-```
-The installer will be placed in `build_x64/` as `achievements-tracker-<version>-windows-x64.exe`.
+##### Signing Windows binaries and installers
 
-5. Or install directly into OBS:
+Windows builds can Authenticode-sign the plugin DLL during the normal build and the NSIS installer during `package-installer` packaging.
+
+Set one of the following certificate inputs before configuring the Windows preset:
+
+- `WINDOWS_SIGN_CERT_FILE` + optional `WINDOWS_SIGN_CERT_PASSWORD` for a `.pfx` / PKCS#12 certificate file
+- `WINDOWS_SIGN_CERT_SHA1` for a certificate already imported into the local Windows certificate store
+
+Optional environment variables:
+
+- `WINDOWS_SIGN_TIMESTAMP_URL` (defaults to `http://timestamp.digicert.com`)
+- `WINDOWS_SIGN_FILE_DIGEST` (defaults to `SHA256`)
+- `WINDOWS_SIGN_TIMESTAMP_DIGEST` (defaults to `SHA256`)
+- `WINDOWS_SIGN_DESCRIPTION`
+- `WINDOWS_SIGN_DESCRIPTION_URL`
+- `WINDOWS_SIGNTOOL_PATH` if `signtool.exe` is not discoverable from the installed Windows SDK
+
+Example with a local `.pfx`:
+
+```powershell
+$env:WINDOWS_SIGN_CERT_FILE = 'C:\certs\achievements-tracker.pfx'
+$env:WINDOWS_SIGN_CERT_PASSWORD = 'your-pfx-password'
+$env:WINDOWS_SIGN_DESCRIPTION = 'Achievements Tracker'
+$env:WINDOWS_SIGN_DESCRIPTION_URL = 'https://github.com/Octelys/achievements-tracker-plugin'
+
+cmake --preset windows-x64 -DWINDOWS_CODESIGN=ON
+cmake --build build_x64 --config Release
+cmake --build build_x64 --target package-installer --config Release
+```
+
+When `WINDOWS_CODESIGN=ON`, the build fails if the certificate configuration is incomplete so unsigned release artifacts are not produced accidentally.
+
+4. Install into OBS's default shared plugin location:
+
 ```powershell
 cmake --install build_x64 --config RelWithDebInfo
 ```
-This installs to `%ALLUSERSPROFILE%\obs-studio\plugins\` by default.
+
+By default, the Windows CMake setup installs into `%ALLUSERSPROFILE%\obs-studio\plugins\`.
+
+##### GitHub Actions secrets for Windows signing
+
+The Windows release jobs understand these repository secrets:
+
+- `WINDOWS_SIGNING_CERT_BASE64` — base64-encoded `.pfx` / PKCS#12 certificate
+- `WINDOWS_SIGNING_CERT_PASSWORD` — certificate password
+- `WINDOWS_SIGNING_CERT_SHA1` — optional thumbprint-based alternative to the `.pfx` secret
+- `WINDOWS_SIGNING_TIMESTAMP_URL` — optional RFC 3161 timestamp URL override
+
+If none of those certificate secrets are present, the workflow automatically skips Windows signing while continuing to build unsigned artifacts.
 
 #### Linux
 
-Dependencies are installed from system packages and linked **dynamically**. Static linking is avoided on Linux because `glibc`-dependent libraries (such as those used by libwebsockets) can break resolver APIs (`getaddrinfo`, NSS) when statically linked.
+For a simple local build on Ubuntu, install the common development packages:
 
-1. Install dependencies:
 ```bash
-sudo apt-get install cmake libssl-dev libcurl4-openssl-dev uuid-dev libfreetype6-dev libwebsockets-dev
+sudo apt-get update
+sudo apt-get install -y \
+  cmake \
+  libssl-dev \
+  libcurl4-openssl-dev \
+  uuid-dev \
+  libfreetype6-dev \
+  libwebsockets-dev \
+  zlib1g-dev
 ```
 
-2. Configure and build:
+Then configure and build:
+
 ```bash
 cmake --preset ubuntu-x86_64
 cmake --build build_x86_64 --config RelWithDebInfo
 ```
 
-3. Install directly into OBS:
+Install with:
+
 ```bash
 cmake --install build_x86_64 --config RelWithDebInfo
 ```
+
+For CI/release-style Ubuntu builds, see `.github/scripts/build-ubuntu` and `.github/scripts/utils.zsh/setup_ubuntu`, which additionally build a PIC static `libwebsockets` for packaging compatibility.
 
 ---
 
 ## Running Tests
 
-The project uses [Unity](https://github.com/ThrowTheSwitch/Unity) as the unit testing framework.
+The project uses [Unity](https://github.com/ThrowTheSwitch/Unity) for unit tests.
 
 ### macOS
 
-For local development (single-arch, uses Homebrew OpenSSL):
+Local development preset:
 
 ```bash
 cmake --preset macos-dev -DBUILD_TESTING=ON
@@ -379,7 +375,7 @@ cmake --build build_macos_dev --config Debug
 ctest --test-dir build_macos_dev -C Debug --output-on-failure
 ```
 
-For CI builds (universal binary, custom OpenSSL):
+CI-style universal preset:
 
 ```bash
 cmake --preset macos-ci -DBUILD_TESTING=ON
@@ -387,28 +383,38 @@ cmake --build build_macos --config RelWithDebInfo
 ctest --test-dir build_macos -C RelWithDebInfo --output-on-failure
 ```
 
-### Windows / Linux (Untested)
+### Linux
 
 ```bash
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --config Debug
-ctest --test-dir build -C Debug --output-on-failure
+cmake --preset ubuntu-x86_64 -DBUILD_TESTING=ON
+cmake --build build_x86_64 --config RelWithDebInfo
+ctest --test-dir build_x86_64 --output-on-failure
 ```
 
-### Running Individual Tests (Untested)
+### Windows
+
+```powershell
+cmake --preset windows-x64 -DBUILD_TESTING=ON
+cmake --build build_x64 --config RelWithDebInfo
+ctest --test-dir build_x64 -C RelWithDebInfo --output-on-failure
+```
+
+### Running individual tests
+
+Examples on macOS debug builds:
 
 ```bash
-# Test Base64 encoding
 cmake --build build_macos_dev --target test_encoder --config Debug
 ./build_macos_dev/Debug/test_encoder
 
-# Test cryptographic signing
 cmake --build build_macos_dev --target test_crypto --config Debug
 ./build_macos_dev/Debug/test_crypto
 
-# Test ISO-8601 timestamp parsing
-cmake --build build_macos_dev --target test_time --config Debug
-./build_macos_dev/Debug/test_time
+cmake --build build_macos_dev --target test_convert --config Debug
+./build_macos_dev/Debug/test_convert
+
+cmake --build build_macos_dev --target test_parsers --config Debug
+./build_macos_dev/Debug/test_parsers
 ```
 
 ---
@@ -417,21 +423,21 @@ cmake --build build_macos_dev --target test_time --config Debug
 
 ### macOS
 
-Ensure the plugin is build in `Debug`:
- 
+Ensure the plugin is built in `Debug`:
+
 ```bash
 xcodebuild -configuration Debug -scheme achievements-tracker -parallelizeTargets -destination "generic/platform=macOS,name=Any Mac"
 ```
 
-Ensure the `xcodeproj` of the plugin has the option `DWARF with dSYM file` enabled:
+Ensure the plugin Xcode project is configured to generate `dSYM` files:
 
 ![plugin-xcode-dsym-configuration.png](images/plugin-xcode-dsym-configuration.png)
 
-Copy both the plugin and the dSYM in the `Debug/OBS/Contents/PlugIns` folder of OBS Studio:
+Copy both the plugin bundle and its `dSYM` into the debug OBS plugin location:
 
 ![plugin-debug-folders.png](images/plugin-debug-folders.png)
 
-Open `obs-studio` in Xcode and ensure  `Debug` configuration is chosen for `Profile`:
+Then open `obs-studio` in Xcode and make sure the `Debug` configuration is selected for profiling:
 
 ![obs-xcode-profile-debug-scheme.png](images/obs-xcode-profile-debug-scheme.png)
 
@@ -439,13 +445,13 @@ Open `obs-studio` in Xcode and ensure  `Debug` configuration is chosen for `Prof
 
 ## References
 
-https://learn.microsoft.com/en-us/gaming/gdk/docs/reference/live/rest/uri/gamerpic/atoc-reference-gamerpic
-https://deepwiki.com/microsoft/xbox-live-api/5-real-time-activity-system#resource-uri-format
+- https://learn.microsoft.com/en-us/gaming/gdk/docs/reference/live/rest/uri/gamerpic/atoc-reference-gamerpic
+- https://deepwiki.com/microsoft/xbox-live-api/5-real-time-activity-system#resource-uri-format
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions are welcome. Please open an issue or submit a pull request.
 
 ## Support
 
-For issues, questions, or feature requests, please visit the [GitHub Issues](https://github.com/your-org/achievements-tracker-plugin/issues) page.
+For issues, questions, or feature requests, visit [GitHub Issues](https://github.com/Octelys/achievements-tracker-plugin/issues).
