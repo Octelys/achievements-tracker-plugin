@@ -5,6 +5,8 @@ include_guard(GLOBAL)
 # Set default installation directories
 include(GNUInstallDirs)
 
+include(buildspec)
+
 if(CMAKE_INSTALL_LIBDIR MATCHES "(CMAKE_SYSTEM_PROCESSOR)")
   string(REPLACE "CMAKE_SYSTEM_PROCESSOR" "${CMAKE_SYSTEM_PROCESSOR}" CMAKE_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
 endif()

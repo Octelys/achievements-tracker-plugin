@@ -52,28 +52,58 @@ function(_setup_obs_studio)
     set(_is_fresh --fresh)
   endif()
 
+  set(_cmake_generator_args)
+  set(_cmake_arch_args)
+  set(_cmake_extra_args)
+
+  string(REPLACE ";" "\\;" _obs_prefix_path "${CMAKE_PREFIX_PATH}")
+
   if(OS_WINDOWS)
-    set(_cmake_generator "${CMAKE_GENERATOR}")
-    set(_cmake_arch "-A ${arch},version=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
-    set(_cmake_extra "-DCMAKE_SYSTEM_VERSION=${CMAKE_SYSTEM_VERSION} -DCMAKE_ENABLE_SCRIPTING=OFF")
+    set(_cmake_generator_args -G "${CMAKE_GENERATOR}")
+    set(_cmake_arch_args -A "${arch},version=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}")
+    list(APPEND _cmake_extra_args -DCMAKE_SYSTEM_VERSION=${CMAKE_SYSTEM_VERSION} -DCMAKE_ENABLE_SCRIPTING=OFF)
   elseif(OS_MACOS)
-    set(_cmake_generator "Xcode")
-    set(_cmake_arch "-DCMAKE_OSX_ARCHITECTURES:STRING='arm64;x86_64'")
-    set(_cmake_extra "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    list(APPEND _cmake_extra_args -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+  elseif(OS_LINUX OR OS_FREEBSD OR OS_OPENBSD)
+    set(_cmake_generator_args -G "${CMAKE_GENERATOR}")
+    list(
+      APPEND
+      _cmake_extra_args
+      -DCMAKE_BUILD_TYPE:STRING=Release
+      -DENABLE_UI:BOOL=OFF
+      -DENABLE_SCRIPTING:BOOL=OFF
+      -DENABLE_HEVC:BOOL=OFF
+      -DENABLE_PULSEAUDIO:BOOL=OFF
+      -DENABLE_WAYLAND:BOOL=OFF
+    )
   endif()
 
   message(STATUS "Configure ${label} (${arch})")
-  execute_process(
-    COMMAND
-      "${CMAKE_COMMAND}" -S "${dependencies_dir}/${_obs_destination}" -B
-      "${dependencies_dir}/${_obs_destination}/build_${arch}" -G ${_cmake_generator} "${_cmake_arch}"
-      -DOBS_CMAKE_VERSION:STRING=3.0.0 -DENABLE_PLUGINS:BOOL=OFF -DENABLE_FRONTEND:BOOL=OFF
-      -DOBS_VERSION_OVERRIDE:STRING=${_obs_version} "-DCMAKE_PREFIX_PATH='${CMAKE_PREFIX_PATH}'" ${_is_fresh}
-      ${_cmake_extra}
-    RESULT_VARIABLE _process_result
-    COMMAND_ERROR_IS_FATAL ANY
-    OUTPUT_QUIET
-  )
+  if(OS_MACOS)
+    execute_process(
+      COMMAND
+        "${CMAKE_COMMAND}" -S "${dependencies_dir}/${_obs_destination}" -B
+        "${dependencies_dir}/${_obs_destination}/build_${arch}" -G Xcode
+        "-DCMAKE_OSX_ARCHITECTURES:STRING='arm64;x86_64'" -DOBS_CMAKE_VERSION:STRING=3.0.0
+        -DENABLE_PLUGINS:BOOL=OFF -DENABLE_FRONTEND:BOOL=OFF -DOBS_VERSION_OVERRIDE:STRING=${_obs_version}
+        -DCMAKE_PREFIX_PATH=${_obs_prefix_path} ${_is_fresh} ${_cmake_extra_args}
+      RESULT_VARIABLE _process_result
+      COMMAND_ERROR_IS_FATAL ANY
+      OUTPUT_QUIET
+    )
+  else()
+    execute_process(
+      COMMAND
+        "${CMAKE_COMMAND}" -S "${dependencies_dir}/${_obs_destination}" -B
+        "${dependencies_dir}/${_obs_destination}/build_${arch}" ${_cmake_generator_args} ${_cmake_arch_args}
+        -DOBS_CMAKE_VERSION:STRING=3.0.0 -DENABLE_PLUGINS:BOOL=OFF -DENABLE_FRONTEND:BOOL=OFF
+        -DOBS_VERSION_OVERRIDE:STRING=${_obs_version} -DCMAKE_PREFIX_PATH=${_obs_prefix_path} ${_is_fresh}
+        ${_cmake_extra_args}
+      RESULT_VARIABLE _process_result
+      COMMAND_ERROR_IS_FATAL ANY
+      OUTPUT_QUIET
+    )
+  endif()
   message(STATUS "Configure ${label} (${arch}) - done")
 
   message(STATUS "Build ${label} (Debug - ${arch})")
