@@ -40,6 +40,7 @@ if (( ! (${skips[(Ie)all]} + ${skips[(Ie)deps]}) )) {
   sudo apt-get install ${apt_args} \
     build-essential \
     cmake \
+    extra-cmake-modules \
     libavcodec-dev \
     libavformat-dev \
     libavutil-dev \
