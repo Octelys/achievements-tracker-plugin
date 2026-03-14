@@ -14,5 +14,5 @@ void free_device(device_t **device) {
         EVP_PKEY_free((*device)->keys);
     }
 
-    free_memory((void **)&device);
+    free_memory((void **)device);
 }
