@@ -35,6 +35,12 @@ SetCompressorDictSize 32
   !define MUI_UNICON "@CMAKE_CURRENT_SOURCE_DIR@/cmake/windows/resources/installer.ico"
 !endif
 
+; Pre-populate the directory page with the detected OBS install path
+!define MUI_PAGE_CUSTOMFUNCTION_PRE PageDirectoryPre
+!define MUI_DIRECTORYPAGE_TEXT_TOP \
+    "The installer will place the plugin inside your OBS Studio installation folder.$\r$\n$\r$\nIf the path below is not correct, click Browse and navigate to your OBS Studio installation directory."
+!define MUI_DIRECTORYPAGE_TEXT_DESTINATION "OBS Studio Installation Folder"
+
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -63,31 +69,38 @@ Function FindOBSDir
     Push $0
 FunctionEnd
 
+; Pre-populate $INSTDIR with the detected OBS path before the directory page
+Function PageDirectoryPre
+    Call FindOBSDir
+    Pop $0
+    StrCpy $INSTDIR $0
+FunctionEnd
+
 ; ---------------------------------------------------------------------------
 ; Install section
 ; ---------------------------------------------------------------------------
 Section "Achievements Tracker Plugin" SecPlugin
 
-    Call FindOBSDir
-    Pop $R0  ; $R0 = OBS install directory
+    ; $INSTDIR is the OBS installation directory chosen by the user
+    ; (pre-populated from registry / default fallback by PageDirectoryPre)
 
     ; --- Plugin DLL ---
-    SetOutPath "$R0\obs-plugins\${PLUGIN_BIN_SUBDIR}"
+    SetOutPath "$INSTDIR\obs-plugins\${PLUGIN_BIN_SUBDIR}"
     File "@INSTALL_STAGE_DIR@\@CMAKE_PROJECT_NAME@\bin\${PLUGIN_BIN_SUBDIR}\${PLUGIN_DLL}"
 
     ; --- Plugin data (locale, effects, etc.) ---
-    SetOutPath "$R0\data\obs-plugins\${PLUGIN_NAME}"
+    SetOutPath "$INSTDIR\data\obs-plugins\${PLUGIN_NAME}"
     File /r "@INSTALL_STAGE_DIR@\@CMAKE_PROJECT_NAME@\data\"
 
     ; --- Write uninstaller ---
-    WriteUninstaller "$R0\obs-plugins\${PLUGIN_BIN_SUBDIR}\Uninstall-${PLUGIN_NAME}.exe"
+    WriteUninstaller "$INSTDIR\obs-plugins\${PLUGIN_BIN_SUBDIR}\Uninstall-${PLUGIN_NAME}.exe"
 
     ; --- Register in Add/Remove Programs ---
     WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayName"          "${PLUGIN_DISPLAY} (${PLUGIN_ARCH})"
     WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayVersion"       "${PLUGIN_VERSION}"
     WriteRegStr   HKLM "${UNINSTALL_KEY}" "Publisher"            "${PLUGIN_AUTHOR}"
-    WriteRegStr   HKLM "${UNINSTALL_KEY}" "InstallLocation"      "$R0"
-    WriteRegStr   HKLM "${UNINSTALL_KEY}" "UninstallString"      "$R0\obs-plugins\${PLUGIN_BIN_SUBDIR}\Uninstall-${PLUGIN_NAME}.exe"
+    WriteRegStr   HKLM "${UNINSTALL_KEY}" "InstallLocation"      "$INSTDIR"
+    WriteRegStr   HKLM "${UNINSTALL_KEY}" "UninstallString"      "$INSTDIR\obs-plugins\${PLUGIN_BIN_SUBDIR}\Uninstall-${PLUGIN_NAME}.exe"
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify"             1
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoRepair"             1
 
