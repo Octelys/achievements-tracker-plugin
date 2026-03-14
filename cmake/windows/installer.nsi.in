@@ -55,17 +55,19 @@ SetCompressorDictSize 32
 ; Helpers
 ; ---------------------------------------------------------------------------
 
-; Locate OBS Studio install dir from registry (64-bit first, then 32-bit view)
+; Locate OBS Studio install dir from registry.
+; SetRegView 64 is required because makensis produces a 32-bit executable and
+; WOW64 would otherwise silently redirect HKLM\SOFTWARE reads to
+; HKLM\SOFTWARE\WOW6432Node, where OBS Studio (a 64-bit app) does not write.
 Function FindOBSDir
+    SetRegView 64
     ClearErrors
     ReadRegStr $0 HKLM "SOFTWARE\OBS Studio" ""
     ${If} ${Errors}
-        ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\OBS Studio" ""
-    ${EndIf}
-    ${If} ${Errors}
-        ; Fall back to default Program Files location
+        ; Fall back to default 64-bit Program Files location
         StrCpy $0 "$PROGRAMFILES64\obs-studio"
     ${EndIf}
+    SetRegView lastused
     Push $0
 FunctionEnd
 
