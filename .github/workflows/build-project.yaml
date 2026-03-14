@@ -418,6 +418,18 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Set Up Windows Codesigning 🔑
+        uses: ./.github/actions/setup-windows-codesigning
+        if: fromJSON(needs.check-event.outputs.codesign)
+        id: windows-codesign
+        with:
+          certificateBase64: ${{ secrets.WINDOWS_SIGNING_CERT_BASE64 }}
+          certificatePassword: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+          certificateSha1: ${{ secrets.WINDOWS_SIGNING_CERT_SHA1 }}
+          timestampUrl: ${{ secrets.WINDOWS_SIGNING_TIMESTAMP_URL }}
+          productDescription: ${{ needs.check-event.outputs.pluginName }}
+          descriptionUrl: ${{ github.server_url }}/${{ github.repository }}
+
       - name: Install Dependencies 🔐
         run: |
           # Install OpenSSL and libwebsockets for x64 via vcpkg.
@@ -437,6 +449,7 @@ jobs:
         with:
           target: x64
           config: ${{ needs.check-event.outputs.config }}
+          codesign: ${{ fromJSON(needs.check-event.outputs.codesign) && fromJSON(steps.windows-codesign.outputs.enabled) }}
           runTests: 'true'
           coverage: 'true'
           versionOverride: ${{ needs.check-event.outputs.versionOverride }}
@@ -469,6 +482,18 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Set Up Windows Codesigning 🔑
+        uses: ./.github/actions/setup-windows-codesigning
+        if: fromJSON(needs.check-event.outputs.codesign)
+        id: windows-codesign
+        with:
+          certificateBase64: ${{ secrets.WINDOWS_SIGNING_CERT_BASE64 }}
+          certificatePassword: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+          certificateSha1: ${{ secrets.WINDOWS_SIGNING_CERT_SHA1 }}
+          timestampUrl: ${{ secrets.WINDOWS_SIGNING_TIMESTAMP_URL }}
+          productDescription: ${{ needs.check-event.outputs.pluginName }}
+          descriptionUrl: ${{ github.server_url }}/${{ github.repository }}
+
       - name: Install OpenSSL for ARM64 🔐
         run: |
           # Install OpenSSL and libwebsockets for ARM64 via vcpkg.
@@ -489,6 +514,7 @@ jobs:
         with:
           target: arm64
           config: ${{ needs.check-event.outputs.config }}
+          codesign: ${{ fromJSON(needs.check-event.outputs.codesign) && fromJSON(steps.windows-codesign.outputs.enabled) }}
           versionOverride: ${{ needs.check-event.outputs.versionOverride }}
 
       - name: Package Plugin 📀

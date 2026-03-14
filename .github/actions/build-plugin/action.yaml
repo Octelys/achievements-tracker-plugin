@@ -9,7 +9,7 @@ inputs:
     required: false
     default: RelWithDebInfo
   codesign:
-    description: Enable codesigning (macOS only)
+    description: Enable codesigning for supported platforms
     required: false
     default: 'false'
   codesignIdent:
@@ -120,6 +120,10 @@ runs:
         $BuildArgs = @{
           Target = '${{ inputs.target }}'
           Configuration = '${{ inputs.config }}'
+        }
+
+        if ( '${{ inputs.codesign }}' -eq 'true' ) {
+          $BuildArgs['Codesign'] = $true
         }
 
         if ( '${{ inputs.versionOverride }}' -ne '' ) {
