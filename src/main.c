@@ -2,6 +2,7 @@
 #include <diagnostics/log.h>
 
 #include "sources/common/achievement_cycle.h"
+#include "sources/playlab/account.h"
 #include "sources/xbox/account.h"
 #include "sources/xbox/gamerpic.h"
 #include "sources/xbox/game_cover.h"
@@ -22,6 +23,7 @@ bool obs_module_load(void) {
     obs_log(LOG_INFO, "Loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
 
+    play_lab_account_source_register();
     xbox_account_source_register();
 
     xbox_gamerpic_source_register();
