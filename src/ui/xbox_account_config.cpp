@@ -56,18 +56,24 @@ class XboxAccountDialog final : public QDialog {
         m_helpText->setText(
             "Manage your Xbox sign-in once here. All Xbox sources in the plugin will use the same account.");
 
+        auto *signInLayout = new QHBoxLayout();
+        signInLayout->addWidget(m_signInButton);
+        signInLayout->addStretch(1);
+        signInLayout->setContentsMargins(0, 0, 0, 0);
+
+        auto *signOutLayout = new QHBoxLayout();
+        signOutLayout->addWidget(m_signOutButton);
+        signOutLayout->addStretch(1);
+        signOutLayout->setContentsMargins(0, 0, 0, 0);
+
         formLayout->addRow("Status", m_statusValue);
         formLayout->addRow("Plugin version", m_versionValue);
-
-        auto *actionsLayout = new QHBoxLayout();
-        actionsLayout->addWidget(m_signInButton);
-        actionsLayout->addWidget(m_signOutButton);
-        actionsLayout->addStretch(1);
+        formLayout->addRow("Account", signInLayout);
+        formLayout->addRow("", signOutLayout);
 
         rootLayout->addWidget(m_helpText);
         rootLayout->addSpacing(8);
         rootLayout->addLayout(formLayout);
-        rootLayout->addLayout(actionsLayout);
         rootLayout->addWidget(buttonBox);
 
         m_versionValue->setText(PLUGIN_VERSION);
