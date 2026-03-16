@@ -30,8 +30,7 @@ class XboxAccountDialog final : public QDialog {
           m_statusValue(new QLabel(this)),
           m_versionValue(new QLabel(this)),
           m_helpText(new QLabel(this)),
-          m_signInButton(new QPushButton("Sign in with Xbox", this)),
-          m_signOutButton(new QPushButton("Sign out from Xbox", this)),
+          m_accountButton(new QPushButton(this)),
           m_refreshTimer(new QTimer(this)) {
         setWindowTitle("Xbox Account");
         setModal(false);
@@ -56,20 +55,14 @@ class XboxAccountDialog final : public QDialog {
         m_helpText->setText(
             "Manage your Xbox sign-in once here. All Xbox sources in the plugin will use the same account.");
 
-        auto *signInLayout = new QHBoxLayout();
-        signInLayout->addWidget(m_signInButton);
-        signInLayout->addStretch(1);
-        signInLayout->setContentsMargins(0, 0, 0, 0);
-
-        auto *signOutLayout = new QHBoxLayout();
-        signOutLayout->addWidget(m_signOutButton);
-        signOutLayout->addStretch(1);
-        signOutLayout->setContentsMargins(0, 0, 0, 0);
+        auto *accountLayout = new QHBoxLayout();
+        accountLayout->addWidget(m_accountButton);
+        accountLayout->addStretch(1);
+        accountLayout->setContentsMargins(0, 0, 0, 0);
 
         formLayout->addRow("Status", m_statusValue);
         formLayout->addRow("Plugin version", m_versionValue);
-        formLayout->addRow("Account", signInLayout);
-        formLayout->addRow("", signOutLayout);
+        formLayout->addRow("Account", accountLayout);
 
         rootLayout->addWidget(m_helpText);
         rootLayout->addSpacing(8);
@@ -79,8 +72,7 @@ class XboxAccountDialog final : public QDialog {
         m_versionValue->setText(PLUGIN_VERSION);
 
         connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::close);
-        connect(m_signInButton, &QPushButton::clicked, this, &XboxAccountDialog::onSignInClicked);
-        connect(m_signOutButton, &QPushButton::clicked, this, &XboxAccountDialog::onSignOutClicked);
+        connect(m_accountButton, &QPushButton::clicked, this, &XboxAccountDialog::onAccountButtonClicked);
         connect(m_refreshTimer, &QTimer::timeout, this, &XboxAccountDialog::refreshUi);
 
         m_refreshTimer->start(1000);
@@ -88,23 +80,22 @@ class XboxAccountDialog final : public QDialog {
     }
 
     private:
-    void onSignInClicked() {
-        if (!xbox_account_sign_in()) {
-            QMessageBox::warning(this, "Xbox Account", "Unable to start the Xbox sign-in flow.");
+    void onAccountButtonClicked() {
+        if (xbox_account_is_signed_in()) {
+            xbox_account_sign_out();
             refreshUi();
-            return;
+        } else {
+            if (!xbox_account_sign_in()) {
+                QMessageBox::warning(this, "Xbox Account", "Unable to start the Xbox sign-in flow.");
+                refreshUi();
+                return;
+            }
+            QMessageBox::information(this,
+                                     "Xbox Account",
+                                     "Your browser was opened to continue Xbox sign-in. Finish the authentication "
+                                     "there, then return to OBS.");
+            refreshUi();
         }
-
-        QMessageBox::information(this,
-                                 "Xbox Account",
-                                 "Your browser was opened to continue Xbox sign-in. Finish the authentication there, "
-                                 "then return to OBS.");
-        refreshUi();
-    }
-
-    void onSignOutClicked() {
-        xbox_account_sign_out();
-        refreshUi();
     }
 
     void refreshUi() {
@@ -114,18 +105,14 @@ class XboxAccountDialog final : public QDialog {
         m_statusValue->setText(QString::fromUtf8(status));
 
         const bool signedIn = xbox_account_is_signed_in();
-        m_signInButton->setVisible(!signedIn);
-        m_signInButton->setEnabled(!signedIn);
-        m_signOutButton->setVisible(signedIn);
-        m_signOutButton->setEnabled(signedIn);
+        m_accountButton->setText(signedIn ? "Sign out from Xbox" : "Sign in with Xbox");
     }
 
     private:
     QLabel      *m_statusValue;
     QLabel      *m_versionValue;
     QLabel      *m_helpText;
-    QPushButton *m_signInButton;
-    QPushButton *m_signOutButton;
+    QPushButton *m_accountButton;
     QTimer      *m_refreshTimer;
 };
 
