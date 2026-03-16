@@ -15,8 +15,18 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalFreeType.cmake")
 
 project(${_name} VERSION ${PLUGIN_VERSION})
 
-option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
-option(ENABLE_QT "Use Qt functionality" OFF)
+option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
+option(ENABLE_QT "Use Qt functionality" ON)
+
+if(NOT ENABLE_FRONTEND_API)
+  message(STATUS "Enabling obs-frontend-api because the global Xbox account configuration requires it")
+  set(ENABLE_FRONTEND_API ON CACHE BOOL "Use obs-frontend-api for UI functionality" FORCE)
+endif()
+
+if(NOT ENABLE_QT)
+  message(STATUS "Enabling Qt because the global Xbox account configuration requires it")
+  set(ENABLE_QT ON CACHE BOOL "Use Qt functionality" FORCE)
+endif()
 
 include(compilerconfig)
 include(defaults)
@@ -243,23 +253,42 @@ else()
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
 endif()
 
-if(ENABLE_FRONTEND_API)
-  find_package(obs-frontend-api REQUIRED)
-  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
-endif()
+find_package(obs-frontend-api REQUIRED)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
 
-if(ENABLE_QT)
-  find_package(Qt6 COMPONENTS Widgets Core)
-  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
-  target_compile_options(
-    ${CMAKE_PROJECT_NAME}
-    PRIVATE $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header -Wno-comma>
-  )
-  set_target_properties(
-    ${CMAKE_PROJECT_NAME}
-    PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
-  )
+find_package(Qt6 COMPONENTS Widgets Core REQUIRED)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
+
+# ----------------------------------------------------------------------------
+# macOS: Remove legacy AGL.framework from Qt6's WrapOpenGL::WrapOpenGL target.
+#
+# Qt6's FindWrapOpenGL.cmake unconditionally adds -framework AGL as a
+# transitive dependency of Qt6::Gui.  AGL (Apple OpenGL) was removed from the
+# macOS 15+ SDK, so the linker fails with "framework 'AGL' not found" when
+# building against a modern SDK.  Strip it out after Qt is found.
+# ----------------------------------------------------------------------------
+if(APPLE AND TARGET WrapOpenGL::WrapOpenGL)
+  get_target_property(_wrap_opengl_libs WrapOpenGL::WrapOpenGL INTERFACE_LINK_LIBRARIES)
+  if(_wrap_opengl_libs)
+    list(REMOVE_ITEM _wrap_opengl_libs "-framework AGL")
+    # Also handle the case where it was found as an absolute path / find_library result
+    list(FILTER _wrap_opengl_libs EXCLUDE REGEX "AGL\\.framework")
+    set_target_properties(WrapOpenGL::WrapOpenGL PROPERTIES INTERFACE_LINK_LIBRARIES "${_wrap_opengl_libs}")
+    message(STATUS "Removed AGL.framework from WrapOpenGL::WrapOpenGL (not present in macOS 15+ SDK)")
+  endif()
 endif()
+target_compile_options(
+  ${CMAKE_PROJECT_NAME}
+  PRIVATE
+    $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header
+    -Wno-comma>
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header
+    -Wno-comma>
+)
+set_target_properties(
+  ${CMAKE_PROJECT_NAME}
+  PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
+)
 
 # FreeType for text rendering
 #
@@ -381,9 +410,11 @@ target_sources(
     src/net/json/json.c
     src/oauth/util.c
     src/oauth/xbox-live.c
+    src/xbox/account_manager.c
     src/xbox/xbox_session.c
     src/xbox/xbox_client.c
     src/xbox/xbox_monitor.c
+    src/ui/xbox_account_config.cpp
     src/io/state.c
     src/io/cache.c
     src/encoding/base64.c

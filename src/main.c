@@ -2,6 +2,7 @@
 #include <diagnostics/log.h>
 
 #include "sources/common/achievement_cycle.h"
+#include "ui/xbox_account_config.h"
 #include "sources/xbox/account.h"
 #include "sources/xbox/gamerpic.h"
 #include "sources/xbox/game_cover.h"
@@ -22,6 +23,7 @@ bool obs_module_load(void) {
     obs_log(LOG_INFO, "Loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
 
+    xbox_account_config_register();
     xbox_account_source_register();
 
     xbox_gamerpic_source_register();
@@ -43,6 +45,8 @@ bool obs_module_load(void) {
 }
 
 void obs_module_unload(void) {
+    xbox_account_config_unregister();
+
     achievement_cycle_destroy();
     image_cleanup();
 
