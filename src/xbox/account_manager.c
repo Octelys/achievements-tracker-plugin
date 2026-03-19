@@ -12,19 +12,6 @@
 static void on_xbox_signed_in(void *data) {
     UNUSED_PARAMETER(data);
 
-    xbox_account_start_monitoring_if_needed();
-}
-
-void xbox_account_start_monitoring_if_needed(void) {
-    xbox_identity_t *identity = xbox_live_get_identity();
-
-    if (!identity) {
-        obs_log(LOG_INFO, "Monitoring will not be started: no identity signed-in");
-        return;
-    }
-
-    free_identity(&identity);
-
     xbox_monitoring_start();
 }
 

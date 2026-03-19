@@ -14,6 +14,7 @@
 #include "sources/xbox/achievement_icon.h"
 #include "sources/xbox/achievements_count.h"
 #include "drawing/image.h"
+#include "xbox/xbox_monitor.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -23,6 +24,7 @@ bool obs_module_load(void) {
     io_load();
 
     xbox_account_config_register();
+    xbox_monitoring_start();
 
     xbox_gamerpic_source_register();
     xbox_game_cover_source_register();
