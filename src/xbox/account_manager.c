@@ -23,9 +23,9 @@ void xbox_account_start_monitoring_if_needed(void) {
         return;
     }
 
-    xbox_monitoring_start();
-
     free_identity(&identity);
+
+    xbox_monitoring_start();
 }
 
 bool xbox_account_sign_in(void) {
