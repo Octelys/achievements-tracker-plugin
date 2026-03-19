@@ -4,7 +4,7 @@ A cross-platform OBS Studio plugin that displays Xbox Live profile data, current
 
 ## Features
 
-- **Xbox sign-in source** using Microsoft's device-code flow
+- **Global Xbox account configuration dialog** using Microsoft's device-code flow
 - **Real-time game and achievement tracking** through Xbox Live RTA monitoring when available
 - **Profile sources** for gamertag, gamerpic, and gamerscore
 - **Achievement sources** for name, description, icon, and progress count
@@ -55,19 +55,25 @@ After installation, restart OBS Studio.
 ### Configuration
 
 1. Open OBS Studio.
-2. Add a new **Source** → **Xbox Account**.
-3. In the source properties, click **Sign in with Xbox**.
+2. Open **Tools** → **Xbox Account**.
+3. Use the global Xbox Account dialog to review the current status and click **Sign in with Xbox**.
 4. A browser window opens for Microsoft account authentication.
-5. Once authentication succeeds, add any of the Xbox display sources you want to use in your scene.
+5. Once authentication succeeds, return to OBS. The dialog will update to show the connected account.
+6. Add any of the Xbox display sources you want to use in your scene.
+
+All Xbox sources in the plugin share the same authenticated account.
+
+![Xbox Account dialog](plugin-xbox-account.png)
 
 ### Available OBS Sources
 
 #### Account & profile
 
-- **Xbox Account**: sign-in / sign-out source
 - **Xbox Gamertag**: text source for the current gamertag
 - **Xbox Gamerpic**: image source for the current gamerpic
 - **Xbox Gamerscore**: text source for the current gamerscore
+
+Account sign-in and sign-out are managed globally from **Tools** → **Xbox Account**.
 
 #### Game
 
