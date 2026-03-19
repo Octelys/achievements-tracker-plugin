@@ -253,8 +253,64 @@ else()
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
 endif()
 
-find_package(obs-frontend-api REQUIRED)
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
+if(ENABLE_FRONTEND_API)
+  # Local macOS/dev builds bootstrap OBS into `.deps`, but some IDE / custom
+  # configure flows do not preserve the derived prefix path early enough for a
+  # plain `find_package(obs-frontend-api)` call to discover it reliably.
+  set(_obs_frontend_api_config_hints
+      "${CMAKE_CURRENT_SOURCE_DIR}/.deps"
+      "${CMAKE_CURRENT_SOURCE_DIR}/.deps/lib/cmake/obs-frontend-api")
+  file(GLOB _obs_frontend_api_obs_build_dirs "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-studio-*/build_*")
+  foreach(_obs_build_dir IN LISTS _obs_frontend_api_obs_build_dirs)
+    list(APPEND _obs_frontend_api_config_hints
+         "${_obs_build_dir}/frontend/api"
+         "${_obs_build_dir}/libobs")
+  endforeach()
+
+  find_package(obs-frontend-api CONFIG QUIET
+               HINTS ${_obs_frontend_api_config_hints}
+               PATH_SUFFIXES lib/cmake/obs-frontend-api)
+
+  if(NOT TARGET OBS::obs-frontend-api)
+    set(_obs_frontend_api_include_hints "${CMAKE_CURRENT_SOURCE_DIR}/.deps/include")
+    file(GLOB _obs_frontend_api_source_hints "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-studio-*/frontend/api")
+    list(APPEND _obs_frontend_api_include_hints ${_obs_frontend_api_source_hints})
+
+    find_path(
+      OBS_FRONTEND_API_INCLUDE_DIR
+      NAMES obs-frontend-api.h
+      HINTS ${_obs_frontend_api_include_hints}
+      PATH_SUFFIXES obs
+    )
+    find_library(
+      OBS_FRONTEND_API_LIBRARY
+      NAMES obs-frontend-api
+      HINTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/lib"
+    )
+
+    if(OBS_FRONTEND_API_INCLUDE_DIR AND OBS_FRONTEND_API_LIBRARY)
+      add_library(OBS::obs-frontend-api SHARED IMPORTED)
+      set_target_properties(
+        OBS::obs-frontend-api
+        PROPERTIES
+          IMPORTED_LOCATION "${OBS_FRONTEND_API_LIBRARY}"
+          INTERFACE_INCLUDE_DIRECTORIES "${OBS_FRONTEND_API_INCLUDE_DIR}"
+          INTERFACE_LINK_LIBRARIES "OBS::libobs"
+      )
+      message(STATUS "Using fallback obs-frontend-api import from ${OBS_FRONTEND_API_LIBRARY}")
+    else()
+      message(
+        FATAL_ERROR
+        "Could not find obs-frontend-api. Expected either a CMake package under ${CMAKE_CURRENT_SOURCE_DIR}/.deps or an installed library/header pair.\n"
+        "Checked config hints: ${_obs_frontend_api_config_hints}\n"
+        "Checked include hints: ${_obs_frontend_api_include_hints}\n"
+        "Looked for library under: ${CMAKE_CURRENT_SOURCE_DIR}/.deps/lib"
+      )
+    endif()
+  endif()
+
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
+endif()
 
 find_package(Qt6 COMPONENTS Widgets Core REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
