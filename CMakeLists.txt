@@ -313,7 +313,25 @@ if(ENABLE_FRONTEND_API)
 endif()
 
 set(_qt6_package_hints)
-file(GLOB _qt6_local_prefix_hints "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*")
+set(_qt6_local_prefix_globs "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*")
+
+if(WIN32 AND CMAKE_VS_PLATFORM_NAME)
+  string(TOLOWER "${CMAKE_VS_PLATFORM_NAME}" _qt6_target_arch)
+  if(_qt6_target_arch STREQUAL "amd64")
+    set(_qt6_target_arch "x64")
+  elseif(_qt6_target_arch STREQUAL "win32")
+    set(_qt6_target_arch "x86")
+  endif()
+
+  set(_qt6_local_prefix_globs "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*-${_qt6_target_arch}")
+endif()
+
+file(GLOB _qt6_local_prefix_hints LIST_DIRECTORIES TRUE ${_qt6_local_prefix_globs})
+if(NOT _qt6_local_prefix_hints)
+  file(GLOB _qt6_local_prefix_hints LIST_DIRECTORIES TRUE "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*")
+endif()
+
+list(SORT _qt6_local_prefix_hints)
 foreach(_qt6_prefix IN LISTS _qt6_local_prefix_hints)
   list(APPEND _qt6_package_hints "${_qt6_prefix}" "${_qt6_prefix}/lib/cmake/Qt6")
 endforeach()
