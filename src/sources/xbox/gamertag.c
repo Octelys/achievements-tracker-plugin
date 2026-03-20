@@ -20,7 +20,7 @@
 /** Current gamertag text to display. */
 static char g_gamertag[256];
 
-/** Flag indicating text source needs to be reloaded. */
+/** Flag indicating the text source needs to be reloaded. */
 static bool g_must_reload;
 
 /** Global configuration for gamertag display (font, color, size). */

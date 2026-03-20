@@ -2,7 +2,7 @@
 #include <diagnostics/log.h>
 
 #include "sources/common/achievement_cycle.h"
-#include "sources/xbox/account.h"
+#include "ui/xbox_account_config.h"
 #include "sources/xbox/gamerpic.h"
 #include "sources/xbox/game_cover.h"
 #include "sources/xbox/gamerscore.h"
@@ -14,6 +14,7 @@
 #include "sources/xbox/achievement_icon.h"
 #include "sources/xbox/achievements_count.h"
 #include "drawing/image.h"
+#include "xbox/xbox_monitor.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -22,7 +23,8 @@ bool obs_module_load(void) {
     obs_log(LOG_INFO, "Loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
 
-    xbox_account_source_register();
+    xbox_account_config_register();
+    xbox_monitoring_start();
 
     xbox_gamerpic_source_register();
     xbox_game_cover_source_register();
@@ -43,6 +45,8 @@ bool obs_module_load(void) {
 }
 
 void obs_module_unload(void) {
+    xbox_account_config_unregister();
+
     achievement_cycle_destroy();
     image_cleanup();
 

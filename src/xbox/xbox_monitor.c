@@ -854,12 +854,12 @@ static void *monitoring_thread(void *arg) {
         }
     }
 
-    obs_log(LOG_INFO, "[Monitoring] Monitoring thread shutting down");
-
     if (ctx->context) {
         lws_context_destroy(ctx->context);
         ctx->context = NULL;
     }
+
+    obs_log(LOG_INFO, "[Monitoring] Monitoring thread stopped");
 
     return 0;
 }
@@ -873,8 +873,8 @@ bool xbox_monitoring_start() {
     bool succeeded = false;
 
     if (g_monitoring_context) {
-        obs_log(LOG_WARNING, "[Monitoring] Monitoring already active");
-        goto error;
+        obs_log(LOG_INFO, "[Monitoring] Monitoring already started");
+        goto done;
     }
 
     xbox_identity_t *identity = xbox_live_get_identity();
@@ -910,7 +910,6 @@ bool xbox_monitoring_start() {
 
     if (pthread_create(&g_monitoring_context->thread, NULL, monitoring_thread, g_monitoring_context) != 0) {
         obs_log(LOG_ERROR, "[Monitoring] Failed to create monitoring thread");
-
         goto error;
     }
 

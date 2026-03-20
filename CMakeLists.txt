@@ -15,8 +15,20 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EnsureUniversalFreeType.cmake")
 
 project(${_name} VERSION ${PLUGIN_VERSION})
 
-option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" OFF)
-option(ENABLE_QT "Use Qt functionality" OFF)
+option(ENABLE_FRONTEND_API "Use obs-frontend-api for UI functionality" ON)
+option(ENABLE_QT "Use Qt functionality" ON)
+
+if(NOT ENABLE_FRONTEND_API)
+  message(STATUS "Enabling obs-frontend-api because the global Xbox account configuration requires it")
+  set(ENABLE_FRONTEND_API ON CACHE BOOL "Use obs-frontend-api for UI functionality" FORCE)
+  set(ENABLE_FRONTEND_API ON)
+endif()
+
+if(NOT ENABLE_QT)
+  message(STATUS "Enabling Qt because the global Xbox account configuration requires it")
+  set(ENABLE_QT ON CACHE BOOL "Use Qt functionality" FORCE)
+  set(ENABLE_QT ON)
+endif()
 
 include(compilerconfig)
 include(defaults)
@@ -244,22 +256,126 @@ else()
 endif()
 
 if(ENABLE_FRONTEND_API)
-  find_package(obs-frontend-api REQUIRED)
+  # Local macOS/dev builds bootstrap OBS into `.deps`, but some IDE / custom
+  # configure flows do not preserve the derived prefix path early enough for a
+  # plain `find_package(obs-frontend-api)` call to discover it reliably.
+  set(
+    _obs_frontend_api_config_hints
+    "${CMAKE_CURRENT_SOURCE_DIR}/.deps"
+    "${CMAKE_CURRENT_SOURCE_DIR}/.deps/lib/cmake/obs-frontend-api"
+  )
+  file(GLOB _obs_frontend_api_obs_build_dirs "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-studio-*/build_*")
+  foreach(_obs_build_dir IN LISTS _obs_frontend_api_obs_build_dirs)
+    list(APPEND _obs_frontend_api_config_hints "${_obs_build_dir}/frontend/api" "${_obs_build_dir}/libobs")
+  endforeach()
+
+  find_package(
+    obs-frontend-api
+    CONFIG
+    QUIET
+    HINTS ${_obs_frontend_api_config_hints}
+    PATH_SUFFIXES lib/cmake/obs-frontend-api
+  )
+
+  if(NOT TARGET OBS::obs-frontend-api)
+    set(_obs_frontend_api_include_hints "${CMAKE_CURRENT_SOURCE_DIR}/.deps/include")
+    file(GLOB _obs_frontend_api_source_hints "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-studio-*/frontend/api")
+    list(APPEND _obs_frontend_api_include_hints ${_obs_frontend_api_source_hints})
+
+    find_path(
+      OBS_FRONTEND_API_INCLUDE_DIR
+      NAMES obs-frontend-api.h
+      HINTS ${_obs_frontend_api_include_hints}
+      PATH_SUFFIXES obs
+    )
+    find_library(OBS_FRONTEND_API_LIBRARY NAMES obs-frontend-api HINTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/lib")
+
+    if(OBS_FRONTEND_API_INCLUDE_DIR AND OBS_FRONTEND_API_LIBRARY)
+      add_library(OBS::obs-frontend-api SHARED IMPORTED)
+      set_target_properties(
+        OBS::obs-frontend-api
+        PROPERTIES
+          IMPORTED_LOCATION "${OBS_FRONTEND_API_LIBRARY}"
+          INTERFACE_INCLUDE_DIRECTORIES "${OBS_FRONTEND_API_INCLUDE_DIR}"
+          INTERFACE_LINK_LIBRARIES "OBS::libobs"
+      )
+      message(STATUS "Using fallback obs-frontend-api import from ${OBS_FRONTEND_API_LIBRARY}")
+    else()
+      message(
+        FATAL_ERROR
+        "Could not find obs-frontend-api. Expected either a CMake package under ${CMAKE_CURRENT_SOURCE_DIR}/.deps or an installed library/header pair.\n"
+        "Checked config hints: ${_obs_frontend_api_config_hints}\n"
+        "Checked include hints: ${_obs_frontend_api_include_hints}\n"
+        "Looked for library under: ${CMAKE_CURRENT_SOURCE_DIR}/.deps/lib"
+      )
+    endif()
+  endif()
+
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::obs-frontend-api)
 endif()
 
-if(ENABLE_QT)
-  find_package(Qt6 COMPONENTS Widgets Core)
-  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
-  target_compile_options(
-    ${CMAKE_PROJECT_NAME}
-    PRIVATE $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header -Wno-comma>
-  )
-  set_target_properties(
-    ${CMAKE_PROJECT_NAME}
-    PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
-  )
+set(_qt6_package_hints)
+set(_qt6_local_prefix_globs "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*")
+
+if(WIN32 AND CMAKE_VS_PLATFORM_NAME)
+  string(TOLOWER "${CMAKE_VS_PLATFORM_NAME}" _qt6_target_arch)
+  if(_qt6_target_arch STREQUAL "amd64")
+    set(_qt6_target_arch "x64")
+  elseif(_qt6_target_arch STREQUAL "win32")
+    set(_qt6_target_arch "x86")
+  endif()
+
+  set(_qt6_local_prefix_globs "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*-${_qt6_target_arch}")
 endif()
+
+file(GLOB _qt6_local_prefix_hints LIST_DIRECTORIES TRUE ${_qt6_local_prefix_globs})
+if(NOT _qt6_local_prefix_hints)
+  file(GLOB _qt6_local_prefix_hints LIST_DIRECTORIES TRUE "${CMAKE_CURRENT_SOURCE_DIR}/.deps/obs-deps-qt6-*")
+endif()
+
+list(SORT _qt6_local_prefix_hints)
+foreach(_qt6_prefix IN LISTS _qt6_local_prefix_hints)
+  list(APPEND _qt6_package_hints "${_qt6_prefix}" "${_qt6_prefix}/lib/cmake/Qt6")
+endforeach()
+
+if(WIN32 AND COMMAND _handle_qt_cross_compile AND _qt6_local_prefix_hints)
+  list(GET _qt6_local_prefix_hints 0 _qt6_primary_prefix)
+  _handle_qt_cross_compile(DIRECTORY "${_qt6_primary_prefix}")
+endif()
+
+find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets Core HINTS ${_qt6_package_hints} PATH_SUFFIXES lib/cmake/Qt6)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
+
+# ----------------------------------------------------------------------------
+# macOS: Remove legacy AGL.framework from Qt6's WrapOpenGL::WrapOpenGL target.
+#
+# Qt6's FindWrapOpenGL.cmake unconditionally adds -framework AGL as a
+# transitive dependency of Qt6::Gui.  AGL (Apple OpenGL) was removed from the
+# macOS 15+ SDK, so the linker fails with "framework 'AGL' not found" when
+# building against a modern SDK.  Strip it out after Qt is found.
+# ----------------------------------------------------------------------------
+if(APPLE AND TARGET WrapOpenGL::WrapOpenGL)
+  get_target_property(_wrap_opengl_libs WrapOpenGL::WrapOpenGL INTERFACE_LINK_LIBRARIES)
+  if(_wrap_opengl_libs)
+    list(REMOVE_ITEM _wrap_opengl_libs "-framework AGL")
+    # Also handle the case where it was found as an absolute path / find_library result
+    list(FILTER _wrap_opengl_libs EXCLUDE REGEX "AGL\\.framework")
+    set_target_properties(WrapOpenGL::WrapOpenGL PROPERTIES INTERFACE_LINK_LIBRARIES "${_wrap_opengl_libs}")
+    message(STATUS "Removed AGL.framework from WrapOpenGL::WrapOpenGL (not present in macOS 15+ SDK)")
+  endif()
+endif()
+target_compile_options(
+  ${CMAKE_PROJECT_NAME}
+  PRIVATE
+    $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header
+    -Wno-comma>
+    $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header
+    -Wno-comma>
+)
+set_target_properties(
+  ${CMAKE_PROJECT_NAME}
+  PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
+)
 
 # FreeType for text rendering
 #
@@ -361,7 +477,6 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
-    src/sources/xbox/account.c
     src/sources/xbox/gamerpic.c
     src/sources/xbox/game_cover.c
     src/sources/xbox/gamerscore.c
@@ -381,9 +496,11 @@ target_sources(
     src/net/json/json.c
     src/oauth/util.c
     src/oauth/xbox-live.c
+    src/xbox/account_manager.c
     src/xbox/xbox_session.c
     src/xbox/xbox_client.c
     src/xbox/xbox_monitor.c
+    src/ui/xbox_account_config.cpp
     src/io/state.c
     src/io/cache.c
     src/encoding/base64.c
