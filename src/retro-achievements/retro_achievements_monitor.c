@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common/types.h"
 #include "external/cjson/cJSON.h"
 
 /* -------------------------------------------------------------------------
@@ -43,25 +44,29 @@
  * ---------------------------------------------------------------------- */
 
 typedef struct game_playing_subscription {
-    on_retro_game_playing_t            callback;
-    struct game_playing_subscription  *next;
+    on_retro_game_playing_t           callback;
+    struct game_playing_subscription *next;
 } game_playing_subscription_t;
 
 static game_playing_subscription_t *g_game_playing_subscriptions = NULL;
 
 typedef struct no_game_subscription {
-    on_retro_no_game_t            callback;
-    struct no_game_subscription  *next;
+    on_retro_no_game_t           callback;
+    struct no_game_subscription *next;
 } no_game_subscription_t;
 
 static no_game_subscription_t *g_no_game_subscriptions = NULL;
 
 typedef struct connection_changed_subscription {
-    on_retro_connection_changed_t            callback;
-    struct connection_changed_subscription  *next;
+    on_retro_connection_changed_t           callback;
+    struct connection_changed_subscription *next;
 } connection_changed_subscription_t;
 
 static connection_changed_subscription_t *g_connection_changed_subscriptions = NULL;
+
+static bool json_item_is_string(const cJSON *item) {
+    return item != NULL && (item->type & 0xFF) == cJSON_String && item->valuestring != NULL;
+}
 
 /* -------------------------------------------------------------------------
  * Monitor context
@@ -101,8 +106,7 @@ static monitor_context_t *g_monitor_context = NULL;
  * Notification helpers
  * ---------------------------------------------------------------------- */
 
-static void notify_game_playing(const retro_game_t *game)
-{
+static void notify_game_playing(const retro_game_t *game) {
     obs_log(LOG_INFO, "[RetroAchievements] Game playing: %s (%s)", game->game_name, game->game_id);
 
     game_playing_subscription_t *node = g_game_playing_subscriptions;
@@ -112,8 +116,7 @@ static void notify_game_playing(const retro_game_t *game)
     }
 }
 
-static void notify_no_game(void)
-{
+static void notify_no_game(void) {
     obs_log(LOG_INFO, "[RetroAchievements] No game playing");
 
     no_game_subscription_t *node = g_no_game_subscriptions;
@@ -123,8 +126,7 @@ static void notify_no_game(void)
     }
 }
 
-static void notify_connection_changed(const char *error_message)
-{
+static void notify_connection_changed(const char *error_message) {
     if (!g_monitor_context) {
         return;
     }
@@ -164,8 +166,7 @@ static void notify_connection_changed(const char *error_message)
  *
  *   { "type": "no_game" }
  */
-static void on_message_received(const char *buffer)
-{
+static void on_message_received(const char *buffer) {
     if (!buffer) {
         return;
     }
@@ -179,7 +180,7 @@ static void on_message_received(const char *buffer)
     }
 
     cJSON *type_item = cJSON_GetObjectItemCaseSensitive(root, "type");
-    if (!cJSON_IsString(type_item) || !type_item->valuestring) {
+    if (!json_item_is_string(type_item)) {
         obs_log(LOG_WARNING, "[RetroAchievements] Missing or invalid \"type\" field");
         cJSON_Delete(root);
         return;
@@ -192,31 +193,31 @@ static void on_message_received(const char *buffer)
         cJSON *field;
 
         field = cJSON_GetObjectItemCaseSensitive(root, "game_id");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.game_id, field->valuestring, sizeof(game.game_id) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "game_name");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.game_name, field->valuestring, sizeof(game.game_name) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "game_path");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.game_path, field->valuestring, sizeof(game.game_path) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "console_id");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.console_id, field->valuestring, sizeof(game.console_id) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "console_name");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.console_name, field->valuestring, sizeof(game.console_name) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "core_name");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.core_name, field->valuestring, sizeof(game.core_name) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "db_name");
-        if (cJSON_IsString(field) && field->valuestring)
+        if (json_item_is_string(field))
             strncpy(game.db_name, field->valuestring, sizeof(game.db_name) - 1);
 
         notify_game_playing(&game);
@@ -235,21 +236,18 @@ static void on_message_received(const char *buffer)
  * Connection event handlers
  * ---------------------------------------------------------------------- */
 
-static void on_websocket_connected(void)
-{
+static void on_websocket_connected(void) {
     g_monitor_context->connected = true;
     notify_connection_changed(NULL);
 }
 
-static void on_websocket_disconnected(void)
-{
+static void on_websocket_disconnected(void) {
     g_monitor_context->connected = false;
     g_monitor_context->wsi       = NULL;
     notify_connection_changed(NULL);
 }
 
-static void on_websocket_error(const char *in)
-{
+static void on_websocket_error(const char *in) {
     g_monitor_context->connected = false;
     g_monitor_context->wsi       = NULL;
     notify_connection_changed(in ? in : "Connection error");
@@ -259,9 +257,7 @@ static void on_websocket_error(const char *in)
  * libwebsockets callback
  * ---------------------------------------------------------------------- */
 
-static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in,
-                               size_t len)
-{
+static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) {
     UNUSED_PARAMETER(user);
 
     monitor_context_t *ctx = lws_context_user(lws_get_context(wsi));
@@ -284,8 +280,8 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         {
             size_t needed = ctx->rx_buffer_used + len + 1;
             if (needed > ctx->rx_buffer_size) {
-                size_t  new_size   = needed * 2;
-                char   *new_buffer = (char *)brealloc(ctx->rx_buffer, new_size);
+                size_t new_size   = needed * 2;
+                char  *new_buffer = (char *)brealloc(ctx->rx_buffer, new_size);
                 if (!new_buffer) {
                     obs_log(LOG_ERROR, "[RetroAchievements] Failed to grow receive buffer");
                     return -1;
@@ -341,8 +337,7 @@ static const struct lws_protocols protocols[] = {
  * Background thread
  * ---------------------------------------------------------------------- */
 
-static void *monitor_thread(void *arg)
-{
+static void *monitor_thread(void *arg) {
     monitor_context_t *ctx = arg;
 
     struct lws_context_creation_info info;
@@ -394,9 +389,7 @@ static void *monitor_thread(void *arg)
 
         /* Reconnect if the connection dropped while the monitor is still active. */
         if (ctx->running && !ctx->wsi && ctx->context) {
-            obs_log(LOG_INFO,
-                    "[RetroAchievements] Connection lost, retrying in %d ms...",
-                    retry_delay_ms);
+            obs_log(LOG_INFO, "[RetroAchievements] Connection lost, retrying in %d ms...", retry_delay_ms);
 
             int iterations = retry_delay_ms / RA_LOOP_CHECK_MS;
             for (int i = 0; i < iterations && ctx->running; i++) {
@@ -434,8 +427,7 @@ static void *monitor_thread(void *arg)
  * Public API
  * ---------------------------------------------------------------------- */
 
-bool retro_achievements_monitor_start(void)
-{
+bool retro_achievements_monitor_start(void) {
     bool succeeded = false;
 
     if (g_monitor_context) {
@@ -449,8 +441,8 @@ bool retro_achievements_monitor_start(void)
         goto error;
     }
 
-    g_monitor_context->running             = true;
-    g_monitor_context->connected           = false;
+    g_monitor_context->running              = true;
+    g_monitor_context->connected            = false;
     g_monitor_context->last_status_notified = false;
 
     g_monitor_context->rx_buffer_size = 4096;
@@ -480,8 +472,7 @@ done:
     return succeeded;
 }
 
-void retro_achievements_monitor_stop(void)
-{
+void retro_achievements_monitor_stop(void) {
     if (!g_monitor_context) {
         return;
     }
@@ -505,8 +496,7 @@ void retro_achievements_monitor_stop(void)
     obs_log(LOG_INFO, "[RetroAchievements] Monitor stopped");
 }
 
-bool retro_achievements_monitor_is_active(void)
-{
+bool retro_achievements_monitor_is_active(void) {
     if (!g_monitor_context) {
         return false;
     }
@@ -514,8 +504,7 @@ bool retro_achievements_monitor_is_active(void)
     return g_monitor_context->running;
 }
 
-void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback)
-{
+void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback) {
     if (!callback) {
         return;
     }
@@ -531,8 +520,7 @@ void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback)
     g_game_playing_subscriptions = node;
 }
 
-void retro_achievements_subscribe_no_game(on_retro_no_game_t callback)
-{
+void retro_achievements_subscribe_no_game(on_retro_no_game_t callback) {
     if (!callback) {
         return;
     }
@@ -543,13 +531,12 @@ void retro_achievements_subscribe_no_game(on_retro_no_game_t callback)
         return;
     }
 
-    node->callback         = callback;
-    node->next             = g_no_game_subscriptions;
+    node->callback          = callback;
+    node->next              = g_no_game_subscriptions;
     g_no_game_subscriptions = node;
 }
 
-void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback)
-{
+void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback) {
     if (!callback) {
         return;
     }
@@ -560,8 +547,8 @@ void retro_achievements_subscribe_connection_changed(on_retro_connection_changed
         return;
     }
 
-    node->callback                    = callback;
-    node->next                        = g_connection_changed_subscriptions;
+    node->callback                     = callback;
+    node->next                         = g_connection_changed_subscriptions;
     g_connection_changed_subscriptions = node;
 }
 
@@ -571,33 +558,26 @@ void retro_achievements_subscribe_connection_changed(on_retro_connection_changed
  * Stub implementations when libwebsockets is not available.
  * ----------------------------------------------------------------- */
 
-bool retro_achievements_monitor_start(void)
-{
+bool retro_achievements_monitor_start(void) {
     obs_log(LOG_WARNING, "[RetroAchievements] Built without libwebsockets support – monitor unavailable");
     return false;
 }
 
-void retro_achievements_monitor_stop(void)
-{
-}
+void retro_achievements_monitor_stop(void) {}
 
-bool retro_achievements_monitor_is_active(void)
-{
+bool retro_achievements_monitor_is_active(void) {
     return false;
 }
 
-void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback)
-{
+void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback) {
     UNUSED_PARAMETER(callback);
 }
 
-void retro_achievements_subscribe_no_game(on_retro_no_game_t callback)
-{
+void retro_achievements_subscribe_no_game(on_retro_no_game_t callback) {
     UNUSED_PARAMETER(callback);
 }
 
-void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback)
-{
+void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback) {
     UNUSED_PARAMETER(callback);
 }
 

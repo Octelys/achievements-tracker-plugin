@@ -285,10 +285,11 @@ static void complete(authentication_ctx_t *ctx) {
 static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     bool     succeeded           = false;
-    uint8_t *signature           = NULL;
     char    *signature_b64       = NULL;
     char    *sisu_token_response = NULL;
+    uint8_t *signature           = NULL;
     char    *proof_key           = NULL;
+    cJSON   *sisu_token_json     = NULL;
 
     /* Creates the request */
     proof_key = crypto_to_string(ctx->device->keys, false);
@@ -361,7 +362,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
         goto cleanup;
     }
 
-    cJSON *sisu_token_json = cJSON_Parse(sisu_token_response);
+    sisu_token_json = cJSON_Parse(sisu_token_response);
 
     if (!sisu_token_json) {
         ctx->result.error_message = "Unable retrieve a sisu token: unable to parse the JSON response";
@@ -509,6 +510,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     char    *device_token_response = NULL;
     uint8_t *signature             = NULL;
     char    *proof_key             = NULL;
+    cJSON   *device_token_json     = NULL;
 
     obs_log(LOG_INFO, "No device token cached found. Requesting a new device token");
 
@@ -582,7 +584,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     }
 
     /* Retrieves the device token */
-    cJSON *device_token_json = cJSON_Parse(device_token_response);
+    device_token_json = cJSON_Parse(device_token_response);
 
     if (!device_token_json) {
         ctx->result.error_message = "Unable retrieve a device token: unable to parse the JSON response";
@@ -682,8 +684,9 @@ cleanup:
  */
 static bool refresh_user_token(authentication_ctx_t *ctx) {
 
-    bool  succeeded              = false;
-    char *refresh_token_response = NULL;
+    bool   succeeded              = false;
+    char  *refresh_token_response = NULL;
+    cJSON *refresh_token_json     = NULL;
 
     /* URL-encode both refresh_token and scope to prevent injection attacks
      * and ensure proper form-urlencoded format. The refresh_token may contain
@@ -724,7 +727,7 @@ static bool refresh_user_token(authentication_ctx_t *ctx) {
 
     obs_log(LOG_DEBUG, "Response received: %s", refresh_token_response);
 
-    cJSON *refresh_token_json = cJSON_Parse(refresh_token_response);
+    refresh_token_json = cJSON_Parse(refresh_token_response);
 
     if (!refresh_token_json) {
         ctx->result.error_message = "Unable to refresh the user token: unable to parse the JSON response";
@@ -951,8 +954,9 @@ static void poll_for_user_token(authentication_ctx_t *ctx) {
  */
 static void *start_authentication_flow(void *param) {
 
-    char *scope_enc      = NULL;
-    char *token_response = NULL;
+    char  *scope_enc      = NULL;
+    char  *token_response = NULL;
+    cJSON *token_json     = NULL;
 
     authentication_ctx_t *ctx = param;
 
@@ -1009,7 +1013,7 @@ static void *start_authentication_flow(void *param) {
 
     obs_log(LOG_DEBUG, "Response received: %s", token_response);
 
-    cJSON *token_json = cJSON_Parse(token_response);
+    token_json = cJSON_Parse(token_response);
 
     if (!token_json) {
         obs_log(LOG_ERROR, "Failed to retrieve the user token: unable to parse the JSON response");

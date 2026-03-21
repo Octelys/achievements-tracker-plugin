@@ -51,13 +51,13 @@ extern "C" {
  * that messages always fit without truncation.
  */
 typedef struct {
-    char game_id[64];      /**< CRC-32 checksum of the ROM as a hex string.   */
-    char game_name[512];   /**< Base filename of the ROM without extension.   */
-    char game_path[4096];  /**< Full filesystem path to the ROM.              */
-    char console_id[64];   /**< Short platform identifier (e.g. "snes").      */
-    char console_name[256];/**< Human-readable platform name.                 */
-    char core_name[256];   /**< Name of the libretro core running the game.   */
-    char db_name[512];     /**< Playlist/database name for the content.       */
+    char game_id[64];       /**< CRC-32 checksum of the ROM as a hex string.   */
+    char game_name[512];    /**< Base filename of the ROM without extension.   */
+    char game_path[4096];   /**< Full filesystem path to the ROM.              */
+    char console_id[64];    /**< Short platform identifier (e.g. "snes").      */
+    char console_name[256]; /**< Human-readable platform name.                 */
+    char core_name[256];    /**< Name of the libretro core running the game.   */
+    char db_name[512];      /**< Playlist/database name for the content.       */
 } retro_game_t;
 
 /* -------------------------------------------------------------------------

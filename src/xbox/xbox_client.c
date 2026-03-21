@@ -382,6 +382,7 @@ game_t *xbox_get_current_game(void) {
 
     char   *presence_response = NULL;
     game_t *game              = NULL;
+    cJSON  *presence_json     = NULL;
 
     char headers[4096];
     snprintf(headers,
@@ -414,7 +415,7 @@ game_t *xbox_get_current_game(void) {
 
     obs_log(LOG_DEBUG, "Response: %s", presence_response);
 
-    cJSON *presence_json = cJSON_Parse(presence_response);
+    presence_json = cJSON_Parse(presence_response);
 
     if (!presence_json) {
         obs_log(LOG_ERROR, "Failed to fetch the current game: unable to parse the JSON response");
@@ -431,8 +432,8 @@ game_t *xbox_get_current_game(void) {
         goto cleanup;
     }
 
-    char current_game_title[128];
-    char current_game_id[128];
+    char current_game_title[128] = "";
+    char current_game_id[128]    = "";
 
     for (int title_game_index = 0; title_game_index < 10; title_game_index++) {
 
