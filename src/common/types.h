@@ -17,6 +17,7 @@
 #include "common/device.h"
 #include "common/game.h"
 #include "common/gamerscore.h"
+#include "common/identity.h"
 #include "common/token.h"
 #include "common/unlocked_achievement.h"
 #include "common/xbox_identity.h"

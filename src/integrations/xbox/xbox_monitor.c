@@ -41,7 +41,7 @@
 #include "external/cjson/cJSON.h"
 
 #include "io/state.h"
-#include "oauth/xbox-live.h"
+#include "integrations/xbox/oauth/xbox-live.h"
 
 #include <text/parsers.h>
 

@@ -494,13 +494,13 @@ target_sources(
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
-    src/oauth/util.c
-    src/oauth/xbox-live.c
-    src/xbox/account_manager.c
-    src/xbox/xbox_session.c
-    src/xbox/xbox_client.c
-    src/xbox/xbox_monitor.c
-    src/retro-achievements/retro_achievements_monitor.c
+    src/integrations/xbox/oauth/util.c
+    src/integrations/xbox/oauth/xbox-live.c
+    src/integrations/xbox/account_manager.c
+    src/integrations/xbox/xbox_session.c
+    src/integrations/xbox/xbox_client.c
+    src/integrations/xbox/xbox_monitor.c
+    src/integrations/retro-achievements/retro_achievements_monitor.c
     src/ui/xbox_account_config.cpp
     src/io/state.c
     src/io/cache.c
@@ -514,6 +514,7 @@ target_sources(
     src/common/device.c
     src/common/game.c
     src/common/gamerscore.c
+    src/common/identity.c
     src/common/token.c
     src/common/unlocked_achievement.c
     src/common/xbox_identity.c
@@ -729,7 +730,7 @@ if(BUILD_TESTING)
     test_xbox_session
     test/test_xbox_session.c
     ${unity_SOURCE_DIR}/src/unity.c
-    src/xbox/xbox_session.c
+    src/integrations/xbox/xbox_session.c
     src/common/achievement.c
     src/common/achievement_progress.c
     src/common/game.c
@@ -769,7 +770,7 @@ if(BUILD_TESTING)
     test_types
     test/test_types.c
     ${unity_SOURCE_DIR}/src/unity.c
-    src/xbox/xbox_session.c
+    src/integrations/xbox/xbox_session.c
     src/common/achievement.c
     src/common/achievement_progress.c
     src/common/game.c

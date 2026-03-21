@@ -1,4 +1,4 @@
-#include "xbox/account_manager.h"
+#include "integrations/xbox/account_manager.h"
 
 #include <obs-module.h>
 #include <diagnostics/log.h>
@@ -6,8 +6,8 @@
 #include <stdio.h>
 
 #include "io/state.h"
-#include "oauth/xbox-live.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/oauth/xbox-live.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 static void on_xbox_signed_in(void *data) {
     UNUSED_PARAMETER(data);

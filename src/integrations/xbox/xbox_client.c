@@ -27,7 +27,7 @@
 #include "io/state.h"
 #include "net/http/http.h"
 #include "net/json/json.h"
-#include "oauth/xbox-live.h"
+#include "integrations/xbox/oauth/xbox-live.h"
 #include "text/parsers.h"
 
 #include <cJSON.h>

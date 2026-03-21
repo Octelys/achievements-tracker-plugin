@@ -14,8 +14,8 @@
 #include "sources/xbox/achievement_icon.h"
 #include "sources/xbox/achievements_count.h"
 #include "drawing/image.h"
-#include "xbox/xbox_monitor.h"
-#include "retro-achievements/retro_achievements_monitor.h"
+#include "integrations/xbox/xbox_monitor.h"
+#include "integrations/retro-achievements/retro_achievements_monitor.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")

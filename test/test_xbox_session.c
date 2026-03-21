@@ -2,7 +2,7 @@
 #include "stubs/xbox/xbox_client.h"
 #include "util/bmem.h"
 #include "common/types.h"
-#include "xbox/xbox_session.h"
+#include "integrations/xbox/xbox_session.h"
 
 #define OUTER_WORLD_2_ID "outer_worlds_2_id"
 #define FALLOUT_4_ID "fallout_4_id"

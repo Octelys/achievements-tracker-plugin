@@ -362,11 +362,11 @@ static void on_message_received(const char *buffer) {
             strncpy(user.display_name, field->valuestring, sizeof(user.display_name) - 1);
 
         field = cJSON_GetObjectItemCaseSensitive(root, "score");
-        if (field != NULL && cJSON_IsNumber(field))
+        if (field != NULL && (field->type & cJSON_Number))
             user.score = (uint32_t)field->valuedouble;
 
         field = cJSON_GetObjectItemCaseSensitive(root, "score_softcore");
-        if (field != NULL && cJSON_IsNumber(field))
+        if (field != NULL && (field->type & cJSON_Number))
             user.score_softcore = (uint32_t)field->valuedouble;
 
         field = cJSON_GetObjectItemCaseSensitive(root, "avatar_url");

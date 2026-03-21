@@ -21,10 +21,10 @@
 #include <diagnostics/log.h>
 #include <inttypes.h>
 
-#include "oauth/xbox-live.h"
+#include "integrations/xbox/oauth/xbox-live.h"
 #include "sources/common/image_source.h"
-#include "xbox/xbox_client.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/xbox_client.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 /**
  * @brief Global singleton cover cache.

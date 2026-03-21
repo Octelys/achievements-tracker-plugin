@@ -1,4 +1,5 @@
-#include "oauth/util.h"
+
+#include "integrations/xbox/oauth/util.h"
 
 /**
  * @file util.c

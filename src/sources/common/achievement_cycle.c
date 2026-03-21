@@ -4,7 +4,7 @@
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 /** Duration to show the last unlocked achievement (seconds). */
 #define LAST_UNLOCKED_DISPLAY_DURATION 45.0f

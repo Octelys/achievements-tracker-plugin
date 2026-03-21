@@ -28,8 +28,8 @@
 #include <diagnostics/log.h>
 
 #include "io/state.h"
-#include "oauth/xbox-live.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/oauth/xbox-live.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 #define NO_FLIP 0
 

@@ -18,7 +18,7 @@
 #include <QWidget>
 
 extern "C" {
-#include "xbox/account_manager.h"
+#include "integrations/xbox/account_manager.h"
 }
 
 namespace {

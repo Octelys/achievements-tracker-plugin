@@ -5,7 +5,7 @@
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
-#include "oauth/xbox-live.h"
+#include "integrations/xbox/oauth/xbox-live.h"
 #include "sources/common/achievement_cycle.h"
 #include "sources/common/image_source.h"
 

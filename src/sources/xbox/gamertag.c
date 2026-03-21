@@ -14,8 +14,8 @@
 #include <diagnostics/log.h>
 
 #include "io/state.h"
-#include "oauth/xbox-live.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/xbox/oauth/xbox-live.h"
+#include "integrations/xbox/xbox_monitor.h"
 
 /** Current gamertag text to display. */
 static char g_gamertag[256];

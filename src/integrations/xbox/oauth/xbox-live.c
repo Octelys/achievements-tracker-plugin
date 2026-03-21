@@ -1,4 +1,4 @@
-#include "oauth/xbox-live.h"
+#include "integrations/xbox/oauth/xbox-live.h"
 
 /**
  * @file xbox-live.c
