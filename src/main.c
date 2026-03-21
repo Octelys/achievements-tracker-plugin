@@ -15,6 +15,7 @@
 #include "sources/xbox/achievements_count.h"
 #include "drawing/image.h"
 #include "xbox/xbox_monitor.h"
+#include "retro-achievements/retro_achievements_monitor.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -25,6 +26,7 @@ bool obs_module_load(void) {
 
     xbox_account_config_register();
     xbox_monitoring_start();
+    retro_achievements_monitor_start();
 
     xbox_gamerpic_source_register();
     xbox_game_cover_source_register();
@@ -60,6 +62,7 @@ void obs_module_unload(void) {
     xbox_gamerscore_source_cleanup();
     xbox_gamertag_source_cleanup();
 
+    retro_achievements_monitor_stop();
     io_cleanup();
 
     obs_log(LOG_INFO, "Plugin unloaded");
