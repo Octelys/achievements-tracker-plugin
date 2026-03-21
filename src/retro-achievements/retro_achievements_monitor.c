@@ -64,6 +64,13 @@ typedef struct connection_changed_subscription {
 
 static connection_changed_subscription_t *g_connection_changed_subscriptions = NULL;
 
+typedef struct achievements_subscription {
+    on_retro_achievements_t           callback;
+    struct achievements_subscription *next;
+} achievements_subscription_t;
+
+static achievements_subscription_t *g_achievements_subscriptions = NULL;
+
 static bool json_item_is_string(const cJSON *item) {
     return item != NULL && (item->type & 0xFF) == cJSON_String && item->valuestring != NULL;
 }
@@ -152,6 +159,16 @@ static void notify_connection_changed(const char *error_message) {
     g_monitor_context->last_status_notified = g_monitor_context->connected;
 }
 
+static void notify_achievements(const retro_achievement_t *achievements, size_t count) {
+    obs_log(LOG_INFO, "[RetroAchievements] Achievements received: %zu", count);
+
+    achievements_subscription_t *node = g_achievements_subscriptions;
+    while (node) {
+        node->callback(achievements, count);
+        node = node->next;
+    }
+}
+
 /* -------------------------------------------------------------------------
  * Message parsing
  * ---------------------------------------------------------------------- */
@@ -165,6 +182,10 @@ static void notify_connection_changed(const char *error_message) {
  *     "core_name": "...", "db_name": "..." }
  *
  *   { "type": "no_game" }
+ *
+ *   { "type": "achievements",
+ *     "items": [ { "id": 1, "name": "...", "points": 5,
+ *                  "status": "unlocked", "badge_url": "..." }, ... ] }
  */
 static void on_message_received(const char *buffer) {
     if (!buffer) {
@@ -224,6 +245,68 @@ static void on_message_received(const char *buffer) {
 
     } else if (strcmp(type_item->valuestring, "no_game") == 0) {
         notify_no_game();
+
+    } else if (strcmp(type_item->valuestring, "achievements") == 0) {
+        cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
+        if (!cJSON_IsArray(items)) {
+            obs_log(LOG_WARNING, "[RetroAchievements] \"achievements\" message missing \"items\" array");
+            cJSON_Delete(root);
+            return;
+        }
+
+        int count = cJSON_GetArraySize(items);
+        if (count < 0) {
+            cJSON_Delete(root);
+            return;
+        }
+
+        retro_achievement_t *achievements = NULL;
+        if (count > 0) {
+            if ((size_t)count > SIZE_MAX / sizeof(retro_achievement_t)) {
+                obs_log(LOG_ERROR, "[RetroAchievements] Achievement count too large");
+                cJSON_Delete(root);
+                return;
+            }
+            achievements = (retro_achievement_t *)bzalloc(sizeof(retro_achievement_t) * (size_t)count);
+            if (!achievements) {
+                obs_log(LOG_ERROR, "[RetroAchievements] Failed to allocate achievements array");
+                cJSON_Delete(root);
+                return;
+            }
+        }
+
+        int idx = 0;
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, items) {
+            if (idx >= count)
+                break;
+            retro_achievement_t *ach = &achievements[idx++];
+
+            cJSON *field;
+
+            field = cJSON_GetObjectItemCaseSensitive(item, "id");
+            if (field != NULL && cJSON_IsNumber(field))
+                ach->id = (uint32_t)field->valuedouble;
+
+            field = cJSON_GetObjectItemCaseSensitive(item, "name");
+            if (json_item_is_string(field))
+                strncpy(ach->name, field->valuestring, sizeof(ach->name) - 1);
+
+            field = cJSON_GetObjectItemCaseSensitive(item, "points");
+            if (field != NULL && cJSON_IsNumber(field))
+                ach->points = (uint32_t)field->valuedouble;
+
+            field = cJSON_GetObjectItemCaseSensitive(item, "status");
+            if (json_item_is_string(field))
+                strncpy(ach->status, field->valuestring, sizeof(ach->status) - 1);
+
+            field = cJSON_GetObjectItemCaseSensitive(item, "badge_url");
+            if (json_item_is_string(field))
+                strncpy(ach->badge_url, field->valuestring, sizeof(ach->badge_url) - 1);
+        }
+
+        notify_achievements(achievements, (size_t)count);
+        bfree(achievements);
 
     } else {
         obs_log(LOG_DEBUG, "[RetroAchievements] Unknown message type: %s", type_item->valuestring);
@@ -552,6 +635,22 @@ void retro_achievements_subscribe_connection_changed(on_retro_connection_changed
     g_connection_changed_subscriptions = node;
 }
 
+void retro_achievements_subscribe_achievements(on_retro_achievements_t callback) {
+    if (!callback) {
+        return;
+    }
+
+    achievements_subscription_t *node = bzalloc(sizeof(achievements_subscription_t));
+    if (!node) {
+        obs_log(LOG_ERROR, "[RetroAchievements] Failed to allocate subscription node");
+        return;
+    }
+
+    node->callback                = callback;
+    node->next                    = g_achievements_subscriptions;
+    g_achievements_subscriptions  = node;
+}
+
 #else /* !HAVE_LIBWEBSOCKETS */
 
 /* -----------------------------------------------------------------
@@ -578,6 +677,10 @@ void retro_achievements_subscribe_no_game(on_retro_no_game_t callback) {
 }
 
 void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback) {
+    UNUSED_PARAMETER(callback);
+}
+
+void retro_achievements_subscribe_achievements(on_retro_achievements_t callback) {
     UNUSED_PARAMETER(callback);
 }
 

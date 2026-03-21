@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,11 +18,15 @@ extern "C" {
  * stops. The same message is pushed to every newly connected client.
  *
  * Message shapes:
- *   - Game playing : { "type":"game_playing", "game_id":"...",
- *                      "game_name":"...", "game_path":"...",
- *                      "console_id":"...", "console_name":"...",
- *                      "core_name":"...", "db_name":"..." }
- *   - No game      : { "type":"no_game" }
+ *   - Game playing   : { "type":"game_playing", "game_id":"...",
+ *                        "game_name":"...", "game_path":"...",
+ *                        "console_id":"...", "console_name":"...",
+ *                        "core_name":"...", "db_name":"..." }
+ *   - No game        : { "type":"no_game" }
+ *   - Achievements   : { "type":"achievements",
+ *                        "items":[{ "id":1, "name":"...", "points":5,
+ *                                   "status":"unlocked",
+ *                                   "badge_url":"..." }, ...] }
  *
  * Threading:
  *  - Callbacks may be invoked from the monitor's background thread.
@@ -61,6 +67,22 @@ typedef struct {
 } retro_game_t;
 
 /* -------------------------------------------------------------------------
+ * Achievement record
+ * ---------------------------------------------------------------------- */
+
+/**
+ * @brief A single achievement entry received from the RetroArch WebSocket
+ *        server inside an @c "achievements" message.
+ */
+typedef struct {
+    uint32_t id;            /**< Numeric achievement ID.                          */
+    char     name[256];     /**< Achievement title.                               */
+    uint32_t points;        /**< Point value of the achievement.                  */
+    char     status[16];    /**< "unlocked" or "locked".                          */
+    char     badge_url[512]; /**< Unlocked badge image URL; empty when absent.    */
+} retro_achievement_t;
+
+/* -------------------------------------------------------------------------
  * Callback types
  * ---------------------------------------------------------------------- */
 
@@ -86,6 +108,15 @@ typedef void (*on_retro_no_game_t)(void);
  *                      false; NULL when the disconnect was clean.
  */
 typedef void (*on_retro_connection_changed_t)(bool connected, const char *error_message);
+
+/**
+ * @brief Invoked when the achievements list is received.
+ *
+ * @param achievements  Pointer to an array of @p count achievement records.
+ *                      Valid only for the duration of the callback.
+ * @param count         Number of entries in @p achievements.
+ */
+typedef void (*on_retro_achievements_t)(const retro_achievement_t *achievements, size_t count);
 
 /* -------------------------------------------------------------------------
  * Lifecycle
@@ -149,6 +180,16 @@ void retro_achievements_subscribe_no_game(on_retro_no_game_t callback);
  *                 lost.
  */
 void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback);
+
+/**
+ * @brief Subscribe to achievements-list events.
+ *
+ * Ignored if @p callback is NULL.
+ *
+ * @param callback Invoked whenever an "achievements" message is received,
+ *                 passing the full list of achievement records.
+ */
+void retro_achievements_subscribe_achievements(on_retro_achievements_t callback);
 
 #ifdef __cplusplus
 }
