@@ -479,9 +479,11 @@ game_t *xbox_get_current_game(void) {
 
     obs_log(LOG_INFO, "Game is '%s' (%s)", current_game_title, current_game_id);
 
-    game        = bzalloc(sizeof(game_t));
-    game->id    = bstrdup(current_game_id);
-    game->title = bstrdup(current_game_title);
+    game               = bzalloc(sizeof(game_t));
+    game->id           = bstrdup(current_game_id);
+    game->title        = bstrdup(current_game_title);
+    /* TODO Figure out if it is Xbox one, Xbox series S, Xbox series X */
+    game->console_name = bstrdup("xbox");
 
 cleanup:
     free_json_memory((void **)&presence_json);

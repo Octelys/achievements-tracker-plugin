@@ -39,9 +39,9 @@ identity_t *identity_from_xbox(const xbox_identity_t *xbox_identity, const gamer
     }
 
     identity_t *identity = alloc_identity();
-
+    identity->source     = IDENTITY_SOURCE_XBOX;
     identity->name       = xbox_identity->gamertag ? bstrdup(xbox_identity->gamertag) : NULL;
-    identity->avatar_url = NULL; /* Xbox identity does not carry an avatar URL. */
+    identity->avatar_url = NULL;
 
     int computed    = gamerscore_compute(gamerscore);
     identity->score = (computed > 0) ? (uint32_t)computed : 0;
@@ -55,6 +55,7 @@ identity_t *identity_from_retro(const retro_user_t *user) {
     }
 
     identity_t *identity = alloc_identity();
+    identity->source     = IDENTITY_SOURCE_RETRO;
 
     /* Prefer display_name; fall back to username when it is empty. */
     const char *name = (user->display_name[0] != '\0') ? user->display_name : user->username;

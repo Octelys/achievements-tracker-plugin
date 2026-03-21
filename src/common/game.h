@@ -19,6 +19,8 @@ typedef struct game {
     const char *id;
     /** Human-readable title. */
     const char *title;
+    /** Name of the console / platform the game belongs to. */
+    const char *console_name;
 } game_t;
 
 /**

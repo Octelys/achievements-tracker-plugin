@@ -2,10 +2,10 @@
 
 /**
  * @file gamertag.c
- * @brief OBS source that displays the authenticated Xbox account's gamertag.
+ * @brief OBS source that displays the authenticated user's gamertag / display name.
  *
- * Uses the text_source infrastructure for rendering and configuration management.
- * Updates automatically when connection state changes via Xbox monitor callbacks.
+ * Subscribes to the monitoring service's active-identity event so it works for
+ * both Xbox Live and RetroAchievements sessions.
  */
 
 #include "sources/common/text_source.h"
@@ -14,8 +14,7 @@
 #include <diagnostics/log.h>
 
 #include "io/state.h"
-#include "integrations/xbox/oauth/xbox-live.h"
-#include "integrations/xbox/xbox_monitor.h"
+#include "integrations/monitoring_service.h"
 
 /** Current gamertag text to display. */
 static char g_gamertag[256];
@@ -27,32 +26,24 @@ static bool g_must_reload;
 static gamertag_configuration_t *g_configuration;
 
 /**
- * @brief Update the gamertag display from Xbox identity.
+ * @brief Update the gamertag display from the active identity.
  */
-static void update_gamertag(void) {
+static void update_gamertag(const identity_t *identity) {
 
-    xbox_identity_t *identity = xbox_live_get_identity();
-
-    if (!identity || !identity->gamertag) {
+    if (!identity || !identity->name) {
         snprintf(g_gamertag, sizeof(g_gamertag), "Not connected");
     } else {
-        snprintf(g_gamertag, sizeof(g_gamertag), "%s", identity->gamertag);
+        snprintf(g_gamertag, sizeof(g_gamertag), "%s", identity->name);
     }
 
     g_must_reload = true;
-
-    free_identity(&identity);
 }
 
 /**
- * @brief Xbox monitor callback for connection state changes.
+ * @brief Monitoring service callback for active identity changes.
  */
-static void on_connection_changed(bool is_connected, const char *error_message) {
-
-    UNUSED_PARAMETER(is_connected);
-    UNUSED_PARAMETER(error_message);
-
-    update_gamertag();
+static void on_active_identity_changed(const identity_t *identity) {
+    update_gamertag(identity);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -62,7 +53,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     UNUSED_PARAMETER(settings);
 
-    update_gamertag();
+    snprintf(g_gamertag, sizeof(g_gamertag), "Not connected");
 
     return text_source_create(source, "Gamertag");
 }
@@ -147,7 +138,7 @@ void xbox_gamertag_source_register(void) {
 
     obs_register_source(&xbox_gamertag_source);
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
+    monitoring_subscribe_active_identity(on_active_identity_changed);
 }
 
 void xbox_gamertag_source_cleanup(void) {

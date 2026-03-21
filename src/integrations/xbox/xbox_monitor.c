@@ -977,6 +977,13 @@ const achievement_t *get_current_game_achievements() {
 void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
 
     if (!callback) {
+        game_played_subscription_t *node = g_game_played_subscriptions;
+        while (node) {
+            game_played_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_game_played_subscriptions = NULL;
         return;
     }
 
@@ -1000,6 +1007,13 @@ void xbox_subscribe_game_played(const on_xbox_game_played_t callback) {
 void xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed_t callback) {
 
     if (!callback) {
+        achievements_updated_subscription_t *node = g_achievements_updated_subscriptions;
+        while (node) {
+            achievements_updated_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_achievements_updated_subscriptions = NULL;
         return;
     }
 

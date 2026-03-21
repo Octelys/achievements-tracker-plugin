@@ -659,6 +659,13 @@ bool retro_achievements_monitor_is_active(void) {
 
 void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback) {
     if (!callback) {
+        game_playing_subscription_t *node = g_game_playing_subscriptions;
+        while (node) {
+            game_playing_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_game_playing_subscriptions = NULL;
         return;
     }
 
@@ -675,6 +682,13 @@ void retro_achievements_subscribe_game_playing(on_retro_game_playing_t callback)
 
 void retro_achievements_subscribe_no_game(on_retro_no_game_t callback) {
     if (!callback) {
+        no_game_subscription_t *node = g_no_game_subscriptions;
+        while (node) {
+            no_game_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_no_game_subscriptions = NULL;
         return;
     }
 
@@ -691,6 +705,13 @@ void retro_achievements_subscribe_no_game(on_retro_no_game_t callback) {
 
 void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback) {
     if (!callback) {
+        connection_changed_subscription_t *node = g_connection_changed_subscriptions;
+        while (node) {
+            connection_changed_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_connection_changed_subscriptions = NULL;
         return;
     }
 
@@ -723,6 +744,13 @@ void retro_achievements_subscribe_achievements(on_retro_achievements_t callback)
 
 void retro_achievements_subscribe_user(on_retro_user_t callback) {
     if (!callback) {
+        user_subscription_t *node = g_user_subscriptions;
+        while (node) {
+            user_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_user_subscriptions = NULL;
         return;
     }
 
@@ -739,6 +767,13 @@ void retro_achievements_subscribe_user(on_retro_user_t callback) {
 
 void retro_achievements_subscribe_no_user(on_retro_no_user_t callback) {
     if (!callback) {
+        no_user_subscription_t *node = g_no_user_subscriptions;
+        while (node) {
+            no_user_subscription_t *next = node->next;
+            bfree(node);
+            node = next;
+        }
+        g_no_user_subscriptions = NULL;
         return;
     }
 

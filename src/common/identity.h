@@ -11,6 +11,14 @@ extern "C" {
 #endif
 
 /**
+ * @brief Identifies which integration produced an @c identity_t.
+ */
+typedef enum {
+    IDENTITY_SOURCE_XBOX  = 0, /**< Xbox Live. */
+    IDENTITY_SOURCE_RETRO = 1, /**< RetroAchievements. */
+} identity_source_t;
+
+/**
  * @file identity.h
  * @brief Source-agnostic user identity record.
  *
@@ -27,6 +35,11 @@ extern "C" {
  *   freed by @ref free_identity_t.
  */
 typedef struct identity {
+    /**
+     * Which integration produced this identity.
+     */
+    identity_source_t source;
+
     /**
      * Display name shown to the user.
      *

@@ -207,10 +207,10 @@ void retro_achievements_subscribe_no_game(on_retro_no_game_t callback);
 /**
  * @brief Subscribe to connection-state change events.
  *
- * Ignored if @p callback is NULL.
+ * Passing NULL clears/unsubscribes the current callback.
  *
  * @param callback Invoked whenever the WebSocket connection is established or
- *                 lost.
+ *                 lost, or NULL to unsubscribe.
  */
 void retro_achievements_subscribe_connection_changed(on_retro_connection_changed_t callback);
 
@@ -227,20 +227,21 @@ void retro_achievements_subscribe_achievements(on_retro_achievements_t callback)
 /**
  * @brief Subscribe to user-info events.
  *
- * Ignored if @p callback is NULL.
+ * Passing NULL clears/unsubscribes the current callback.
  *
  * @param callback Invoked whenever a "user" message is received with the
- *                 current logged-in user's information.
+ *                 current logged-in user's information, or NULL to unsubscribe.
  */
 void retro_achievements_subscribe_user(on_retro_user_t callback);
 
 /**
  * @brief Subscribe to no-user events.
  *
- * Ignored if @p callback is NULL.
+ * Passing NULL clears/unsubscribes the current callback.
  *
  * @param callback Invoked whenever a "no_user" message is received,
- *                 indicating that no user is currently logged in.
+ *                 indicating that no user is currently logged in, or NULL to
+ *                 unsubscribe.
  */
 void retro_achievements_subscribe_no_user(on_retro_no_user_t callback);
 

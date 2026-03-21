@@ -2,23 +2,11 @@
 
 /**
  * @file gamerscore.c
- * @brief OBS source that renders the currently authenticated Xbox account's gamerscore.
+ * @brief OBS source that renders the active user's score.
  *
- * This source displays a numeric gamerscore by drawing digits from a pre-baked
- * font sheet (atlas). Digits are extracted as subregions from the atlas texture
- * and drawn sequentially.
- *
- * Data flow:
- *  - The Xbox monitor notifies this module when connection state changes and/or
- *    achievement progress updates.
- *  - The module computes the latest gamerscore and stores it in a global.
- *  - During rendering, the current gamerscore is formatted to text and each
- *    digit is drawn from the font sheet texture.
- *
- * Threading notes:
- *  - Event handlers may be invoked from non-graphics threads.
- *  - Texture creation must happen on the OBS graphics thread; this file lazily
- *    initializes the texture in the video_render callback.
+ * Subscribes to the monitoring service's active-identity event so it works for
+ * both Xbox Live (gamerscore) and RetroAchievements (higher of hardcore vs
+ * softcore score, resolved by identity_from_retro()).
  */
 
 #include "sources/common/text_source.h"
@@ -28,74 +16,38 @@
 #include <diagnostics/log.h>
 
 #include "io/state.h"
-#include "integrations/xbox/oauth/xbox-live.h"
-#include "integrations/xbox/xbox_monitor.h"
+#include "integrations/monitoring_service.h"
 
 #define NO_FLIP 0
 
 static char g_gamerscore[64];
 static bool g_must_reload;
 
-/**
- * @brief Configuration for rendering digits from the font sheet.
- *
- * Stored as a module-global pointer and initialized during
- * xbox_gamerscore_source_register().
- */
 static gamerscore_configuration_t *g_default_configuration;
 
 /**
- * @brief Recompute and store the latest gamerscore.
- *
- * @param gamerscore Gamerscore snapshot received from the Xbox monitor.
+ * @brief Update the score display from the active identity.
  */
-static void update_gamerscore(const gamerscore_t *gamerscore) {
+static void update_gamerscore(const identity_t *identity) {
 
-    int total_gamerscore = gamerscore_compute(gamerscore);
-
-    //  Computes the total gamerscore and activate the switch to reload the texture with the new number.
-    snprintf(g_gamerscore, sizeof(g_gamerscore), "%dG", total_gamerscore);
-    g_must_reload = true;
-
-    obs_log(LOG_INFO, "[Gamerscore] Gamerscore is %" PRId64, total_gamerscore);
-}
-
-/**
- * @brief Xbox monitor callback invoked when connection state changes.
- *
- * When connected, this refreshes the gamerscore display.
- *
- * @param is_connected Whether the account is currently connected.
- * @param error_message Optional error message if disconnected (ignored here).
- */
-static void on_connection_changed(bool is_connected, const char *error_message) {
-
-    UNUSED_PARAMETER(error_message);
-
-    if (!is_connected) {
+    if (!identity) {
         g_gamerscore[0] = '\0';
-        g_must_reload   = true;
-        return;
+    } else if (identity->source == IDENTITY_SOURCE_XBOX) {
+        snprintf(g_gamerscore, sizeof(g_gamerscore), "%u G", identity->score);
+        obs_log(LOG_INFO, "[Gamerscore] Xbox score: %uG", identity->score);
+    } else {
+        snprintf(g_gamerscore, sizeof(g_gamerscore), "%u", identity->score);
+        obs_log(LOG_INFO, "[Gamerscore] Retro score: %u Hardcore", identity->score);
     }
 
-    const gamerscore_t *gamerscore = get_current_gamerscore();
-
-    update_gamerscore(gamerscore);
+    g_must_reload = true;
 }
 
 /**
- * @brief Xbox monitor callback invoked when achievements progress.
- *
- * Recomputes the gamerscore based on the updated snapshot.
- *
- * @param gamerscore Updated gamerscore snapshot.
- * @param progress   Achievement progress details (unused).
+ * @brief Monitoring service callback for active identity changes.
  */
-static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
-
-    UNUSED_PARAMETER(progress);
-
-    update_gamerscore(gamerscore);
+static void on_active_identity_changed(const identity_t *identity) {
+    update_gamerscore(identity);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -258,8 +210,7 @@ void xbox_gamerscore_source_register(void) {
 
     obs_register_source(xbox_source_get());
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
-    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
+    monitoring_subscribe_active_identity(on_active_identity_changed);
 }
 
 void xbox_gamerscore_source_cleanup(void) {

@@ -3,11 +3,9 @@
 #include <obs-module.h>
 #include <diagnostics/log.h>
 
-#include "integrations/xbox/oauth/xbox-live.h"
 #include "sources/common/image_source.h"
 #include "common/memory.h"
-#include "integrations/xbox/xbox_client.h"
-#include "integrations/xbox/xbox_monitor.h"
+#include "integrations/monitoring_service.h"
 
 /**
  * @brief Global singleton gamerpic cache.
@@ -21,43 +19,25 @@ static image_t g_gamerpic;
 //	Event handlers
 //  --------------------------------------------------------------------------------------------------------------------
 
-/**
- * @brief Xbox monitor callback invoked when connection state changes.
- *
- * When connected, this refreshes the gamerscore display.
- *
- * @param is_connected Whether the account is currently connected.
- * @param error_message Optional error message if disconnected (ignored here).
- */
-static void on_connection_changed(bool is_connected, const char *error_message) {
+static void on_active_identity_changed(const identity_t *identity) {
 
-    UNUSED_PARAMETER(error_message);
-
-    if (!is_connected) {
-        obs_log(LOG_DEBUG, "[Gamerpic] Not connected - clearing");
+    if (!identity || !identity->avatar_url || identity->avatar_url[0] == '\0') {
+        obs_log(LOG_DEBUG, "[Gamerpic] No avatar URL - clearing");
         image_source_clear(&g_gamerpic);
         return;
     }
 
-    obs_log(LOG_DEBUG, "[Gamerpic] Connected to Xbox Live - fetching Gamerpic URL %s", g_gamerpic.type);
-
-    char *gamerpic_url = xbox_fetch_gamerpic();
-
-    if (!gamerpic_url || gamerpic_url[0] == '\0') {
-        obs_log(LOG_INFO, "[Gamerpic] No Gamerpic URL - clearing");
-        image_source_clear(&g_gamerpic);
-        goto cleanup;
-    }
-
-    if (strcasecmp(gamerpic_url, g_gamerpic.url) != 0) {
-        obs_log(LOG_DEBUG, "[Gamerpic] Gamerpic URL changed - downloading");
-        snprintf(g_gamerpic.url, sizeof(g_gamerpic.url), "%s", gamerpic_url);
-        snprintf(g_gamerpic.id, sizeof(g_gamerpic.id), "%s", "default");
+    if (strcasecmp(identity->avatar_url, g_gamerpic.url) != 0) {
+        obs_log(LOG_DEBUG, "[Gamerpic] Avatar URL changed - downloading");
+        snprintf(g_gamerpic.url, sizeof(g_gamerpic.url), "%s", identity->avatar_url);
+        /* Use the identity name as the cache id so Xbox and RA avatars
+         * never share the same cache file. */
+        snprintf(g_gamerpic.id,
+                 sizeof(g_gamerpic.id),
+                 "%s",
+                 (identity->name && identity->name[0] != '\0') ? identity->name : "default");
         image_source_download(&g_gamerpic);
     }
-
-cleanup:
-    free_memory((void **)&gamerpic_url);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -160,25 +140,8 @@ static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
 
-    /* Gets or refreshes the token */
-    xbox_identity_t *xbox_identity = xbox_live_get_identity();
-
-    /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
-
-    if (xbox_identity != NULL) {
-        char status[4096];
-        snprintf(status, 4096, "Connected to your xbox account as %s", xbox_identity->gamertag);
-        obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
-    } else {
-        obs_properties_add_text(p,
-                                "disconnected_status_info",
-                                "You are not connected to your xbox account",
-                                OBS_TEXT_INFO);
-    }
-
-    free_identity(&xbox_identity);
-
+    obs_properties_add_text(p, "info", "Displays the active user's profile picture.", OBS_TEXT_INFO);
     return p;
 }
 
@@ -219,7 +182,7 @@ void xbox_gamerpic_source_register(void) {
 
     obs_register_source(xbox_gamerpic_source_get());
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
+    monitoring_subscribe_active_identity(on_active_identity_changed);
 }
 
 void xbox_gamerpic_source_cleanup(void) {

@@ -500,6 +500,7 @@ target_sources(
     src/integrations/xbox/xbox_session.c
     src/integrations/xbox/xbox_client.c
     src/integrations/xbox/xbox_monitor.c
+    src/integrations/monitoring_service.c
     src/integrations/retro-achievements/retro_achievements_monitor.c
     src/ui/xbox_account_config.cpp
     src/io/state.c
