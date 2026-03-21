@@ -71,6 +71,20 @@ typedef struct achievements_subscription {
 
 static achievements_subscription_t *g_achievements_subscriptions = NULL;
 
+typedef struct user_subscription {
+    on_retro_user_t           callback;
+    struct user_subscription *next;
+} user_subscription_t;
+
+static user_subscription_t *g_user_subscriptions = NULL;
+
+typedef struct no_user_subscription {
+    on_retro_no_user_t           callback;
+    struct no_user_subscription *next;
+} no_user_subscription_t;
+
+static no_user_subscription_t *g_no_user_subscriptions = NULL;
+
 static bool json_item_is_string(const cJSON *item) {
     return item != NULL && (item->type & 0xFF) == cJSON_String && item->valuestring != NULL;
 }
@@ -169,6 +183,26 @@ static void notify_achievements(const retro_achievement_t *achievements, size_t 
     }
 }
 
+static void notify_user(const retro_user_t *user) {
+    obs_log(LOG_INFO, "[RetroAchievements] User: %s (%s)", user->username, user->display_name);
+
+    user_subscription_t *node = g_user_subscriptions;
+    while (node) {
+        node->callback(user);
+        node = node->next;
+    }
+}
+
+static void notify_no_user(void) {
+    obs_log(LOG_INFO, "[RetroAchievements] No user logged in");
+
+    no_user_subscription_t *node = g_no_user_subscriptions;
+    while (node) {
+        node->callback();
+        node = node->next;
+    }
+}
+
 /* -------------------------------------------------------------------------
  * Message parsing
  * ---------------------------------------------------------------------- */
@@ -186,6 +220,11 @@ static void notify_achievements(const retro_achievement_t *achievements, size_t 
  *   { "type": "achievements",
  *     "items": [ { "id": 1, "name": "...", "points": 5,
  *                  "status": "unlocked", "badge_url": "..." }, ... ] }
+ *
+ *   { "type": "user", "username": "...", "display_name": "...",
+ *     "score": N, "score_softcore": N, "avatar_url": "..." }
+ *
+ *   { "type": "no_user" }
  */
 static void on_message_received(const char *buffer) {
     if (!buffer) {
@@ -307,6 +346,37 @@ static void on_message_received(const char *buffer) {
 
         notify_achievements(achievements, (size_t)count);
         bfree(achievements);
+
+    } else if (strcmp(type_item->valuestring, "user") == 0) {
+        retro_user_t user;
+        memset(&user, 0, sizeof(user));
+
+        cJSON *field;
+
+        field = cJSON_GetObjectItemCaseSensitive(root, "username");
+        if (json_item_is_string(field))
+            strncpy(user.username, field->valuestring, sizeof(user.username) - 1);
+
+        field = cJSON_GetObjectItemCaseSensitive(root, "display_name");
+        if (json_item_is_string(field))
+            strncpy(user.display_name, field->valuestring, sizeof(user.display_name) - 1);
+
+        field = cJSON_GetObjectItemCaseSensitive(root, "score");
+        if (field != NULL && cJSON_IsNumber(field))
+            user.score = (uint32_t)field->valuedouble;
+
+        field = cJSON_GetObjectItemCaseSensitive(root, "score_softcore");
+        if (field != NULL && cJSON_IsNumber(field))
+            user.score_softcore = (uint32_t)field->valuedouble;
+
+        field = cJSON_GetObjectItemCaseSensitive(root, "avatar_url");
+        if (json_item_is_string(field))
+            strncpy(user.avatar_url, field->valuestring, sizeof(user.avatar_url) - 1);
+
+        notify_user(&user);
+
+    } else if (strcmp(type_item->valuestring, "no_user") == 0) {
+        notify_no_user();
 
     } else {
         obs_log(LOG_DEBUG, "[RetroAchievements] Unknown message type: %s", type_item->valuestring);
@@ -651,6 +721,38 @@ void retro_achievements_subscribe_achievements(on_retro_achievements_t callback)
     g_achievements_subscriptions = node;
 }
 
+void retro_achievements_subscribe_user(on_retro_user_t callback) {
+    if (!callback) {
+        return;
+    }
+
+    user_subscription_t *node = bzalloc(sizeof(user_subscription_t));
+    if (!node) {
+        obs_log(LOG_ERROR, "[RetroAchievements] Failed to allocate subscription node");
+        return;
+    }
+
+    node->callback       = callback;
+    node->next           = g_user_subscriptions;
+    g_user_subscriptions = node;
+}
+
+void retro_achievements_subscribe_no_user(on_retro_no_user_t callback) {
+    if (!callback) {
+        return;
+    }
+
+    no_user_subscription_t *node = bzalloc(sizeof(no_user_subscription_t));
+    if (!node) {
+        obs_log(LOG_ERROR, "[RetroAchievements] Failed to allocate subscription node");
+        return;
+    }
+
+    node->callback          = callback;
+    node->next              = g_no_user_subscriptions;
+    g_no_user_subscriptions = node;
+}
+
 #else /* !HAVE_LIBWEBSOCKETS */
 
 /* -----------------------------------------------------------------
@@ -681,6 +783,14 @@ void retro_achievements_subscribe_connection_changed(on_retro_connection_changed
 }
 
 void retro_achievements_subscribe_achievements(on_retro_achievements_t callback) {
+    UNUSED_PARAMETER(callback);
+}
+
+void retro_achievements_subscribe_user(on_retro_user_t callback) {
+    UNUSED_PARAMETER(callback);
+}
+
+void retro_achievements_subscribe_no_user(on_retro_no_user_t callback) {
     UNUSED_PARAMETER(callback);
 }
 

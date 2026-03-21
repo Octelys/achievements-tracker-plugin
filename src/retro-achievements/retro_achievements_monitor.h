@@ -27,6 +27,10 @@ extern "C" {
  *                        "items":[{ "id":1, "name":"...", "points":5,
  *                                   "status":"unlocked",
  *                                   "badge_url":"..." }, ...] }
+ *   - User           : { "type":"user", "username":"...",
+ *                        "display_name":"...", "score":N,
+ *                        "score_softcore":N, "avatar_url":"..." }
+ *   - No user        : { "type":"no_user" }
  *
  * Threading:
  *  - Callbacks may be invoked from the monitor's background thread.
@@ -83,6 +87,22 @@ typedef struct {
 } retro_achievement_t;
 
 /* -------------------------------------------------------------------------
+ * User record
+ * ---------------------------------------------------------------------- */
+
+/**
+ * @brief Logged-in RetroAchievements user information received from the
+ *        RetroArch WebSocket server inside a @c "user" message.
+ */
+typedef struct {
+    char     username[128];     /**< RA account username.                        */
+    char     display_name[128]; /**< Display name (may differ from username).    */
+    uint32_t score;             /**< Hardcore points earned.                     */
+    uint32_t score_softcore;    /**< Softcore points earned.                     */
+    char     avatar_url[512];   /**< URL of the user's avatar image.             */
+} retro_user_t;
+
+/* -------------------------------------------------------------------------
  * Callback types
  * ---------------------------------------------------------------------- */
 
@@ -117,6 +137,19 @@ typedef void (*on_retro_connection_changed_t)(bool connected, const char *error_
  * @param count         Number of entries in @p achievements.
  */
 typedef void (*on_retro_achievements_t)(const retro_achievement_t *achievements, size_t count);
+
+/**
+ * @brief Invoked when the logged-in user information is received.
+ *
+ * @param user  Non-NULL pointer to the current user information.
+ *              Valid only for the duration of the callback.
+ */
+typedef void (*on_retro_user_t)(const retro_user_t *user);
+
+/**
+ * @brief Invoked when no user is logged in.
+ */
+typedef void (*on_retro_no_user_t)(void);
 
 /* -------------------------------------------------------------------------
  * Lifecycle
@@ -190,6 +223,26 @@ void retro_achievements_subscribe_connection_changed(on_retro_connection_changed
  *                 passing the full list of achievement records.
  */
 void retro_achievements_subscribe_achievements(on_retro_achievements_t callback);
+
+/**
+ * @brief Subscribe to user-info events.
+ *
+ * Ignored if @p callback is NULL.
+ *
+ * @param callback Invoked whenever a "user" message is received with the
+ *                 current logged-in user's information.
+ */
+void retro_achievements_subscribe_user(on_retro_user_t callback);
+
+/**
+ * @brief Subscribe to no-user events.
+ *
+ * Ignored if @p callback is NULL.
+ *
+ * @param callback Invoked whenever a "no_user" message is received,
+ *                 indicating that no user is currently logged in.
+ */
+void retro_achievements_subscribe_no_user(on_retro_no_user_t callback);
 
 #ifdef __cplusplus
 }
