@@ -248,7 +248,7 @@ static void on_message_received(const char *buffer) {
 
     } else if (strcmp(type_item->valuestring, "achievements") == 0) {
         cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
-        if (!cJSON_IsArray(items)) {
+        if (!items || !(items->type & cJSON_Array)) {
             obs_log(LOG_WARNING, "[RetroAchievements] \"achievements\" message missing \"items\" array");
             cJSON_Delete(root);
             return;
@@ -275,17 +275,15 @@ static void on_message_received(const char *buffer) {
             }
         }
 
-        int idx = 0;
+        int    idx  = 0;
         cJSON *item = NULL;
-        cJSON_ArrayForEach(item, items) {
-            if (idx >= count)
-                break;
+        for (item = items->child; item != NULL && idx < count; item = item->next) {
             retro_achievement_t *ach = &achievements[idx++];
 
             cJSON *field;
 
             field = cJSON_GetObjectItemCaseSensitive(item, "id");
-            if (field != NULL && cJSON_IsNumber(field))
+            if (field != NULL && (field->type & cJSON_Number))
                 ach->id = (uint32_t)field->valuedouble;
 
             field = cJSON_GetObjectItemCaseSensitive(item, "name");
@@ -293,7 +291,7 @@ static void on_message_received(const char *buffer) {
                 strncpy(ach->name, field->valuestring, sizeof(ach->name) - 1);
 
             field = cJSON_GetObjectItemCaseSensitive(item, "points");
-            if (field != NULL && cJSON_IsNumber(field))
+            if (field != NULL && (field->type & cJSON_Number))
                 ach->points = (uint32_t)field->valuedouble;
 
             field = cJSON_GetObjectItemCaseSensitive(item, "status");
@@ -303,6 +301,8 @@ static void on_message_received(const char *buffer) {
             field = cJSON_GetObjectItemCaseSensitive(item, "badge_url");
             if (json_item_is_string(field))
                 strncpy(ach->badge_url, field->valuestring, sizeof(ach->badge_url) - 1);
+
+            obs_log(LOG_INFO, "[RetroAchievements] Achievement: %s (%u points)", ach->name, ach->points);
         }
 
         notify_achievements(achievements, (size_t)count);
@@ -646,9 +646,9 @@ void retro_achievements_subscribe_achievements(on_retro_achievements_t callback)
         return;
     }
 
-    node->callback                = callback;
-    node->next                    = g_achievements_subscriptions;
-    g_achievements_subscriptions  = node;
+    node->callback               = callback;
+    node->next                   = g_achievements_subscriptions;
+    g_achievements_subscriptions = node;
 }
 
 #else /* !HAVE_LIBWEBSOCKETS */
