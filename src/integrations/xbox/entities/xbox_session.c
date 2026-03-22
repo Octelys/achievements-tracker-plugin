@@ -1,4 +1,4 @@
-#include "common/xbox_session.h"
+#include "integrations/xbox/entities/xbox_session.h"
 
 #include <obs-module.h>
 
@@ -11,7 +11,7 @@ xbox_session_t *copy_xbox_session(const xbox_session_t *session) {
     xbox_session_t *copy = bzalloc(sizeof(xbox_session_t));
     copy->game           = copy_game(session->game);
     copy->gamerscore     = copy_gamerscore(session->gamerscore);
-    copy->achievements   = copy_achievement(session->achievements);
+    copy->achievements   = xbox_copy_achievement(session->achievements);
 
     return copy;
 }
@@ -26,7 +26,7 @@ void free_xbox_session(xbox_session_t **session) {
 
     free_game(&current->game);
     free_gamerscore(&current->gamerscore);
-    free_achievement(&current->achievements);
+    xbox_free_achievement(&current->achievements);
 
     bfree(current);
     *session = NULL;

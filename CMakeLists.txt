@@ -511,15 +511,16 @@ target_sources(
     src/text/parsers.c
     src/time/time.c
     src/common/achievement.c
-    src/common/achievement_progress.c
     src/common/device.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/identity.c
     src/common/token.c
-    src/common/unlocked_achievement.c
-    src/common/xbox_identity.c
-    src/common/xbox_session.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_identity.c
+    src/integrations/xbox/entities/xbox_session.c
 )
 
 # Link vendored deps
@@ -733,12 +734,13 @@ if(BUILD_TESTING)
     ${unity_SOURCE_DIR}/src/unity.c
     src/integrations/xbox/xbox_session.c
     src/common/achievement.c
-    src/common/achievement_progress.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c
-    src/common/unlocked_achievement.c
-    src/common/xbox_session.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_session.c
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
@@ -773,12 +775,13 @@ if(BUILD_TESTING)
     ${unity_SOURCE_DIR}/src/unity.c
     src/integrations/xbox/xbox_session.c
     src/common/achievement.c
-    src/common/achievement_progress.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c
-    src/common/unlocked_achievement.c
-    src/common/xbox_session.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_session.c
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c

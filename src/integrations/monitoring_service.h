@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/achievement.h"
+#include "common/game.h"
 #include "common/identity.h"
 
 #include <stdbool.h>
@@ -43,6 +45,33 @@ typedef void (*on_monitoring_connection_changed_t)(bool connected, const char *e
 typedef void (*on_monitoring_active_identity_changed_t)(const identity_t *identity);
 
 /**
+ * @brief Callback invoked when the current game changes.
+ *
+ * Fired by whichever integration detects a new game being played.
+ * May be called with NULL when no game is active.
+ *
+ * @param game The currently played game, or NULL.
+ */
+typedef void (*on_monitoring_game_played_t)(const game_t *game);
+
+/**
+ * @brief Callback invoked when the achievements list for the current game changes.
+ *
+ * Fired whenever an integration receives new or updated achievements (e.g.
+ * after an unlock or when the full list is first fetched).
+ */
+typedef void (*on_monitoring_achievements_changed_t)(void);
+
+/**
+ * @brief Callback invoked when the session is fully ready.
+ *
+ * "Ready" means the current game's achievements have been fetched and all
+ * achievement icons have been prefetched to the local cache.  This is the
+ * appropriate moment to start the achievement display cycle.
+ */
+typedef void (*on_monitoring_session_ready_t)(void);
+
+/**
  * @brief Start all integration monitors.
  *
  * Starts the Xbox Live RTA monitor and the RetroAchievements WebSocket
@@ -81,6 +110,52 @@ void monitoring_subscribe_connection_changed(on_monitoring_connection_changed_t 
  *                 to unsubscribe.
  */
 void monitoring_subscribe_active_identity(on_monitoring_active_identity_changed_t callback);
+
+/**
+ * @brief Subscribe to game-played events from any integration.
+ *
+ * The callback is fired whenever either integration detects a new game.
+ * Passing NULL unsubscribes.
+ *
+ * @param callback Function to invoke when the current game changes, or NULL
+ *                 to unsubscribe.
+ */
+void monitoring_subscribe_game_played(on_monitoring_game_played_t callback);
+
+/**
+ * @brief Subscribe to achievements-changed events from any integration.
+ *
+ * The callback is fired whenever the cached achievements list is updated
+ * (new game, unlock, progress). Passing NULL unsubscribes.
+ *
+ * @param callback Function to invoke when achievements change, or NULL
+ *                 to unsubscribe.
+ */
+void monitoring_subscribe_achievements_changed(on_monitoring_achievements_changed_t callback);
+
+/**
+ * @brief Subscribe to session-ready events from any integration.
+ *
+ * The callback is fired once per game change after all achievement icons have
+ * been prefetched. Passing NULL unsubscribes.
+ *
+ * @param callback Function to invoke when the session is ready, or NULL
+ *                 to unsubscribe.
+ */
+void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback);
+
+/**
+ * @brief Get the cached generic achievements list for the current game.
+ *
+ * Returns the achievements converted to generic @ref achievement_t form,
+ * regardless of which integration provided them.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitoring service
+ * and may be replaced on the next update. Copy if you need to keep it.
+ *
+ * @return Head of the generic achievements linked list, or NULL if unavailable.
+ */
+const achievement_t *monitoring_get_current_game_achievements(void);
 
 #ifdef __cplusplus
 }

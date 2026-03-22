@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/gamerscore.h"
-#include "common/xbox_identity.h"
+#include "integrations/xbox/entities/xbox_identity.h"
 #include "integrations/retro-achievements/retro_achievements_monitor.h"
 
 #include <stdint.h>

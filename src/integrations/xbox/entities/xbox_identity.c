@@ -1,6 +1,6 @@
-#include "xbox_identity.h"
+#include "integrations/xbox/entities/xbox_identity.h"
 
-#include "memory.h"
+#include "common/memory.h"
 
 xbox_identity_t *copy_xbox_identity(const xbox_identity_t *identity) {
 

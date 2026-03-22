@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/unlocked_achievement.h"
+#include "integrations/xbox/contracts/xbox_unlocked_achievement.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,9 +23,9 @@ extern "C" {
  */
 typedef struct gamerscore {
     /** Base gamerscore value. */
-    int                     base_value;
+    int                          base_value;
     /** Linked list of unlocked achievements used to compute additional score. */
-    unlocked_achievement_t *unlocked_achievements;
+    xbox_unlocked_achievement_t *unlocked_achievements;
 } gamerscore_t;
 
 /**

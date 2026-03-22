@@ -46,8 +46,8 @@ typedef void (*on_xbox_game_played_t)(const game_t *game);
  * @param gamerscore            Current gamerscore snapshot.
  * @param achievements_progress Linked list of achievement progress items.
  */
-typedef void (*on_xbox_achievements_progressed_t)(const gamerscore_t           *gamerscore,
-                                                  const achievement_progress_t *achievements_progress);
+typedef void (*on_xbox_achievements_progressed_t)(const gamerscore_t                *gamerscore,
+                                                  const xbox_achievement_progress_t *achievements_progress);
 
 /**
  * @brief Callback invoked when the connection status changes.
@@ -99,7 +99,7 @@ const game_t *get_current_game(void);
  *
  * @return Pointer to the cached achievements list, or NULL if not available.
  */
-const achievement_t *get_current_game_achievements(void);
+const xbox_achievement_t *get_current_game_achievements(void);
 
 /**
  * @brief Start monitoring the Xbox Live RTA endpoint.

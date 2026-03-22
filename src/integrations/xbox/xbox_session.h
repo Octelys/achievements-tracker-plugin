@@ -70,7 +70,7 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_sessio
  * @param session Session to update.
  * @param progress Progress information for the achievement being unlocked.
  */
-void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_progress_t *progress);
+void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achievement_progress_t *progress);
 
 /**
  * @brief Clears all session state.

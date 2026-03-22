@@ -5,6 +5,7 @@
 
 #include "integrations/xbox/xbox_monitor.h"
 #include "integrations/xbox/xbox_client.h"
+#include "integrations/xbox/contracts/xbox_achievement.h"
 #include "integrations/retro-achievements/retro_achievements_monitor.h"
 #include "common/identity.h"
 #include "common/game.h"
@@ -53,6 +54,65 @@ static identity_t *g_retro_identity = NULL;
 static game_t *g_xbox_game  = NULL;
 static game_t *g_retro_game = NULL;
 
+/** Cached generic achievements for the current game (owned by this module). */
+static achievement_t *g_current_achievements = NULL;
+
+static on_monitoring_game_played_t          g_game_played_callback          = NULL;
+static on_monitoring_achievements_changed_t g_achievements_changed_callback = NULL;
+static on_monitoring_session_ready_t        g_session_ready_callback        = NULL;
+
+/**
+ * @brief Replace the cached achievements list with a new one.
+ *
+ * Frees the old list and stores @p new_achievements. Then fires the
+ * achievements-changed callback if one is registered.
+ *
+ * @param new_achievements New list to cache (ownership transferred to this module).
+ */
+static void replace_current_achievements(achievement_t *new_achievements) {
+    free_achievement(&g_current_achievements);
+    g_current_achievements = new_achievements;
+
+    if (g_achievements_changed_callback)
+        g_achievements_changed_callback();
+}
+
+/**
+ * @brief Convert RetroAchievements records to a generic achievement_t linked list.
+ */
+static achievement_t *retro_to_achievements(const retro_achievement_t *retro, size_t count) {
+    achievement_t *root     = NULL;
+    achievement_t *previous = NULL;
+
+    for (size_t i = 0; i < count; i++) {
+        const retro_achievement_t *r = &retro[i];
+
+        achievement_t *a = bzalloc(sizeof(achievement_t));
+
+        /* retro_achievement_t.id is a uint32_t – convert to string */
+        char id_buf[16];
+        snprintf(id_buf, sizeof(id_buf), "%u", r->id);
+        a->id = bstrdup(id_buf);
+
+        a->name               = bstrdup(r->name);
+        a->description        = bstrdup(r->description);
+        a->icon_url           = bstrdup(r->badge_url);
+        a->is_secret          = false;
+        a->value              = (int)r->points;
+        a->unlocked_timestamp = (strcmp(r->status, "unlocked") == 0) ? 1 : 0;
+        a->source             = ACHIEVEMENT_SOURCE_RETRO;
+
+        if (previous) {
+            previous->next = a;
+        } else {
+            root = a;
+        }
+        previous = a;
+    }
+
+    return root;
+}
+
 /* --------------------------------------------------------------------------
  * Xbox callbacks
  * ----------------------------------------------------------------------- */
@@ -99,7 +159,8 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
         g_connection_changed_callback(connected, error_message);
 }
 
-static void on_xbox_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
+static void on_xbox_achievements_progressed(const gamerscore_t                *gamerscore,
+                                            const xbox_achievement_progress_t *progress) {
     UNUSED_PARAMETER(gamerscore);
     UNUSED_PARAMETER(progress);
 
@@ -108,6 +169,9 @@ static void on_xbox_achievements_progressed(const gamerscore_t *gamerscore, cons
 
     refresh_xbox_score(g_xbox_identity);
     obs_log(LOG_INFO, "[MonitoringService] Xbox score updated: %u", g_xbox_identity->score);
+
+    /* Refresh the cached generic achievements */
+    replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
 
     if (g_xbox_game)
         notify_active_identity(g_xbox_identity);
@@ -118,7 +182,26 @@ static void on_xbox_game_played(const game_t *game) {
     g_xbox_game = copy_game(game);
     obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game ? g_xbox_game->title : "(null)");
 
+    /* Clear cached achievements — they belong to the previous game */
+    replace_current_achievements(NULL);
+
     notify_active_identity(g_xbox_identity);
+
+    if (g_game_played_callback)
+        g_game_played_callback(game);
+}
+
+/**
+ * @brief Xbox monitor callback invoked when the session is fully ready.
+ *
+ * Converts the Xbox achievements to generic form and caches them, then
+ * notifies subscribers.
+ */
+static void on_xbox_session_ready(void) {
+    replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
+
+    if (g_session_ready_callback)
+        g_session_ready_callback();
 }
 
 /* --------------------------------------------------------------------------
@@ -161,11 +244,28 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
 
     obs_log(LOG_INFO, "[MonitoringService] Retro game cached: %s (%s)", g_retro_game->title, g_retro_game->console_name);
 
+    /* Clear cached achievements — they belong to the previous game */
+    replace_current_achievements(NULL);
+
     notify_active_identity(g_retro_identity);
+
+    if (g_game_played_callback)
+        g_game_played_callback(g_retro_game);
 }
 
 static void on_retro_no_game(void) {
     free_game(&g_retro_game);
+    replace_current_achievements(NULL);
+}
+
+/**
+ * @brief RetroAchievements callback invoked when the achievements list is received.
+ */
+static void on_retro_achievements(const retro_achievement_t *achievements, size_t count) {
+    replace_current_achievements(retro_to_achievements(achievements, count));
+
+    if (g_session_ready_callback)
+        g_session_ready_callback();
 }
 
 /* --------------------------------------------------------------------------
@@ -176,12 +276,14 @@ void monitoring_start(void) {
     xbox_subscribe_connected_changed(on_xbox_connection_changed);
     xbox_subscribe_achievements_progressed(on_xbox_achievements_progressed);
     xbox_subscribe_game_played(on_xbox_game_played);
+    xbox_subscribe_session_ready(on_xbox_session_ready);
 
     retro_achievements_subscribe_connection_changed(on_retro_connection_changed);
     retro_achievements_subscribe_user(on_retro_user);
     retro_achievements_subscribe_no_user(on_retro_no_user);
     retro_achievements_subscribe_game_playing(on_retro_game_playing);
     retro_achievements_subscribe_no_game(on_retro_no_game);
+    retro_achievements_subscribe_achievements(on_retro_achievements);
 
     xbox_monitoring_start();
     retro_achievements_monitor_start();
@@ -194,19 +296,26 @@ void monitoring_stop(void) {
     xbox_subscribe_connected_changed(NULL);
     xbox_subscribe_achievements_progressed(NULL);
     xbox_subscribe_game_played(NULL);
+    xbox_subscribe_session_ready(NULL);
 
     retro_achievements_subscribe_connection_changed(NULL);
     retro_achievements_subscribe_user(NULL);
     retro_achievements_subscribe_no_user(NULL);
     retro_achievements_subscribe_game_playing(NULL);
     retro_achievements_subscribe_no_game(NULL);
+    retro_achievements_subscribe_achievements(NULL);
 
     free_identity_t(&g_xbox_identity);
     free_identity_t(&g_retro_identity);
     free_game(&g_xbox_game);
     free_game(&g_retro_game);
+    free_achievement(&g_current_achievements);
 
     clear_active_identity_subscriptions();
+
+    g_game_played_callback          = NULL;
+    g_achievements_changed_callback = NULL;
+    g_session_ready_callback        = NULL;
 }
 
 void monitoring_subscribe_connection_changed(on_monitoring_connection_changed_t callback) {
@@ -228,4 +337,20 @@ void monitoring_subscribe_active_identity(on_monitoring_active_identity_changed_
     node->callback                  = callback;
     node->next                      = g_active_identity_subscriptions;
     g_active_identity_subscriptions = node;
+}
+
+void monitoring_subscribe_game_played(on_monitoring_game_played_t callback) {
+    g_game_played_callback = callback;
+}
+
+void monitoring_subscribe_achievements_changed(on_monitoring_achievements_changed_t callback) {
+    g_achievements_changed_callback = callback;
+}
+
+void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback) {
+    g_session_ready_callback = callback;
+}
+
+const achievement_t *monitoring_get_current_game_achievements(void) {
+    return g_current_achievements;
 }

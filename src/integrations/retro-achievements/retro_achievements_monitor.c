@@ -329,6 +329,10 @@ static void on_message_received(const char *buffer) {
             if (json_item_is_string(field))
                 strncpy(ach->name, field->valuestring, sizeof(ach->name) - 1);
 
+            field = cJSON_GetObjectItemCaseSensitive(item, "description");
+            if (json_item_is_string(field))
+                strncpy(ach->description, field->valuestring, sizeof(ach->description) - 1);
+
             field = cJSON_GetObjectItemCaseSensitive(item, "points");
             if (field != NULL && (field->type & cJSON_Number))
                 ach->points = (uint32_t)field->valuedouble;
@@ -341,7 +345,7 @@ static void on_message_received(const char *buffer) {
             if (json_item_is_string(field))
                 strncpy(ach->badge_url, field->valuestring, sizeof(ach->badge_url) - 1);
 
-            obs_log(LOG_INFO, "[RetroAchievements] Achievement: %s (%u points)", ach->name, ach->points);
+            obs_log(LOG_INFO, "[RetroAchievements] %d - Achievement: %s (%u points)", idx, ach->name, ach->points);
         }
 
         notify_achievements(achievements, (size_t)count);

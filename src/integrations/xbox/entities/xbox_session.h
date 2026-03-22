@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/achievement.h"
+#include "integrations/xbox/contracts/xbox_achievement.h"
 #include "common/game.h"
 #include "common/gamerscore.h"
 
@@ -22,11 +22,11 @@ extern "C" {
  */
 typedef struct xbox_session {
     /** Current game information. */
-    game_t        *game;
+    game_t             *game;
     /** Gamerscore container (base value + unlocked achievements). */
-    gamerscore_t  *gamerscore;
+    gamerscore_t       *gamerscore;
     /** Linked list of achievements for the game. */
-    achievement_t *achievements;
+    xbox_achievement_t *achievements;
 } xbox_session_t;
 
 /**

@@ -203,10 +203,10 @@ cleanup:
     return game;
 }
 
-achievement_progress_t *parse_achievement_progress(const char *json_string) {
+xbox_achievement_progress_t *parse_achievement_progress(const char *json_string) {
 
-    cJSON                  *json_root            = NULL;
-    achievement_progress_t *achievement_progress = NULL;
+    cJSON                       *json_root            = NULL;
+    xbox_achievement_progress_t *achievement_progress = NULL;
 
     if (!json_string || strlen(json_string) == 0) {
         return NULL;
@@ -270,17 +270,17 @@ achievement_progress_t *parse_achievement_progress(const char *json_string) {
             continue;
         }
 
-        achievement_progress_t *progress = bzalloc(sizeof(achievement_progress_t));
-        progress->service_config_id      = bstrdup(current_service_config_id);
-        progress->id                     = bstrdup(id_node->valuestring);
-        progress->progress_state         = bstrdup(progress_state_node->valuestring);
-        progress->unlocked_timestamp     = unlocked_timestamp;
-        progress->next                   = NULL;
+        xbox_achievement_progress_t *progress = bzalloc(sizeof(xbox_achievement_progress_t));
+        progress->service_config_id           = bstrdup(current_service_config_id);
+        progress->id                          = bstrdup(id_node->valuestring);
+        progress->progress_state              = bstrdup(progress_state_node->valuestring);
+        progress->unlocked_timestamp          = unlocked_timestamp;
+        progress->next                        = NULL;
 
         if (!achievement_progress) {
             achievement_progress = progress;
         } else {
-            achievement_progress_t *last_progress = achievement_progress;
+            xbox_achievement_progress_t *last_progress = achievement_progress;
             while (last_progress->next) {
                 last_progress = last_progress->next;
             }
@@ -294,10 +294,10 @@ cleanup:
     return achievement_progress;
 }
 
-achievement_t *parse_achievements(const char *json_string) {
+xbox_achievement_t *parse_achievements(const char *json_string) {
 
-    cJSON         *json_root    = NULL;
-    achievement_t *achievements = NULL;
+    cJSON              *json_root    = NULL;
+    xbox_achievement_t *achievements = NULL;
 
     if (!json_string || strlen(json_string) == 0) {
         return NULL;
@@ -319,7 +319,7 @@ achievement_t *parse_achievements(const char *json_string) {
             break;
         }
 
-        achievement_t *achievement      = bzalloc(sizeof(achievement_t));
+        xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
         achievement->id                 = id;
         achievement->service_config_id  = get_node_string(json_root, achievement_index, "serviceConfigId");
         achievement->name               = get_node_string(json_root, achievement_index, "name");
@@ -332,7 +332,7 @@ achievement_t *parse_achievements(const char *json_string) {
         achievement->icon_url = get_node_string(json_root, achievement_index, "mediaAssets/0/url");
 
         /* Reads the media assets */
-        media_asset_t *media_assets = NULL;
+        xbox_media_asset_t *media_assets = NULL;
 
         for (int media_asset_index = 0;; media_asset_index++) {
 
@@ -346,19 +346,18 @@ achievement_t *parse_achievements(const char *json_string) {
             cJSON *media_asset_url_node = cJSONUtils_GetPointer(json_root, media_asset_url_key);
 
             if (!media_asset_url_node) {
-                /* There is nothing more */
                 obs_log(LOG_DEBUG, "No more media asset at %d/%d", achievement_index, media_asset_index);
                 break;
             }
 
-            media_asset_t *media_asset = bzalloc(sizeof(media_asset_t));
-            media_asset->url           = bstrdup(media_asset_url_node->valuestring);
-            media_asset->next          = NULL;
+            xbox_media_asset_t *media_asset = bzalloc(sizeof(xbox_media_asset_t));
+            media_asset->url                = bstrdup(media_asset_url_node->valuestring);
+            media_asset->next               = NULL;
 
             if (!media_assets) {
                 media_assets = media_asset;
             } else {
-                media_asset_t *last_media_asset = media_assets;
+                xbox_media_asset_t *last_media_asset = media_assets;
                 while (last_media_asset->next) {
                     last_media_asset = last_media_asset->next;
                 }
@@ -369,7 +368,7 @@ achievement_t *parse_achievements(const char *json_string) {
         achievement->media_assets = media_assets;
 
         /* Reads the rewards */
-        reward_t *rewards = NULL;
+        xbox_reward_t *rewards = NULL;
 
         for (int reward_index = 0;; reward_index++) {
 
@@ -383,13 +382,11 @@ achievement_t *parse_achievements(const char *json_string) {
             cJSON *reward_type_node = cJSONUtils_GetPointer(json_root, reward_type_key);
 
             if (!reward_type_node) {
-                /* There is nothing more */
                 obs_log(LOG_DEBUG, "No more reward at %d/%d", achievement_index, reward_index);
                 break;
             }
 
             if (!reward_type_node->type || strcasecmp(reward_type_node->valuestring, "Gamerscore") != 0) {
-                /* Ignores the non-gamerscore reward */
                 obs_log(LOG_DEBUG, "Not a Gamerscore reward at %d/%d", achievement_index, reward_index);
                 continue;
             }
@@ -408,13 +405,13 @@ achievement_t *parse_achievements(const char *json_string) {
                 continue;
             }
 
-            reward_t *reward = bzalloc(sizeof(reward_t));
-            reward->value    = bstrdup(reward_value_node->valuestring);
+            xbox_reward_t *reward = bzalloc(sizeof(xbox_reward_t));
+            reward->value         = bstrdup(reward_value_node->valuestring);
 
             if (!rewards) {
                 rewards = reward;
             } else {
-                reward_t *last_reward = rewards;
+                xbox_reward_t *last_reward = rewards;
                 while (last_reward->next) {
                     last_reward = last_reward->next;
                 }
@@ -434,7 +431,7 @@ achievement_t *parse_achievements(const char *json_string) {
         if (!achievements) {
             achievements = achievement;
         } else {
-            achievement_t *last_achievement = achievements;
+            xbox_achievement_t *last_achievement = achievements;
             while (last_achievement->next) {
                 last_achievement = last_achievement->next;
             }

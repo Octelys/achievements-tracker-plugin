@@ -36,9 +36,9 @@ game_t *xbox_get_current_game(void);
  *
  * @return Head of a newly allocated linked list of achievements, or NULL on
  *         error. The caller owns the returned list and must free it with
- *         @ref free_achievement.
+ *         @ref xbox_free_achievement.
  */
-achievement_t *xbox_get_game_achievements(const game_t *game);
+xbox_achievement_t *xbox_get_game_achievements(const game_t *game);
 
 /**
  * @brief Fetches a cover image URL for a given game.

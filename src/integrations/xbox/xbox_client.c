@@ -493,7 +493,7 @@ cleanup:
     return game;
 }
 
-achievement_t *xbox_get_game_achievements(const game_t *game) {
+xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     if (!game) {
         return NULL;
@@ -506,9 +506,9 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
         return NULL;
     }
 
-    achievement_t *all_achievements   = NULL;
-    achievement_t *last_achievement   = NULL;
-    char          *continuation_token = NULL;
+    xbox_achievement_t *all_achievements   = NULL;
+    xbox_achievement_t *last_achievement   = NULL;
+    char               *continuation_token = NULL;
 
     char headers[4096];
     snprintf(headers,
@@ -523,8 +523,8 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     /* Pagination loop: keep fetching until no continuation token */
     do {
-        char          *response_json     = NULL;
-        achievement_t *page_achievements = NULL;
+        char               *response_json     = NULL;
+        xbox_achievement_t *page_achievements = NULL;
 
         /* Build the URL with or without continuation token */
         char achievements_url[1024];
@@ -590,7 +590,7 @@ achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     } while (continuation_token);
 
-    obs_log(LOG_INFO, "Received %d achievements for game %s", count_achievements(all_achievements), game->title);
+    obs_log(LOG_INFO, "Received %d achievements for game %s", xbox_count_achievements(all_achievements), game->title);
 
     free_identity(&identity);
 

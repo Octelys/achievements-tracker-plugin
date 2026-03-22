@@ -79,11 +79,12 @@ typedef struct {
  *        server inside an @c "achievements" message.
  */
 typedef struct {
-    uint32_t id;             /**< Numeric achievement ID.                          */
-    char     name[256];      /**< Achievement title.                               */
-    uint32_t points;         /**< Point value of the achievement.                  */
-    char     status[16];     /**< "unlocked" or "locked".                          */
-    char     badge_url[512]; /**< Unlocked badge image URL; empty when absent.    */
+    uint32_t id;                /**< Numeric achievement ID.                          */
+    char     name[256];         /**< Achievement title.                               */
+    char     description[1024]; /**< Achievement title.                               */
+    uint32_t points;            /**< Point value of the achievement.                  */
+    char     status[16];        /**< "unlocked" or "locked".                          */
+    char     badge_url[512];    /**< Unlocked badge image URL; empty when absent.    */
 } retro_achievement_t;
 
 /* -------------------------------------------------------------------------

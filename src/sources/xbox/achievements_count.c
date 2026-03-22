@@ -5,11 +5,11 @@
  * @brief OBS source that renders the total number of achievements for the current game.
  *
  * This source displays the total count of achievements available for the currently
- * played Xbox game. The count is updated when the game changes.
+ * played game. The count is updated when the game changes or achievements progress.
  *
  * Data flow:
- *  - The Xbox monitor notifies this module when the connection state changes or
- *    when the game changes.
+ *  - The monitoring service notifies this module when the connection state changes,
+ *    when the game changes, or when achievements are updated.
  *  - The module counts total achievements and stores the result in a global.
  *  - During rendering, the count is formatted to text and rendered.
  *
@@ -27,8 +27,7 @@
 
 #include "common/achievement.h"
 #include "io/state.h"
-#include "integrations/xbox/oauth/xbox-live.h"
-#include "integrations/xbox/xbox_monitor.h"
+#include "integrations/monitoring_service.h"
 
 #define NO_FLIP 0
 
@@ -47,7 +46,7 @@ static achievements_count_configuration_t *g_configuration;
  * @brief Recompute and store the total achievements count.
  */
 static void update_count(void) {
-    const achievement_t *achievements = get_current_game_achievements();
+    const achievement_t *achievements = monitoring_get_current_game_achievements();
 
     int unlocked = count_unlocked_achievements(achievements);
     int total    = count_achievements(achievements);
@@ -59,7 +58,7 @@ static void update_count(void) {
 }
 
 /**
- * @brief Xbox monitor callback invoked when a new game is played.
+ * @brief Monitoring service callback invoked when a new game is played.
  *
  * @param game Current game information.
  */
@@ -74,15 +73,9 @@ static void on_game_played(const game_t *game) {
 }
 
 /**
- * @brief Xbox monitor callback invoked when achievements progress.
- *
- * @param gamerscore Updated gamerscore snapshot (unused).
- * @param progress   Achievement progress details (unused).
+ * @brief Monitoring service callback invoked when achievements change.
  */
-static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
-    UNUSED_PARAMETER(gamerscore);
-    UNUSED_PARAMETER(progress);
-
+static void on_achievements_changed(void) {
     update_count();
 }
 
@@ -228,8 +221,8 @@ void xbox_achievements_count_source_register(void) {
 
     obs_register_source(xbox_source_get());
 
-    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
-    xbox_subscribe_game_played(&on_game_played);
+    monitoring_subscribe_achievements_changed(&on_achievements_changed);
+    monitoring_subscribe_game_played(&on_game_played);
 }
 
 void xbox_achievements_count_source_cleanup(void) {

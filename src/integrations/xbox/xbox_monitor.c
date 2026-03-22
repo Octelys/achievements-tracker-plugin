@@ -229,7 +229,7 @@ static void notify_game_played(const game_t *game) {
 /**
  * @brief Invoke all registered achievement progressed subscribers.
  */
-static void notify_achievements_progressed(const achievement_progress_t *achievements_progress) {
+static void notify_achievements_progressed(const xbox_achievement_progress_t *achievements_progress) {
 
     obs_log(LOG_INFO, "[Monitoring] Notifying achievements progress: %s", achievements_progress->service_config_id);
 
@@ -398,7 +398,7 @@ static bool xbox_achievements_progress_subscribe(const xbox_session_t *session) 
         return false;
     }
 
-    const achievement_t *achievements = session->achievements;
+    const xbox_achievement_t *achievements = session->achievements;
 
     if (!achievements) {
         obs_log(LOG_ERROR, "[Monitoring] No achievements specified");
@@ -443,7 +443,7 @@ static bool xbox_achievements_progress_unsubscribe(const xbox_session_t *session
         return false;
     }
 
-    const achievement_t *achievements = session->achievements;
+    const xbox_achievement_t *achievements = session->achievements;
 
     if (!achievements) {
         obs_log(LOG_ERROR, "[Monitoring] No achievements specified");
@@ -511,7 +511,7 @@ static void on_game_update_received(game_t *game) {
 /**
  * @brief Handle a parsed achievement progress message.
  */
-static void on_achievement_progress_received(const achievement_progress_t *progress) {
+static void on_achievement_progress_received(const xbox_achievement_progress_t *progress) {
 
     if (!progress) {
         /* No change */
@@ -633,9 +633,9 @@ static void on_buffer_received(const char *buffer) {
 
     if (is_achievement_message(message)) {
         obs_log(LOG_DEBUG, "[Monitoring] Message is an achievement message");
-        achievement_progress_t *progress = parse_achievement_progress(message);
+        xbox_achievement_progress_t *progress = parse_achievement_progress(message);
         on_achievement_progress_received(progress);
-        free_achievement_progress(&progress);
+        xbox_free_achievement_progress(&progress);
     }
 
 cleanup:
@@ -970,7 +970,7 @@ const gamerscore_t *get_current_gamerscore(void) {
     return g_current_session.gamerscore;
 }
 
-const achievement_t *get_current_game_achievements() {
+const xbox_achievement_t *get_current_game_achievements() {
     return g_current_session.achievements;
 }
 
@@ -1094,7 +1094,7 @@ const game_t *get_current_game() {
     return NULL;
 }
 
-const achievement_t *get_current_game_achievements() {
+const xbox_achievement_t *get_current_game_achievements() {
     return NULL;
 }
 

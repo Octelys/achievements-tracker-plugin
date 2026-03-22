@@ -1,5 +1,5 @@
 #include "gamerscore.h"
-
+#include "integrations/xbox/contracts/xbox_unlocked_achievement.h"
 #include <obs-module.h>
 
 gamerscore_t *copy_gamerscore(const gamerscore_t *gamerscore) {
@@ -11,7 +11,7 @@ gamerscore_t *copy_gamerscore(const gamerscore_t *gamerscore) {
     gamerscore_t *copy = bzalloc(sizeof(gamerscore_t));
 
     copy->base_value            = gamerscore->base_value;
-    copy->unlocked_achievements = copy_unlocked_achievement(gamerscore->unlocked_achievements);
+    copy->unlocked_achievements = xbox_copy_unlocked_achievement(gamerscore->unlocked_achievements);
 
     return copy;
 }
@@ -23,7 +23,7 @@ void free_gamerscore(gamerscore_t **gamerscore) {
     }
 
     gamerscore_t *current = *gamerscore;
-    free_unlocked_achievement(&current->unlocked_achievements);
+    xbox_free_unlocked_achievement(&current->unlocked_achievements);
 
     bfree(current);
     *gamerscore = NULL;
@@ -37,7 +37,7 @@ int gamerscore_compute(const gamerscore_t *gamerscore) {
 
     int total_value = gamerscore->base_value;
 
-    const unlocked_achievement_t *current = gamerscore->unlocked_achievements;
+    const xbox_unlocked_achievement_t *current = gamerscore->unlocked_achievements;
 
     while (current) {
         total_value += current->value;

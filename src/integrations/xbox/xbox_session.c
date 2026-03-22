@@ -6,6 +6,9 @@
 #include "io/cache.h"
 #include "util/bmem.h"
 #include "integrations/xbox/xbox_client.h"
+#include "integrations/xbox/contracts/xbox_achievement.h"
+#include "integrations/xbox/contracts/xbox_achievement_progress.h"
+#include "integrations/xbox/contracts/xbox_unlocked_achievement.h"
 
 #include <errno.h>
 #include <util/thread_compat.h>
@@ -18,26 +21,18 @@
 
 /**
  * @brief Context passed to the prefetch background thread.
- *
- * Bundles the deep-copied achievements list (owned by the thread) and the
- * optional completion callback.
  */
 typedef struct prefetch_context {
     /** Deep-copied achievement list. Freed by the thread when done. */
-    achievement_t                *achievements;
+    xbox_achievement_t           *achievements;
     /** Optional callback invoked after all icons have been downloaded. */
     xbox_session_ready_callback_t on_ready;
 } prefetch_context_t;
 
 /**
  * @brief Download a single achievement icon to the local file cache.
- *
- * Uses the same cache-path convention as image_source_download() so that later
- * display requests hit the on-disk cache instead of making another HTTP call.
- *
- * @param achievement
  */
-static bool download_icon_to_cache(const achievement_t *achievement) {
+static bool download_icon_to_cache(const xbox_achievement_t *achievement) {
 
     if (!achievement->icon_url || achievement->icon_url[0] == '\0') {
         return false;
@@ -52,23 +47,14 @@ static bool download_icon_to_cache(const achievement_t *achievement) {
 
 /**
  * @brief Background thread entry point: prefetches all achievement icons.
- *
- * Receives a prefetch_context_t (deep-copied achievement list + optional
- * callback), downloads every icon to the local cache, invokes the callback,
- * then frees all resources.  The thread is created detached, so no join is
- * required.
- *
- * @param arg Pointer to a heap-allocated prefetch_context_t. Ownership is
- *            transferred to this thread.
- * @return NULL (unused).
  */
 static void *prefetch_icons_thread(void *arg) {
 
     prefetch_context_t *ctx          = arg;
-    achievement_t      *achievements = ctx->achievements;
+    xbox_achievement_t *achievements = ctx->achievements;
     int                 count        = 0;
 
-    for (const achievement_t *achievement = achievements; achievement != NULL; achievement = achievement->next) {
+    for (const xbox_achievement_t *achievement = achievements; achievement != NULL; achievement = achievement->next) {
         if (download_icon_to_cache(achievement)) {
             sleep_ms(5000);
         }
@@ -81,23 +67,15 @@ static void *prefetch_icons_thread(void *arg) {
         ctx->on_ready();
     }
 
-    free_achievement(&achievements);
+    xbox_free_achievement(&achievements);
     free_memory((void **)&ctx);
     return NULL;
 }
 
 /**
  * @brief Starts a background thread to prefetch all achievement icons.
- *
- * Deep-copies the given achievements list and passes ownership to a detached
- * pthread that downloads each icon to the local file cache.  When finished,
- * @p on_ready is invoked (if non-NULL) from the background thread.
- *
- * @param achievements Head of the achievements list to prefetch icons for.
- *                     The caller retains ownership; the function makes its own copy.
- * @param on_ready     Optional callback invoked when all icons have been downloaded.
  */
-static void prefetch_achievement_icons(const achievement_t *achievements, xbox_session_ready_callback_t on_ready) {
+static void prefetch_achievement_icons(const xbox_achievement_t *achievements, xbox_session_ready_callback_t on_ready) {
 
     if (!achievements) {
         if (on_ready) {
@@ -106,7 +84,7 @@ static void prefetch_achievement_icons(const achievement_t *achievements, xbox_s
         return;
     }
 
-    achievement_t *copy = copy_achievement(achievements);
+    xbox_achievement_t *copy = xbox_copy_achievement(achievements);
 
     if (!copy) {
         obs_log(LOG_WARNING, "[Prefetch] Failed to copy achievements for icon prefetch");
@@ -126,7 +104,7 @@ static void prefetch_achievement_icons(const achievement_t *achievements, xbox_s
         obs_log(LOG_INFO, "[Prefetch] Started background icon prefetch thread");
     } else {
         obs_log(LOG_ERROR, "[Prefetch] Failed to create icon prefetch thread");
-        free_achievement(&copy);
+        xbox_free_achievement(&copy);
         free_memory((void **)&ctx);
         if (on_ready) {
             on_ready();
@@ -139,27 +117,17 @@ static void prefetch_achievement_icons(const achievement_t *achievements, xbox_s
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Finds an achievement definition by id.
- *
- * Performs a case-insensitive search of the @p achievements linked list for an
- * entry whose @c id matches @c progress->id.
- *
- * @param progress Progress item containing the achievement id to look up.
- * @param achievements Head of the achievements linked list.
- *
- * @return Pointer to the matching achievement node within @p achievements, or
- *         NULL if not found.
+ * @brief Finds an Xbox achievement definition by id.
  */
-static achievement_t *find_achievement_by_id(const achievement_progress_t *progress, achievement_t *achievements) {
+static xbox_achievement_t *find_achievement_by_id(const xbox_achievement_progress_t *progress,
+                                                  xbox_achievement_t                *achievements) {
 
-    achievement_t *current = achievements;
+    xbox_achievement_t *current = achievements;
 
     while (current) {
-
         if (strcasecmp(current->id, progress->id) == 0) {
             return current;
         }
-
         current = current->next;
     }
 
@@ -192,10 +160,9 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_sessio
         return;
     }
 
-    free_achievement(&session->achievements);
+    xbox_free_achievement(&session->achievements);
     free_game(&session->game);
 
-    /* Let's get the achievements of the game */
     if (!game) {
         if (on_ready) {
             on_ready();
@@ -206,22 +173,18 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_sessio
     session->game         = copy_game(game);
     session->achievements = xbox_get_game_achievements(game);
 
-    /* Sort the achievements from the most recent unlocked to the locked ones */
-    sort_achievements(&session->achievements);
+    xbox_sort_achievements(&session->achievements);
 
-    /* Prefetch all achievement icons in the background; on_ready fires when done */
     prefetch_achievement_icons(session->achievements, on_ready);
 }
 
-void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_progress_t *progress) {
+void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achievement_progress_t *progress) {
 
     if (!session || !progress) {
         return;
     }
 
-    /* TODO Let's make sure the progress is achieved */
-
-    achievement_t *achievement = find_achievement_by_id(progress, session->achievements);
+    xbox_achievement_t *achievement = find_achievement_by_id(progress, session->achievements);
 
     if (!achievement) {
         obs_log(LOG_ERROR,
@@ -235,10 +198,9 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
     achievement->progress_state     = bstrdup(progress->progress_state);
     achievement->unlocked_timestamp = progress->unlocked_timestamp;
 
-    /* Sort the achievements from the most recent unlocked to the locked ones */
-    sort_achievements(&session->achievements);
+    xbox_sort_achievements(&session->achievements);
 
-    const reward_t *reward = achievement->rewards;
+    const xbox_reward_t *reward = achievement->rewards;
 
     if (!reward) {
         obs_log(LOG_ERROR, "Failed to unlock achievement %s: no reward found", progress->id ? progress->id : "(null)");
@@ -249,8 +211,8 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
 
     gamerscore_t *gamerscore = session->gamerscore;
 
-    unlocked_achievement_t *unlocked_achievement = bzalloc(sizeof(unlocked_achievement_t));
-    unlocked_achievement->id                     = bstrdup(progress->id);
+    xbox_unlocked_achievement_t *unlocked_achievement = bzalloc(sizeof(xbox_unlocked_achievement_t));
+    unlocked_achievement->id                          = bstrdup(progress->id);
 
     long  parsed_value = 0;
     char *endptr       = NULL;
@@ -270,20 +232,17 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const achievement_
 
     unlocked_achievement->value = (int)parsed_value;
 
-    unlocked_achievement_t *unlocked_achievements = gamerscore->unlocked_achievements;
+    xbox_unlocked_achievement_t *unlocked_achievements = gamerscore->unlocked_achievements;
 
-    /* Appends the unlocked achievement to the list */
     if (!unlocked_achievements) {
         gamerscore->unlocked_achievements = unlocked_achievement;
     } else {
-        unlocked_achievement_t *last_unlocked_achievement = unlocked_achievements;
+        xbox_unlocked_achievement_t *last_unlocked_achievement = unlocked_achievements;
         while (last_unlocked_achievement->next) {
             last_unlocked_achievement = last_unlocked_achievement->next;
         }
         last_unlocked_achievement->next = unlocked_achievement;
     }
-
-    /* Sort achievements from the most recent unlocked achievement first and then locked achievements */
 
     obs_log(LOG_INFO,
             "New achievement unlocked: %s (%d G)! Gamerscore is now %d",
@@ -298,7 +257,7 @@ void xbox_session_clear(xbox_session_t *session) {
         return;
     }
 
-    free_achievement(&session->achievements);
+    xbox_free_achievement(&session->achievements);
     free_game(&session->game);
     free_gamerscore(&session->gamerscore);
 }

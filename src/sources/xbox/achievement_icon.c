@@ -5,7 +5,6 @@
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
-#include "integrations/xbox/oauth/xbox-live.h"
 #include "sources/common/achievement_cycle.h"
 #include "sources/common/image_source.h"
 
@@ -140,11 +139,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
     //  OBS video/render thread with HTTP I/O.
     g_transition.pending_is_unlocked = is_new_unlocked_achievement;
     g_pending_has_state_changed      = has_state_changed;
-    snprintf(g_next_achievement_icon->id,
-             sizeof(g_next_achievement_icon->id),
-             "%s_%s",
-             achievement->service_config_id,
-             achievement->id);
+    snprintf(g_next_achievement_icon->id, sizeof(g_next_achievement_icon->id), "%s", achievement->id);
     snprintf(g_next_achievement_icon->url, sizeof(g_next_achievement_icon->url), "%s", achievement->icon_url);
 
     pthread_t thread;
@@ -396,24 +391,7 @@ static obs_properties_t *source_get_properties(void *data) {
 
     UNUSED_PARAMETER(data);
 
-    /* Gets or refreshes the token */
-    xbox_identity_t *xbox_identity = xbox_live_get_identity();
-
-    /* Lists all the UI components of the properties page */
     obs_properties_t *p = obs_properties_create();
-
-    if (xbox_identity != NULL) {
-        char status[4096];
-        snprintf(status, 4096, "Connected to your xbox account as %s", xbox_identity->gamertag);
-        obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
-    } else {
-        obs_properties_add_text(p,
-                                "disconnected_status_info",
-                                "You are not connected to your xbox account",
-                                OBS_TEXT_INFO);
-    }
-
-    free_identity(&xbox_identity);
 
     return p;
 }
