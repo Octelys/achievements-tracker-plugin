@@ -1,4 +1,4 @@
-#include "sources/xbox/gamerscore.h"
+#include "sources/gamerscore.h"
 
 /**
  * @file gamerscore.c

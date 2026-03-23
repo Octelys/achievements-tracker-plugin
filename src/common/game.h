@@ -21,6 +21,8 @@ typedef struct game {
     const char *title;
     /** Name of the console / platform the game belongs to. */
     const char *console_name;
+    /** URL of the game cover image; NULL when unavailable. */
+    const char *cover_url;
 } game_t;
 
 /**

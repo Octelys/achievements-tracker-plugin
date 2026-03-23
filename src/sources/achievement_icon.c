@@ -1,4 +1,4 @@
-#include "sources/xbox/achievement_icon.h"
+#include "sources/achievement_icon.h"
 
 #include <obs-module.h>
 #include <util/thread_compat.h>

@@ -477,14 +477,14 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
-    src/sources/xbox/gamerpic.c
-    src/sources/xbox/game_cover.c
-    src/sources/xbox/gamerscore.c
-    src/sources/xbox/gamertag.c
-    src/sources/xbox/achievement_name.c
-    src/sources/xbox/achievement_description.c
-    src/sources/xbox/achievement_icon.c
-    src/sources/xbox/achievements_count.c
+    src/sources/gamerpic.c
+    src/sources/game_cover.c
+    src/sources/gamerscore.c
+    src/sources/gamertag.c
+    src/sources/achievement_name.c
+    src/sources/achievement_description.c
+    src/sources/achievement_icon.c
+    src/sources/achievements_count.c
     src/sources/common/text_source.c
     src/sources/common/image_source.c
     src/sources/common/achievement_cycle.c

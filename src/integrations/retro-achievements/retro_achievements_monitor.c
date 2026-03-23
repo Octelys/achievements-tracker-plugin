@@ -212,8 +212,8 @@ static void notify_no_user(void) {
  *
  * Expected shapes:
  *   { "type": "game_playing", "game_id": "...", "game_name": "...",
- *     "game_path": "...", "console_id": "...", "console_name": "...",
- *     "core_name": "...", "db_name": "..." }
+ *     "console_id": "...", "console_name": "...",
+ *     "cover_url": "..." }
  *
  *   { "type": "no_game" }
  *
@@ -260,10 +260,6 @@ static void on_message_received(const char *buffer) {
         if (json_item_is_string(field))
             strncpy(game.game_name, field->valuestring, sizeof(game.game_name) - 1);
 
-        field = cJSON_GetObjectItemCaseSensitive(root, "game_path");
-        if (json_item_is_string(field))
-            strncpy(game.game_path, field->valuestring, sizeof(game.game_path) - 1);
-
         field = cJSON_GetObjectItemCaseSensitive(root, "console_id");
         if (json_item_is_string(field))
             strncpy(game.console_id, field->valuestring, sizeof(game.console_id) - 1);
@@ -272,13 +268,9 @@ static void on_message_received(const char *buffer) {
         if (json_item_is_string(field))
             strncpy(game.console_name, field->valuestring, sizeof(game.console_name) - 1);
 
-        field = cJSON_GetObjectItemCaseSensitive(root, "core_name");
+        field = cJSON_GetObjectItemCaseSensitive(root, "cover_url");
         if (json_item_is_string(field))
-            strncpy(game.core_name, field->valuestring, sizeof(game.core_name) - 1);
-
-        field = cJSON_GetObjectItemCaseSensitive(root, "db_name");
-        if (json_item_is_string(field))
-            strncpy(game.db_name, field->valuestring, sizeof(game.db_name) - 1);
+            strncpy(game.cover_url, field->valuestring, sizeof(game.cover_url) - 1);
 
         notify_game_playing(&game);
 

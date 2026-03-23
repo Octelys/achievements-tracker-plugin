@@ -1,17 +1,17 @@
-#include "sources/xbox/game_cover.h"
+#include "sources/game_cover.h"
 
 /**
  * @file game_cover.c
- * @brief OBS source that renders the cover art for the currently played Xbox game.
+ * @brief OBS source that renders the cover art for the currently played game.
  *
  * Responsibilities:
- *  - Subscribe to Xbox game-played events.
- *  - Download cover art when the game changes.
+ *  - Subscribe to game-played events via the monitoring service.
+ *  - Download cover art when the game changes (using the cover_url from game_t).
  *  - Load the image into an OBS gs_texture_t on the graphics thread.
  *  - Render the texture in the source's video_render callback.
  *
  * Threading notes:
- *  - Downloading happens on the calling thread of on_xbox_game_played() (currently
+ *  - Downloading happens on the calling thread of on_game_played() (currently
  *    synchronous).
  *  - Texture creation/destruction must happen on the OBS graphics thread; this
  *    file uses obs_enter_graphics()/obs_leave_graphics() to ensure that.
@@ -19,12 +19,10 @@
 
 #include <obs-module.h>
 #include <diagnostics/log.h>
-#include <inttypes.h>
 
-#include "integrations/xbox/oauth/xbox-live.h"
 #include "sources/common/image_source.h"
-#include "integrations/xbox/xbox_client.h"
-#include "integrations/xbox/xbox_monitor.h"
+#include "integrations/monitoring_service.h"
+#include "common/game.h"
 
 /**
  * @brief Global singleton cover cache.
@@ -41,11 +39,11 @@ static image_t g_game_cover;
 /**
  * @brief Event handler called when a new game starts being played.
  *
- * Fetches the cover-art URL for the given game and triggers a download.
+ * Uses the cover_url from the game_t to download the cover art.
  *
  * @param game Currently played game information.
  */
-static void on_xbox_game_played(const game_t *game) {
+static void on_game_played(const game_t *game) {
 
     if (!game) {
         obs_log(LOG_DEBUG, "[Game Cover] No game played");
@@ -53,15 +51,20 @@ static void on_xbox_game_played(const game_t *game) {
         return;
     }
 
-    obs_log(LOG_DEBUG, "[Game Cover] Playing game %s (%s)", game->title, game->id);
+    obs_log(LOG_INFO, "[Game Cover] Playing game %s (%s)", game->title, game->id);
 
-    char *game_cover_url = xbox_get_game_cover(game);
-    snprintf(g_game_cover.url, sizeof(g_game_cover.url), "%s", game_cover_url);
+    if (!game->cover_url || game->cover_url[0] == '\0') {
+        obs_log(LOG_INFO, "[Game Cover] No cover URL available");
+        image_source_clear(&g_game_cover);
+        return;
+    }
+
+    obs_log(LOG_INFO, "[Game Cover] Cover URL is %s", game->cover_url);
+
+    snprintf(g_game_cover.url, sizeof(g_game_cover.url), "%s", game->cover_url);
     snprintf(g_game_cover.id, sizeof(g_game_cover.id), "%s", game->id);
 
     image_source_download(&g_game_cover);
-
-    free_memory((void **)&game_cover_url);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -85,7 +88,7 @@ static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Game Cover";
+    return "Game Cover";
 }
 
 /**
@@ -93,7 +96,7 @@ static const char *source_get_name(void *unused) {
  *
  * @param settings OBS settings object (currently unused).
  * @param source   OBS source instance.
- * @return Newly allocated image_source_data_t.
+ * @return Newly allocated image_source_t.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
@@ -156,92 +159,44 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 }
 
 /**
- * @brief OBS callback to construct the properties UI.
- *
- * Shows connection status, gamerscore, and the currently played game.
+ * @brief obs_source_info for the Game Cover source.
  */
-static obs_properties_t *source_get_properties(void *data) {
-
-    UNUSED_PARAMETER(data);
-
-    /* Gets or refreshes the token */
-    xbox_identity_t *xbox_identity = xbox_live_get_identity();
-
-    /* Lists all the UI components of the properties page */
-    obs_properties_t *p = obs_properties_create();
-
-    if (xbox_identity != NULL) {
-        char status[4096];
-        snprintf(status, 4096, "Connected to your xbox account as %s", xbox_identity->gamertag);
-
-        int64_t gamerscore = 0;
-        xbox_fetch_gamerscore(&gamerscore);
-
-        char gamerscore_text[4096];
-        snprintf(gamerscore_text, 4096, "Gamerscore %" PRId64, gamerscore);
-
-        obs_properties_add_text(p, "connected_status_info", status, OBS_TEXT_INFO);
-        obs_properties_add_text(p, "gamerscore_info", gamerscore_text, OBS_TEXT_INFO);
-
-        const game_t *game = get_current_game();
-
-        if (game) {
-            char game_played[4096];
-            snprintf(game_played, sizeof(game_played), "Playing %s (%s)", game->title, game->id);
-            obs_properties_add_text(p, "game_played", game_played, OBS_TEXT_INFO);
-        }
-    } else {
-        obs_properties_add_text(p,
-                                "disconnected_status_info",
-                                "You are not connected to your xbox account",
-                                OBS_TEXT_INFO);
-    }
-
-    free_identity(&xbox_identity);
-
-    return p;
-}
-
-/**
- * @brief obs_source_info for the Xbox Game Cover source.
- */
-static struct obs_source_info xbox_game_cover_source_info = {
-    .id             = "xbox_game_cover_source",
-    .type           = OBS_SOURCE_TYPE_INPUT,
-    .output_flags   = OBS_SOURCE_VIDEO,
-    .get_name       = source_get_name,
-    .create         = on_source_create,
-    .destroy        = on_source_destroy,
-    .update         = on_source_update,
-    .video_render   = on_source_video_render,
-    .get_properties = source_get_properties,
-    .get_width      = source_get_width,
-    .get_height     = source_get_height,
-    .video_tick     = NULL,
+static struct obs_source_info game_cover_source_info = {
+    .id           = "xbox_game_cover_source",
+    .type         = OBS_SOURCE_TYPE_INPUT,
+    .output_flags = OBS_SOURCE_VIDEO,
+    .get_name     = source_get_name,
+    .create       = on_source_create,
+    .destroy      = on_source_destroy,
+    .update       = on_source_update,
+    .video_render = on_source_video_render,
+    .get_width    = source_get_width,
+    .get_height   = source_get_height,
+    .video_tick   = NULL,
 };
 
 /**
  * @brief Get a pointer to this source type's obs_source_info.
  */
-static const struct obs_source_info *xbox_game_cover_source_get(void) {
-    return &xbox_game_cover_source_info;
+static const struct obs_source_info *game_cover_source_get(void) {
+    return &game_cover_source_info;
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
 //      Public functions
 //  --------------------------------------------------------------------------------------------------------------------
 
-void xbox_game_cover_source_register(void) {
+void game_cover_source_register(void) {
 
     snprintf(g_game_cover.display_name, sizeof(g_game_cover.display_name), "Game Cover");
     g_game_cover.id[0] = '\0';
     snprintf(g_game_cover.type, sizeof(g_game_cover.type), "game_cover");
 
-    obs_register_source(xbox_game_cover_source_get());
+    obs_register_source(game_cover_source_get());
 
-    xbox_subscribe_game_played(&on_xbox_game_played);
+    monitoring_subscribe_game_played(&on_game_played);
 }
 
-void xbox_game_cover_source_cleanup(void) {
+void game_cover_source_cleanup(void) {
     image_source_destroy(&g_game_cover);
 }

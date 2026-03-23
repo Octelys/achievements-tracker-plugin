@@ -1,4 +1,4 @@
-#include "sources/xbox/achievement_description.h"
+#include "sources/achievement_description.h"
 
 #include "sources/common/achievement_cycle.h"
 #include "sources/common/text_source.h"

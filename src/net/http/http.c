@@ -394,6 +394,78 @@ char *http_urlencode(const char *in) {
     return out;
 }
 
+char *http_encode_url(const char *url) {
+
+    if (!url)
+        return NULL;
+
+    /* Find the start of the path component.
+     * We look for "://" and then the next '/' after the host. */
+    const char *scheme_end = strstr(url, "://");
+    if (!scheme_end)
+        return bstrdup(url);
+
+    const char *host_start = scheme_end + 3;
+    const char *path_start = strchr(host_start, '/');
+    if (!path_start)
+        return bstrdup(url); /* No path — nothing to encode */
+
+    size_t prefix_len = (size_t)(path_start - url);
+
+    CURL *curl = curl_easy_init();
+    if (!curl)
+        return NULL;
+
+    /* Estimate output size: worst case every byte becomes %XX (×3).
+     * Add prefix length + NUL. */
+    size_t path_len = strlen(path_start);
+    size_t buf_size = prefix_len + path_len * 3 + 1;
+    char  *out      = bzalloc(buf_size);
+    if (!out) {
+        curl_easy_cleanup(curl);
+        return NULL;
+    }
+
+    /* Copy scheme + host verbatim */
+    memcpy(out, url, prefix_len);
+    size_t pos = prefix_len;
+
+    /* Encode path segment-by-segment, preserving '/' separators. */
+    const char *p = path_start;
+    while (*p) {
+        if (*p == '/') {
+            out[pos++] = '/';
+            p++;
+            continue;
+        }
+
+        /* Collect one segment (until next '/' or end) */
+        const char *seg_start = p;
+        while (*p && *p != '/')
+            p++;
+
+        size_t seg_len = (size_t)(p - seg_start);
+        char  *segment = bzalloc(seg_len + 1);
+        memcpy(segment, seg_start, seg_len);
+        segment[seg_len] = '\0';
+
+        char *encoded = curl_easy_escape(curl, segment, (int)seg_len);
+        bfree(segment);
+
+        if (encoded) {
+            size_t enc_len = strlen(encoded);
+            memcpy(out + pos, encoded, enc_len);
+            pos += enc_len;
+            curl_free(encoded);
+        }
+    }
+
+    out[pos] = '\0';
+    curl_easy_cleanup(curl);
+
+    return out;
+}
+
 bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
 
     if (!url || !out_data || !out_size)

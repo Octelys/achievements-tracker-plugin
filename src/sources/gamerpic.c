@@ -1,4 +1,4 @@
-#include "sources/xbox/gamerpic.h"
+#include "sources/gamerpic.h"
 
 #include <obs-module.h>
 #include <diagnostics/log.h>

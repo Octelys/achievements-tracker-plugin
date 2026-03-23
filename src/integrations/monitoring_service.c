@@ -43,6 +43,35 @@ static void clear_active_identity_subscriptions(void) {
 }
 
 /* --------------------------------------------------------------------------
+ * Game-played subscription list
+ * ----------------------------------------------------------------------- */
+
+typedef struct game_played_subscription {
+    on_monitoring_game_played_t      callback;
+    struct game_played_subscription *next;
+} game_played_subscription_t;
+
+static game_played_subscription_t *g_game_played_subscriptions = NULL;
+
+static void notify_game_played(const game_t *game) {
+    game_played_subscription_t *node = g_game_played_subscriptions;
+    while (node) {
+        node->callback(game);
+        node = node->next;
+    }
+}
+
+static void clear_game_played_subscriptions(void) {
+    game_played_subscription_t *node = g_game_played_subscriptions;
+    while (node) {
+        game_played_subscription_t *next = node->next;
+        bfree(node);
+        node = next;
+    }
+    g_game_played_subscriptions = NULL;
+}
+
+/* --------------------------------------------------------------------------
  * Module state
  * ----------------------------------------------------------------------- */
 
@@ -57,7 +86,6 @@ static game_t *g_retro_game = NULL;
 /** Cached generic achievements for the current game (owned by this module). */
 static achievement_t *g_current_achievements = NULL;
 
-static on_monitoring_game_played_t          g_game_played_callback          = NULL;
 static on_monitoring_achievements_changed_t g_achievements_changed_callback = NULL;
 static on_monitoring_session_ready_t        g_session_ready_callback        = NULL;
 
@@ -187,8 +215,7 @@ static void on_xbox_game_played(const game_t *game) {
 
     notify_active_identity(g_xbox_identity);
 
-    if (g_game_played_callback)
-        g_game_played_callback(game);
+    notify_game_played(game);
 }
 
 /**
@@ -241,6 +268,7 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
     g_retro_game->id           = bstrdup(retro_game->game_id);
     g_retro_game->title        = bstrdup(retro_game->game_name);
     g_retro_game->console_name = bstrdup(retro_game->console_name);
+    g_retro_game->cover_url    = bstrdup(retro_game->cover_url);
 
     obs_log(LOG_INFO, "[MonitoringService] Retro game cached: %s (%s)", g_retro_game->title, g_retro_game->console_name);
 
@@ -249,8 +277,7 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
 
     notify_active_identity(g_retro_identity);
 
-    if (g_game_played_callback)
-        g_game_played_callback(g_retro_game);
+    notify_game_played(g_retro_game);
 }
 
 static void on_retro_no_game(void) {
@@ -312,8 +339,8 @@ void monitoring_stop(void) {
     free_achievement(&g_current_achievements);
 
     clear_active_identity_subscriptions();
+    clear_game_played_subscriptions();
 
-    g_game_played_callback          = NULL;
     g_achievements_changed_callback = NULL;
     g_session_ready_callback        = NULL;
 }
@@ -340,7 +367,20 @@ void monitoring_subscribe_active_identity(on_monitoring_active_identity_changed_
 }
 
 void monitoring_subscribe_game_played(on_monitoring_game_played_t callback) {
-    g_game_played_callback = callback;
+    if (!callback) {
+        clear_game_played_subscriptions();
+        return;
+    }
+
+    game_played_subscription_t *node = bzalloc(sizeof(game_played_subscription_t));
+    if (!node) {
+        obs_log(LOG_ERROR, "[MonitoringService] Failed to allocate game-played subscription");
+        return;
+    }
+
+    node->callback              = callback;
+    node->next                  = g_game_played_subscriptions;
+    g_game_played_subscriptions = node;
 }
 
 void monitoring_subscribe_achievements_changed(on_monitoring_achievements_changed_t callback) {

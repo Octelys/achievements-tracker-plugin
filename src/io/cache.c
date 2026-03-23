@@ -86,12 +86,20 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
     uint8_t *data = NULL;
     size_t   size = 0;
 
-    obs_log(LOG_INFO, "[Cache] Downloading '%s'", url);
+    /* Normalize the URL so that any unencoded characters in the path or query
+     * (e.g. spaces, Unicode) are properly percent-encoded. */
+    char       *encoded_url  = http_encode_url(url);
+    const char *download_url = encoded_url ? encoded_url : url;
 
-    if (!http_download(url, &data, &size)) {
-        obs_log(LOG_WARNING, "[Cache] Failed to download '%s'", url);
+    obs_log(LOG_INFO, "[Cache] Downloading '%s'", download_url);
+
+    if (!http_download(download_url, &data, &size)) {
+        obs_log(LOG_WARNING, "[Cache] Failed to download '%s'", download_url);
+        bfree(encoded_url);
         return false;
     }
+
+    bfree(encoded_url);
 
     /* Write to disk */
     FILE *file = fopen(path_buf, "wb");

@@ -3,16 +3,16 @@
 
 #include "sources/common/achievement_cycle.h"
 #include "ui/xbox_account_config.h"
-#include "sources/xbox/gamerpic.h"
-#include "sources/xbox/game_cover.h"
-#include "sources/xbox/gamerscore.h"
-#include "sources/xbox/gamertag.h"
+#include "sources/gamerpic.h"
+#include "sources/game_cover.h"
+#include "sources/gamerscore.h"
+#include "sources/gamertag.h"
 
 #include "io/state.h"
-#include "sources/xbox/achievement_name.h"
-#include "sources/xbox/achievement_description.h"
-#include "sources/xbox/achievement_icon.h"
-#include "sources/xbox/achievements_count.h"
+#include "sources/achievement_name.h"
+#include "sources/achievement_description.h"
+#include "sources/achievement_icon.h"
+#include "sources/achievements_count.h"
 #include "drawing/image.h"
 #include "integrations/monitoring_service.h"
 
@@ -27,7 +27,7 @@ bool obs_module_load(void) {
     monitoring_start();
 
     xbox_gamerpic_source_register();
-    xbox_game_cover_source_register();
+    game_cover_source_register();
     xbox_gamerscore_source_register();
     xbox_gamertag_source_register();
 
@@ -55,7 +55,7 @@ void obs_module_unload(void) {
     xbox_achievement_description_source_cleanup();
     xbox_achievement_icon_source_cleanup();
     xbox_achievements_count_source_cleanup();
-    xbox_game_cover_source_cleanup();
+    game_cover_source_cleanup();
     xbox_gamerpic_source_cleanup();
     xbox_gamerscore_source_cleanup();
     xbox_gamertag_source_cleanup();

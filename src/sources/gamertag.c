@@ -1,4 +1,4 @@
-#include "sources/xbox/gamertag.h"
+#include "sources/gamertag.h"
 
 /**
  * @file gamertag.c

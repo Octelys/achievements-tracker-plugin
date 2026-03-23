@@ -21,7 +21,7 @@
  * @see text_source.h for the common text rendering infrastructure
  */
 
-#include "sources/xbox/achievement_name.h"
+#include "sources/achievement_name.h"
 
 #include "sources/common/achievement_cycle.h"
 #include "sources/common/text_source.h"
