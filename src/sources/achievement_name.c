@@ -140,7 +140,7 @@ static void update_achievement_name(const achievement_t *achievement) {
     }
 
     if (achievement->value > 0) {
-        snprintf(g_achievement_name, sizeof(g_achievement_name), "%dG - %s", achievement->value, achievement->name);
+        snprintf(g_achievement_name, sizeof(g_achievement_name), "%d - %s", achievement->value, achievement->name);
     } else {
         snprintf(g_achievement_name, sizeof(g_achievement_name), "%s", achievement->name);
     }
