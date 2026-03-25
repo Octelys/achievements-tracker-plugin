@@ -256,12 +256,12 @@ static void free_gamerscore__gamerscore_is_null__null_gamerscore_returned(void) 
 static void free_gamerscore__gamerscore_is_not_null__null_gamerscore_returned(void) {
     //  Arrange.
     xbox_unlocked_achievement_t *unlocked_achievement_2 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_2->value                  = 200;
-    unlocked_achievement_2->next                   = NULL;
+    unlocked_achievement_2->value                       = 200;
+    unlocked_achievement_2->next                        = NULL;
 
     xbox_unlocked_achievement_t *unlocked_achievement_1 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_1->value                  = 100;
-    unlocked_achievement_1->next                   = unlocked_achievement_2;
+    unlocked_achievement_1->value                       = 100;
+    unlocked_achievement_1->next                        = unlocked_achievement_2;
 
     gamerscore_t *gamerscore          = bzalloc(sizeof(gamerscore_t));
     gamerscore->base_value            = 1000;
@@ -301,12 +301,12 @@ static void copy_gamerscore__gamerscore_is_null__null_copy_returned(void) {
 static void copy_gamerscore__gamerscore_is_not_null__copy_returned(void) {
     //  Arrange.
     xbox_unlocked_achievement_t *unlocked_achievement_2 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_2->value                  = 200;
-    unlocked_achievement_2->next                   = NULL;
+    unlocked_achievement_2->value                       = 200;
+    unlocked_achievement_2->next                        = NULL;
 
     xbox_unlocked_achievement_t *unlocked_achievement_1 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_1->value                  = 100;
-    unlocked_achievement_1->next                   = unlocked_achievement_2;
+    unlocked_achievement_1->value                       = 100;
+    unlocked_achievement_1->next                        = unlocked_achievement_2;
 
     gamerscore_t *gamerscore          = bzalloc(sizeof(gamerscore_t));
     gamerscore->base_value            = 1000;
@@ -354,9 +354,9 @@ static void copy_gamerscore__no_unlocked_achievements__base_value_returned(void)
 static void copy_gamerscore__one_unlocked_achievement__total_returned(void) {
     //  Arrange.
     xbox_unlocked_achievement_t *unlocked_achievement = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement->id                     = bstrdup("achievement-id");
-    unlocked_achievement->value                  = 200;
-    unlocked_achievement->next                   = NULL;
+    unlocked_achievement->id                          = bstrdup("achievement-id");
+    unlocked_achievement->value                       = 200;
+    unlocked_achievement->next                        = NULL;
 
     gamerscore_t *gamerscore          = bzalloc(sizeof(gamerscore_t));
     gamerscore->base_value            = 400;
@@ -372,14 +372,14 @@ static void copy_gamerscore__one_unlocked_achievement__total_returned(void) {
 static void copy_gamerscore__two_unlocked_achievements__total_returned(void) {
     //  Arrange.
     xbox_unlocked_achievement_t *unlocked_achievement_2 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_2->id                     = bstrdup("achievement-id-2");
-    unlocked_achievement_2->value                  = 200;
-    unlocked_achievement_2->next                   = NULL;
+    unlocked_achievement_2->id                          = bstrdup("achievement-id-2");
+    unlocked_achievement_2->value                       = 200;
+    unlocked_achievement_2->next                        = NULL;
 
     xbox_unlocked_achievement_t *unlocked_achievement_1 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_1->id                     = bstrdup("achievement-id-1");
-    unlocked_achievement_1->value                  = 100;
-    unlocked_achievement_1->next                   = unlocked_achievement_2;
+    unlocked_achievement_1->id                          = bstrdup("achievement-id-1");
+    unlocked_achievement_1->value                       = 100;
+    unlocked_achievement_1->next                        = unlocked_achievement_2;
 
     gamerscore_t *gamerscore          = bzalloc(sizeof(gamerscore_t));
     gamerscore->base_value            = 400;
@@ -408,14 +408,14 @@ static void xbox_free_unlocked_achievement__unlocked_achievement_is_null__null_u
 static void xbox_free_unlocked_achievement__unlocked_achievement_is_not_null__null_unlocked_achievement_returned(void) {
     //  Arrange.
     xbox_unlocked_achievement_t *unlocked_achievement_2 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_2->id                     = bstrdup("achievement-id-2");
-    unlocked_achievement_2->value                  = 200;
-    unlocked_achievement_2->next                   = NULL;
+    unlocked_achievement_2->id                          = bstrdup("achievement-id-2");
+    unlocked_achievement_2->value                       = 200;
+    unlocked_achievement_2->next                        = NULL;
 
     xbox_unlocked_achievement_t *unlocked_achievement_1 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_1->id                     = bstrdup("achievement-id-1");
-    unlocked_achievement_1->value                  = 100;
-    unlocked_achievement_1->next                   = unlocked_achievement_2;
+    unlocked_achievement_1->id                          = bstrdup("achievement-id-1");
+    unlocked_achievement_1->value                       = 100;
+    unlocked_achievement_1->next                        = unlocked_achievement_2;
 
     //  Act.
     xbox_free_unlocked_achievement(&unlocked_achievement_1);
@@ -443,14 +443,14 @@ static void xbox_copy_unlocked_achievement__unlocked_achievement_is_null__null_c
 static void xbox_copy_unlocked_achievement__unlocked_achievement_is_not_null__copy_returned(void) {
     //  Arrange.
     xbox_unlocked_achievement_t *unlocked_achievement_2 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_2->id                     = bstrdup("achievement-id-2");
-    unlocked_achievement_2->value                  = 200;
-    unlocked_achievement_2->next                   = NULL;
+    unlocked_achievement_2->id                          = bstrdup("achievement-id-2");
+    unlocked_achievement_2->value                       = 200;
+    unlocked_achievement_2->next                        = NULL;
 
     xbox_unlocked_achievement_t *unlocked_achievement_1 = bzalloc(sizeof(xbox_unlocked_achievement_t));
-    unlocked_achievement_1->id                     = bstrdup("achievement-id-1");
-    unlocked_achievement_1->value                  = 100;
-    unlocked_achievement_1->next                   = unlocked_achievement_2;
+    unlocked_achievement_1->id                          = bstrdup("achievement-id-1");
+    unlocked_achievement_1->value                       = 100;
+    unlocked_achievement_1->next                        = unlocked_achievement_2;
 
     //  Act.
     const xbox_unlocked_achievement_t *copy = xbox_copy_unlocked_achievement(unlocked_achievement_1);
@@ -481,8 +481,8 @@ static void free_reward__reward_is_null__null_reward_returned(void) {
 static void free_reward__one_reward___null_reward_returned(void) {
     //  Arrange.
     xbox_reward_t *reward = bzalloc(sizeof(xbox_reward_t));
-    reward->value    = bstrdup("1000");
-    reward->next     = NULL;
+    reward->value         = bstrdup("1000");
+    reward->next          = NULL;
 
     //  Act.
     xbox_free_reward(&reward);
@@ -494,12 +494,12 @@ static void free_reward__one_reward___null_reward_returned(void) {
 static void free_reward__two_rewards___null_reward_returned(void) {
     //  Arrange.
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     //  Act.
     xbox_free_reward(&reward1);
@@ -522,8 +522,8 @@ static void copy_reward__reward_is_null__null_copy_returned(void) {
 static void copy_reward__one_reward__copy_returned(void) {
     //  Arrange.
     xbox_reward_t *reward = bzalloc(sizeof(xbox_reward_t));
-    reward->value    = bstrdup("1000");
-    reward->next     = NULL;
+    reward->value         = bstrdup("1000");
+    reward->next          = NULL;
 
     //  Act.
     const xbox_reward_t *copy = xbox_copy_reward(reward);
@@ -537,12 +537,12 @@ static void copy_reward__one_reward__copy_returned(void) {
 static void copy_reward__two_rewards__copy_returned(void) {
     //  Arrange.
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     //  Act.
     const xbox_reward_t *copy = xbox_copy_reward(reward1);
@@ -569,7 +569,7 @@ static void free_media_asset__media_asset_is_null__null_media_asset_returned(voi
 static void free_media_asset__one_media_asset__null_media_asset_returned(void) {
     //  Arrange.
     xbox_media_asset_t *media_asset = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset->url           = bstrdup("https://www.example.com/image.png");
+    media_asset->url                = bstrdup("https://www.example.com/image.png");
 
     //  Act.
     xbox_free_media_asset(&media_asset);
@@ -581,11 +581,11 @@ static void free_media_asset__one_media_asset__null_media_asset_returned(void) {
 static void free_media_asset__two_media_assets__null_media_asset_returned(void) {
     //  Arrange.
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
     //  Act.
     xbox_free_media_asset(&media_asset1);
@@ -608,7 +608,7 @@ static void copy_media_asset__media_asset_is_null__null_copy_returned(void) {
 static void copy_media_asset__one_media_asset__copy_returned(void) {
     //  Arrange.
     xbox_media_asset_t *media_asset = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset->url           = bstrdup("https://www.example.com/image.png");
+    media_asset->url                = bstrdup("https://www.example.com/image.png");
 
     //  Act.
     const xbox_media_asset_t *copy = xbox_copy_media_asset(media_asset);
@@ -622,11 +622,11 @@ static void copy_media_asset__one_media_asset__copy_returned(void) {
 static void copy_media_asset__two_media_assets__copy_returned(void) {
     //  Arrange.
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
     //  Act.
     const xbox_media_asset_t *copy = xbox_copy_media_asset(media_asset1);
@@ -653,21 +653,21 @@ static void free_achievement__achievement_is_null__null_achievement_returned(voi
 static void free_achievement__one_achievement__null_achievement_returned(void) {
     //  Arrange.
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->service_config_id  = bstrdup("service-config-id");
     achievement->name               = bstrdup("Achievement Name");
@@ -688,7 +688,7 @@ static void free_achievement__one_achievement__null_achievement_returned(void) {
 
 static void free_achievement__two_achievements__null_achievement_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id");
     achievement2->service_config_id  = bstrdup("service-config-id");
     achievement2->name               = bstrdup("Achievement Name");
@@ -701,21 +701,21 @@ static void free_achievement__two_achievements__null_achievement_returned(void) 
     achievement2->next               = NULL;
 
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id");
     achievement1->service_config_id  = bstrdup("service-config-id");
     achievement1->name               = bstrdup("Achievement Name");
@@ -748,21 +748,21 @@ static void copy_achievement__achievement_is_null__null_copy_returned(void) {
 static void copy_achievement__one_achievement__copy_returned(void) {
     //  Arrange.
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->service_config_id  = bstrdup("service-config-id");
     achievement->name               = bstrdup("Achievement Name");
@@ -795,7 +795,7 @@ static void copy_achievement__one_achievement__copy_returned(void) {
 
 static void copy_achievement__two_achievements__copy_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id");
     achievement2->service_config_id  = bstrdup("service-config-id");
     achievement2->name               = bstrdup("Achievement Name");
@@ -808,21 +808,21 @@ static void copy_achievement__two_achievements__copy_returned(void) {
     achievement2->next               = NULL;
 
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id");
     achievement1->service_config_id  = bstrdup("service-config-id");
     achievement1->name               = bstrdup("Achievement Name");
@@ -878,21 +878,21 @@ static void count_achievements__achievement_is_null__0_returned(void) {
 static void count_achievements__one_achievement__1_returned(void) {
     //  Arrange.
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->service_config_id  = bstrdup("service-config-id");
     achievement->name               = bstrdup("Achievement Name");
@@ -913,7 +913,7 @@ static void count_achievements__one_achievement__1_returned(void) {
 
 static void count_achievements__two_achievements__2_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id");
     achievement2->service_config_id  = bstrdup("service-config-id");
     achievement2->name               = bstrdup("Achievement Name");
@@ -926,21 +926,21 @@ static void count_achievements__two_achievements__2_returned(void) {
     achievement2->next               = NULL;
 
     xbox_reward_t *reward2 = bzalloc(sizeof(xbox_reward_t));
-    reward2->value    = bstrdup("1000");
-    reward2->next     = NULL;
+    reward2->value         = bstrdup("1000");
+    reward2->next          = NULL;
 
     xbox_reward_t *reward1 = bzalloc(sizeof(xbox_reward_t));
-    reward1->value    = bstrdup("1000");
-    reward1->next     = reward2;
+    reward1->value         = bstrdup("1000");
+    reward1->next          = reward2;
 
     xbox_media_asset_t *media_asset2 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset2->url           = bstrdup("https://www.example.com/image-1.png");
+    media_asset2->url                = bstrdup("https://www.example.com/image-1.png");
 
     xbox_media_asset_t *media_asset1 = bzalloc(sizeof(xbox_media_asset_t));
-    media_asset1->url           = bstrdup("https://www.example.com/image-2.png");
-    media_asset1->next          = media_asset2;
+    media_asset1->url                = bstrdup("https://www.example.com/image-2.png");
+    media_asset1->next               = media_asset2;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id");
     achievement1->service_config_id  = bstrdup("service-config-id");
     achievement1->name               = bstrdup("Achievement Name");
@@ -974,7 +974,7 @@ static void count_locked_achievements__achievement_is_null__0_returned(void) {
 
 static void count_locked_achievements__one_locked_achievement__1_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->name               = bstrdup("Achievement Name");
     achievement->unlocked_timestamp = 0; // Locked
@@ -989,7 +989,7 @@ static void count_locked_achievements__one_locked_achievement__1_returned(void) 
 
 static void count_locked_achievements__one_unlocked_achievement__0_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->name               = bstrdup("Achievement Name");
     achievement->unlocked_timestamp = 1234567890; // Unlocked
@@ -1004,13 +1004,13 @@ static void count_locked_achievements__one_unlocked_achievement__0_returned(void
 
 static void count_locked_achievements__two_locked_achievements__2_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 0; // Locked
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 0; // Locked
@@ -1025,13 +1025,13 @@ static void count_locked_achievements__two_locked_achievements__2_returned(void)
 
 static void count_locked_achievements__two_unlocked_achievements__0_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567890; // Unlocked
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 1234567800; // Unlocked
@@ -1046,19 +1046,19 @@ static void count_locked_achievements__two_unlocked_achievements__0_returned(voi
 
 static void count_locked_achievements__mixed_achievements__locked_count_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement3      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement3 = bzalloc(sizeof(xbox_achievement_t));
     achievement3->id                 = bstrdup("achievement-id-3");
     achievement3->name               = bstrdup("Achievement Name 3");
     achievement3->unlocked_timestamp = 0; // Locked
     achievement3->next               = NULL;
 
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567890; // Unlocked
     achievement2->next               = achievement3;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 0; // Locked
@@ -1086,7 +1086,7 @@ static void find_latest_unlocked_achievement__achievement_is_null__null_returned
 
 static void find_latest_unlocked_achievement__one_locked_achievement__null_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->name               = bstrdup("Achievement Name");
     achievement->unlocked_timestamp = 0; // Locked
@@ -1101,7 +1101,7 @@ static void find_latest_unlocked_achievement__one_locked_achievement__null_retur
 
 static void find_latest_unlocked_achievement__one_unlocked_achievement__achievement_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->name               = bstrdup("Achievement Name");
     achievement->unlocked_timestamp = 1234567890; // Unlocked
@@ -1117,13 +1117,13 @@ static void find_latest_unlocked_achievement__one_unlocked_achievement__achievem
 
 static void find_latest_unlocked_achievement__two_unlocked_achievements__latest_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567900; // Unlocked later
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 1234567800; // Unlocked earlier
@@ -1139,13 +1139,13 @@ static void find_latest_unlocked_achievement__two_unlocked_achievements__latest_
 
 static void find_latest_unlocked_achievement__latest_is_first_in_list__first_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567800; // Unlocked earlier
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 1234567900; // Unlocked later
@@ -1161,13 +1161,13 @@ static void find_latest_unlocked_achievement__latest_is_first_in_list__first_ret
 
 static void find_latest_unlocked_achievement__all_locked__null_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 0; // Locked
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 0; // Locked
@@ -1182,19 +1182,19 @@ static void find_latest_unlocked_achievement__all_locked__null_returned(void) {
 
 static void find_latest_unlocked_achievement__mixed_achievements__latest_unlocked_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement3      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement3 = bzalloc(sizeof(xbox_achievement_t));
     achievement3->id                 = bstrdup("achievement-id-3");
     achievement3->name               = bstrdup("Achievement Name 3");
     achievement3->unlocked_timestamp = 0; // Locked
     achievement3->next               = NULL;
 
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567900; // Unlocked (latest)
     achievement2->next               = achievement3;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 1234567800; // Unlocked (earlier)
@@ -1223,7 +1223,7 @@ static void get_random_locked_achievement__achievement_is_null__null_returned(vo
 
 static void get_random_locked_achievement__one_locked_achievement__achievement_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->name               = bstrdup("Achievement Name");
     achievement->unlocked_timestamp = 0; // Locked
@@ -1239,7 +1239,7 @@ static void get_random_locked_achievement__one_locked_achievement__achievement_r
 
 static void get_random_locked_achievement__one_unlocked_achievement__null_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement = bzalloc(sizeof(xbox_achievement_t));
     achievement->id                 = bstrdup("achievement-id");
     achievement->name               = bstrdup("Achievement Name");
     achievement->unlocked_timestamp = 1234567890; // Unlocked
@@ -1254,13 +1254,13 @@ static void get_random_locked_achievement__one_unlocked_achievement__null_return
 
 static void get_random_locked_achievement__all_unlocked__null_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567900; // Unlocked
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 1234567800; // Unlocked
@@ -1275,19 +1275,19 @@ static void get_random_locked_achievement__all_unlocked__null_returned(void) {
 
 static void get_random_locked_achievement__mixed_achievements__locked_returned(void) {
     //  Arrange.
-    xbox_achievement_t *achievement3      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement3 = bzalloc(sizeof(xbox_achievement_t));
     achievement3->id                 = bstrdup("achievement-id-3");
     achievement3->name               = bstrdup("Achievement Name 3");
     achievement3->unlocked_timestamp = 0; // Locked
     achievement3->next               = NULL;
 
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("achievement-id-2");
     achievement2->name               = bstrdup("Achievement Name 2");
     achievement2->unlocked_timestamp = 1234567890; // Unlocked
     achievement2->next               = achievement3;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("achievement-id-1");
     achievement1->name               = bstrdup("Achievement Name 1");
     achievement1->unlocked_timestamp = 0; // Locked
@@ -1305,13 +1305,13 @@ static void get_random_locked_achievement__mixed_achievements__locked_returned(v
 
 static void get_random_locked_achievement__multiple_calls__returns_locked_achievement(void) {
     //  Arrange.
-    xbox_achievement_t *achievement2      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement2 = bzalloc(sizeof(xbox_achievement_t));
     achievement2->id                 = bstrdup("locked-2");
     achievement2->name               = bstrdup("Locked Achievement 2");
     achievement2->unlocked_timestamp = 0; // Locked
     achievement2->next               = NULL;
 
-    xbox_achievement_t *achievement1      = bzalloc(sizeof(xbox_achievement_t));
+    xbox_achievement_t *achievement1 = bzalloc(sizeof(xbox_achievement_t));
     achievement1->id                 = bstrdup("locked-1");
     achievement1->name               = bstrdup("Locked Achievement 1");
     achievement1->unlocked_timestamp = 0; // Locked
@@ -1341,10 +1341,10 @@ static void xbox_free_achievement_progress__achievement_progress_is_null__null_a
 static void xbox_free_achievement_progress__one_achievement_progress__null_achievement_progress_returned(void) {
     //  Arrange.
     xbox_achievement_progress_t *achievement_progress = bzalloc(sizeof(xbox_achievement_progress_t));
-    achievement_progress->id                     = bstrdup("achievement-progress-id");
-    achievement_progress->service_config_id      = bstrdup("service-config-id");
-    achievement_progress->progress_state         = bstrdup("unlocked");
-    achievement_progress->next                   = NULL;
+    achievement_progress->id                          = bstrdup("achievement-progress-id");
+    achievement_progress->service_config_id           = bstrdup("service-config-id");
+    achievement_progress->progress_state              = bstrdup("unlocked");
+    achievement_progress->next                        = NULL;
 
     //  Act.
     xbox_free_achievement_progress(&achievement_progress);
@@ -1356,16 +1356,16 @@ static void xbox_free_achievement_progress__one_achievement_progress__null_achie
 static void xbox_free_achievement_progress__two_achievement_progresses__null_achievement_progress_returned(void) {
     //  Arrange.
     xbox_achievement_progress_t *achievement_progress2 = bzalloc(sizeof(xbox_achievement_progress_t));
-    achievement_progress2->id                     = bstrdup("achievement-progress-id-2");
-    achievement_progress2->service_config_id      = bstrdup("service-config-id");
-    achievement_progress2->progress_state         = bstrdup("unlocked");
-    achievement_progress2->next                   = NULL;
+    achievement_progress2->id                          = bstrdup("achievement-progress-id-2");
+    achievement_progress2->service_config_id           = bstrdup("service-config-id");
+    achievement_progress2->progress_state              = bstrdup("unlocked");
+    achievement_progress2->next                        = NULL;
 
     xbox_achievement_progress_t *achievement_progress1 = bzalloc(sizeof(xbox_achievement_progress_t));
-    achievement_progress1->id                     = bstrdup("achievement-progress-id-1");
-    achievement_progress1->service_config_id      = bstrdup("service-config-id");
-    achievement_progress1->progress_state         = bstrdup("unlocked");
-    achievement_progress1->next                   = achievement_progress2;
+    achievement_progress1->id                          = bstrdup("achievement-progress-id-1");
+    achievement_progress1->service_config_id           = bstrdup("service-config-id");
+    achievement_progress1->progress_state              = bstrdup("unlocked");
+    achievement_progress1->next                        = achievement_progress2;
 
     //  Act.
     xbox_free_achievement_progress(&achievement_progress1);
@@ -1388,10 +1388,10 @@ static void xbox_copy_achievement_progress__achievement_progress_is_null__null_c
 static void xbox_copy_achievement_progress__one_achievement_progress__copy_returned(void) {
     //  Arrange.
     xbox_achievement_progress_t *achievement_progress = bzalloc(sizeof(xbox_achievement_progress_t));
-    achievement_progress->id                     = bstrdup("achievement-progress-id");
-    achievement_progress->service_config_id      = bstrdup("service-config-id");
-    achievement_progress->progress_state         = bstrdup("unlocked");
-    achievement_progress->next                   = NULL;
+    achievement_progress->id                          = bstrdup("achievement-progress-id");
+    achievement_progress->service_config_id           = bstrdup("service-config-id");
+    achievement_progress->progress_state              = bstrdup("unlocked");
+    achievement_progress->next                        = NULL;
 
     //  Act.
     const xbox_achievement_progress_t *copy = xbox_copy_achievement_progress(achievement_progress);
@@ -1407,16 +1407,16 @@ static void xbox_copy_achievement_progress__one_achievement_progress__copy_retur
 static void xbox_copy_achievement_progress__two_achievement_progresses__copy_returned(void) {
     //  Arrange.
     xbox_achievement_progress_t *achievement_progress2 = bzalloc(sizeof(xbox_achievement_progress_t));
-    achievement_progress2->id                     = bstrdup("achievement-progress-id-2");
-    achievement_progress2->service_config_id      = bstrdup("service-config-id");
-    achievement_progress2->progress_state         = bstrdup("unlocked");
-    achievement_progress2->next                   = NULL;
+    achievement_progress2->id                          = bstrdup("achievement-progress-id-2");
+    achievement_progress2->service_config_id           = bstrdup("service-config-id");
+    achievement_progress2->progress_state              = bstrdup("unlocked");
+    achievement_progress2->next                        = NULL;
 
     xbox_achievement_progress_t *achievement_progress1 = bzalloc(sizeof(xbox_achievement_progress_t));
-    achievement_progress1->id                     = bstrdup("achievement-progress-id-1");
-    achievement_progress1->service_config_id      = bstrdup("service-config-id");
-    achievement_progress1->progress_state         = bstrdup("unlocked");
-    achievement_progress1->next                   = achievement_progress2;
+    achievement_progress1->id                          = bstrdup("achievement-progress-id-1");
+    achievement_progress1->service_config_id           = bstrdup("service-config-id");
+    achievement_progress1->progress_state              = bstrdup("unlocked");
+    achievement_progress1->next                        = achievement_progress2;
 
     //  Act.
     const xbox_achievement_progress_t *copy = xbox_copy_achievement_progress(achievement_progress1);

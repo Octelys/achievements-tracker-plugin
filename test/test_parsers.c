@@ -294,7 +294,7 @@ static void parse_achievements__message_is_multiple_achievements_achievements_re
     TEST_ASSERT_NOT_NULL(actual);
 
     xbox_achievement_t *current_achievement = actual;
-    int            achievements_count  = 0;
+    int                 achievements_count  = 0;
     while (current_achievement != NULL) {
         achievements_count++;
         current_achievement = current_achievement->next;

@@ -7,16 +7,16 @@
 #define OUTER_WORLD_2_ID "outer_worlds_2_id"
 #define FALLOUT_4_ID "fallout_4_id"
 
-static game_t                 *game_outer_worlds_2;
-static game_t                 *game_fallout_4;
-static xbox_session_t                  *session;
-static xbox_achievement_t              *achievement_1;
-static xbox_achievement_t              *achievement_2;
-static xbox_achievement_progress_t     *achievement_progress_1;
-static xbox_achievement_progress_t     *achievement_progress_2;
-static gamerscore_t                    *gamerscore;
-static xbox_reward_t                   *reward_1;
-static xbox_reward_t                   *reward_2;
+static game_t                      *game_outer_worlds_2;
+static game_t                      *game_fallout_4;
+static xbox_session_t              *session;
+static xbox_achievement_t          *achievement_1;
+static xbox_achievement_t          *achievement_2;
+static xbox_achievement_progress_t *achievement_progress_1;
+static xbox_achievement_progress_t *achievement_progress_2;
+static gamerscore_t                *gamerscore;
+static xbox_reward_t               *reward_1;
+static xbox_reward_t               *reward_2;
 
 void setUp(void) {
 
