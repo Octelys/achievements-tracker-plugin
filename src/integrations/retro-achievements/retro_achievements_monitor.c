@@ -231,7 +231,7 @@ static void on_message_received(const char *buffer) {
         return;
     }
 
-    obs_log(LOG_DEBUG, "[RetroAchievements] Message received: %s", buffer);
+    obs_log(LOG_WARNING, "[RetroAchievements] Message received: %s", buffer);
 
     cJSON *root = cJSON_Parse(buffer);
     if (!root) {
@@ -276,7 +276,6 @@ static void on_message_received(const char *buffer) {
 
     } else if (strcmp(type_item->valuestring, "no_game") == 0) {
         notify_no_game();
-
     } else if (strcmp(type_item->valuestring, "achievements") == 0) {
         cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
         if (!items || !(items->type & cJSON_Array)) {

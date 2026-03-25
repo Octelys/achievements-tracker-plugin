@@ -283,6 +283,7 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
 static void on_retro_no_game(void) {
     free_game(&g_retro_game);
     replace_current_achievements(NULL);
+    notify_game_played(NULL);
 }
 
 /**

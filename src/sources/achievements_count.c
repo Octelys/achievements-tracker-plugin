@@ -51,7 +51,14 @@ static void update_count(void) {
     int unlocked = count_unlocked_achievements(achievements);
     int total    = count_achievements(achievements);
 
-    snprintf(g_total_count, sizeof(g_total_count), "%d / %d", unlocked, total);
+    if (unlocked != total) {
+        snprintf(g_total_count, sizeof(g_total_count), "%d / %d", unlocked, total);
+    } else if (total > 0) {
+        snprintf(g_total_count, sizeof(g_total_count), "Mastered");
+    } else {
+        g_total_count[0] = '\0';
+    }
+
     g_must_reload = true;
 
     obs_log(LOG_INFO, "[Achievements Counter] %d achievements unlocked out of %d", unlocked, total);

@@ -46,7 +46,7 @@ static image_t g_game_cover;
 static void on_game_played(const game_t *game) {
 
     if (!game) {
-        obs_log(LOG_DEBUG, "[Game Cover] No game played");
+        obs_log(LOG_INFO, "[Game Cover] No game played");
         image_source_clear(&g_game_cover);
         return;
     }
