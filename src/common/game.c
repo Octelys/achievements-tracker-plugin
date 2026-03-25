@@ -13,7 +13,7 @@ game_t *copy_game(const game_t *game) {
     copy->id           = bstrdup(game->id);
     copy->title        = bstrdup(game->title);
     copy->console_name = bstrdup(game->console_name);
-    copy->cover_url    = bstrdup(game->cover_url);
+    copy->cover_url    = game->cover_url ? bstrdup(game->cover_url) : NULL;
 
     return copy;
 }

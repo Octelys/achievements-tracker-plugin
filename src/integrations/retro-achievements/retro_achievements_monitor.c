@@ -161,7 +161,7 @@ static void notify_connection_changed(const char *error_message) {
             g_monitor_context->connected ? "connected" : "disconnected");
 
     if (error_message) {
-        obs_log(LOG_ERROR, "[RetroAchievements] Connection error: %s", error_message);
+        obs_log(LOG_DEBUG, "[RetroAchievements] Connection error: %s", error_message);
     }
 
     connection_changed_subscription_t *node = g_connection_changed_subscriptions;
@@ -231,7 +231,7 @@ static void on_message_received(const char *buffer) {
         return;
     }
 
-    obs_log(LOG_WARNING, "[RetroAchievements] Message received: %s", buffer);
+    obs_log(LOG_DEBUG, "[RetroAchievements] Message received: %s", buffer);
 
     cJSON *root = cJSON_Parse(buffer);
     if (!root) {
@@ -452,7 +452,7 @@ static int websocket_callback(struct lws *wsi, enum lws_callback_reasons reason,
         break;
 
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-        obs_log(LOG_ERROR, "[RetroAchievements] Connection error: %s", in ? (char *)in : "unknown");
+        obs_log(LOG_DEBUG, "[RetroAchievements] Connection error: %s", in ? (char *)in : "unknown");
         on_websocket_error(in ? (char *)in : "Connection error");
         break;
 
@@ -537,14 +537,14 @@ static void *monitor_thread(void *arg) {
 
         /* Reconnect if the connection dropped while the monitor is still active. */
         if (ctx->running && !ctx->wsi && ctx->context) {
-            obs_log(LOG_INFO, "[RetroAchievements] Connection lost, retrying in %d ms...", retry_delay_ms);
+            obs_log(LOG_DEBUG, "[RetroAchievements] Connection lost, retrying in %d ms...", retry_delay_ms);
 
             int iterations = retry_delay_ms / RA_LOOP_CHECK_MS;
             for (int i = 0; i < iterations && ctx->running; i++) {
                 sleep_ms(RA_LOOP_CHECK_MS);
             }
 
-            obs_log(LOG_INFO, "[RetroAchievements] Reconnecting...");
+            obs_log(LOG_DEBUG, "[RetroAchievements] Reconnecting...");
 
             ctx->wsi = lws_client_connect_via_info(&ccinfo);
 
@@ -555,7 +555,7 @@ static void *monitor_thread(void *arg) {
                     retry_delay_ms = RA_MAX_RETRY_DELAY_MS;
                 }
             } else {
-                obs_log(LOG_INFO, "[RetroAchievements] Connection reestablished");
+                obs_log(LOG_DEBUG, "[RetroAchievements] Connection reestablished");
                 retry_delay_ms = RA_INITIAL_RETRY_DELAY_MS;
             }
         }

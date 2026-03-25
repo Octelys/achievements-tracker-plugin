@@ -208,6 +208,11 @@ static void on_xbox_achievements_progressed(const gamerscore_t                *g
 static void on_xbox_game_played(const game_t *game) {
     free_game(&g_xbox_game);
     g_xbox_game = copy_game(game);
+
+    if (g_xbox_game && (!g_xbox_game->cover_url || g_xbox_game->cover_url[0] == '\0')) {
+        g_xbox_game->cover_url = xbox_get_game_cover(g_xbox_game);
+    }
+
     obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game ? g_xbox_game->title : "(null)");
 
     /* Clear cached achievements — they belong to the previous game */
@@ -215,7 +220,7 @@ static void on_xbox_game_played(const game_t *game) {
 
     notify_active_identity(g_xbox_identity);
 
-    notify_game_played(game);
+    notify_game_played(g_xbox_game);
 }
 
 /**
