@@ -626,7 +626,20 @@ static void on_buffer_received(const char *buffer) {
 
     if (is_presence_message(message)) {
         obs_log(LOG_DEBUG, "[Monitoring] Message is a presence message");
+
+        /* Parse the rich presence information however, we only want the game ID since
+         * the presence game does not provide the game title; just a rich presence text */
         game = parse_game(message);
+
+        if (g_current_session.game != NULL && strcasecmp(game->id, g_current_session.game->id) == 0) {
+            obs_log(LOG_WARNING, "[Monitoring] Game ID has not changed: %s %s", game->id, game->title);
+            goto cleanup;
+        }
+
+        free_game(&game);
+
+        game = xbox_get_current_game();
+
         on_game_update_received(game);
         goto cleanup;
     }

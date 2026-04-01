@@ -130,6 +130,8 @@ game_t *parse_game(const char *json_string) {
         return NULL;
     }
 
+    obs_log(LOG_WARNING, "GAME Received: %s", json_string);
+
     json_root = cJSON_Parse(json_string);
 
     if (!json_root) {
@@ -212,6 +214,8 @@ xbox_achievement_progress_t *parse_achievement_progress(const char *json_string)
         return NULL;
     }
 
+    obs_log(LOG_WARNING, "Received: %s", json_string);
+
     json_root = cJSON_Parse(json_string);
 
     if (!json_root) {
@@ -266,7 +270,7 @@ xbox_achievement_progress_t *parse_achievement_progress(const char *json_string)
         int64_t unlocked_timestamp = 0;
 
         if (!convert_iso8601_utc_to_unix(time_unlocked_node->valuestring, &unlocked_timestamp, &fraction)) {
-            obs_log(LOG_ERROR, "No time unlocked at %d", detail_index);
+            obs_log(LOG_ERROR, "No time unlocked at %d (received %s)", detail_index, time_unlocked_node->valuestring);
             continue;
         }
 

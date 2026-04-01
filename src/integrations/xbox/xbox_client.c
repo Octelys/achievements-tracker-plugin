@@ -413,7 +413,7 @@ game_t *xbox_get_current_game(void) {
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Response: %s", presence_response);
+    obs_log(LOG_WARNING, "PRESENCE Response: %s", presence_response);
 
     presence_json = cJSON_Parse(presence_response);
 
@@ -556,6 +556,8 @@ xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
         }
 
         obs_log(LOG_DEBUG, "Response length: %zu bytes", strlen(response_json));
+
+        obs_log(LOG_WARNING, "Achievemnet response: %s", response_json);
 
         /* Parse achievements from this page */
         page_achievements = parse_achievements(response_json);

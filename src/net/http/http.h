@@ -92,10 +92,12 @@ char *http_urlencode(const char *in);
 /**
  * @brief Normalize and percent-encode a full URL.
  *
- * Parses @p url to locate the path component and percent-encodes each path
- * segment individually while preserving the scheme, host, and '/' separators.
- * This is safe to call on a complete URL — unlike @ref http_urlencode which
- * would escape structural delimiters like '/' and ':'.
+ * Preserves the URL structure (scheme, authority, path separators, query
+ * delimiters, fragment delimiters, and existing %XX escapes) while
+ * percent-encoding only unsafe bytes inside the path/query/fragment
+ * components. This is safe to call on a complete URL — unlike
+ * @ref http_urlencode which would escape structural delimiters like '/', '?',
+ * and ':'.
  *
  * @param url The raw URL to normalize.
  * @return Newly allocated encoded URL (caller must bfree()), or NULL on error.

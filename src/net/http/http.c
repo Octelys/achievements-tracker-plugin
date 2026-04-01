@@ -394,69 +394,132 @@ char *http_urlencode(const char *in) {
     return out;
 }
 
+static bool http_is_hex_digit(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static bool http_is_unreserved(unsigned char c) {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.' ||
+           c == '_' || c == '~';
+}
+
+static void http_append_pct(char *out, size_t *pos, unsigned char c) {
+    static const char hex[] = "0123456789ABCDEF";
+    out[(*pos)++]           = '%';
+    out[(*pos)++]           = hex[(c >> 4) & 0x0F];
+    out[(*pos)++]           = hex[c & 0x0F];
+}
+
 char *http_encode_url(const char *url) {
 
     if (!url)
         return NULL;
 
-    /* Find the start of the path component.
-     * We look for "://" and then the next '/' after the host. */
     const char *scheme_end = strstr(url, "://");
     if (!scheme_end)
         return bstrdup(url);
 
-    const char *host_start = scheme_end + 3;
-    const char *path_start = strchr(host_start, '/');
-    if (!path_start)
-        return bstrdup(url); /* No path — nothing to encode */
+    const char *host_start     = scheme_end + 3;
+    const char *path_start     = strchr(host_start, '/');
+    const char *query_start    = strchr(host_start, '?');
+    const char *fragment_start = strchr(host_start, '#');
+    const char *first_delim    = NULL;
 
-    size_t prefix_len = (size_t)(path_start - url);
+    if (path_start)
+        first_delim = path_start;
+    if (query_start && (!first_delim || query_start < first_delim))
+        first_delim = query_start;
+    if (fragment_start && (!first_delim || fragment_start < first_delim))
+        first_delim = fragment_start;
+
+    if (!first_delim)
+        return bstrdup(url);
+
+    size_t prefix_len = (size_t)(first_delim - url);
 
     CURL *curl = curl_easy_init();
     if (!curl)
         return NULL;
 
-    /* Estimate output size: worst case every byte becomes %XX (×3).
-     * Add prefix length + NUL. */
-    size_t path_len = strlen(path_start);
-    size_t buf_size = prefix_len + path_len * 3 + 1;
-    char  *out      = bzalloc(buf_size);
+    /* Worst case: every remaining byte is percent-encoded. */
+    size_t suffix_len = strlen(first_delim);
+    size_t buf_size   = prefix_len + suffix_len * 3 + 1;
+    char  *out        = bzalloc(buf_size);
     if (!out) {
         curl_easy_cleanup(curl);
         return NULL;
     }
 
-    /* Copy scheme + host verbatim */
+    /* Copy scheme + authority verbatim. */
     memcpy(out, url, prefix_len);
     size_t pos = prefix_len;
 
-    /* Encode path segment-by-segment, preserving '/' separators. */
-    const char *p = path_start;
-    while (*p) {
-        if (*p == '/') {
+    const char *p = first_delim;
+
+    /* Path: preserve '/', preserve existing %XX escapes, encode the rest of
+     * unsafe bytes. Stop at '?' or '#'. */
+    while (*p && *p != '?' && *p != '#') {
+        unsigned char c = (unsigned char)*p;
+
+        if (c == '/') {
             out[pos++] = '/';
             p++;
-            continue;
-        }
-
-        /* Collect one segment (until next '/' or end) */
-        const char *seg_start = p;
-        while (*p && *p != '/')
+        } else if (c == '%' && http_is_hex_digit(p[1]) && http_is_hex_digit(p[2])) {
+            out[pos++] = p[0];
+            out[pos++] = p[1];
+            out[pos++] = p[2];
+            p += 3;
+        } else if (http_is_unreserved(c)) {
+            out[pos++] = (char)c;
             p++;
+        } else {
+            http_append_pct(out, &pos, c);
+            p++;
+        }
+    }
 
-        size_t seg_len = (size_t)(p - seg_start);
-        char  *segment = bzalloc(seg_len + 1);
-        memcpy(segment, seg_start, seg_len);
-        segment[seg_len] = '\0';
+    /* Query: preserve '?', '&', '=', and existing %XX escapes. Encode only
+     * unsafe bytes like spaces. Stop at '#'. */
+    if (*p == '?') {
+        out[pos++] = *p++;
+        while (*p && *p != '#') {
+            unsigned char c = (unsigned char)*p;
 
-        char *encoded = curl_easy_escape(curl, segment, (int)seg_len);
-        bfree(segment);
+            if (c == '%' && http_is_hex_digit(p[1]) && http_is_hex_digit(p[2])) {
+                out[pos++] = p[0];
+                out[pos++] = p[1];
+                out[pos++] = p[2];
+                p += 3;
+            } else if (http_is_unreserved(c) || c == '&' || c == '=' || c == ';' || c == ':' || c == ',' || c == '+' ||
+                       c == '/' || c == '@' || c == '?' || c == '-') {
+                out[pos++] = (char)c;
+                p++;
+            } else {
+                http_append_pct(out, &pos, c);
+                p++;
+            }
+        }
+    }
 
-        if (encoded) {
-            size_t enc_len = strlen(encoded);
-            memcpy(out + pos, encoded, enc_len);
-            pos += enc_len;
-            curl_free(encoded);
+    /* Fragment: preserve '#' and existing %XX escapes; encode only unsafe
+     * bytes. */
+    if (*p == '#') {
+        out[pos++] = *p++;
+        while (*p) {
+            unsigned char c = (unsigned char)*p;
+
+            if (c == '%' && http_is_hex_digit(p[1]) && http_is_hex_digit(p[2])) {
+                out[pos++] = p[0];
+                out[pos++] = p[1];
+                out[pos++] = p[2];
+                p += 3;
+            } else if (http_is_unreserved(c) || c == '/' || c == '?' || c == '&' || c == '=' || c == '-' || c == '.') {
+                out[pos++] = (char)c;
+                p++;
+            } else {
+                http_append_pct(out, &pos, c);
+                p++;
+            }
         }
     }
 
@@ -492,10 +555,19 @@ bool http_download(const char *url, uint8_t **out_data, size_t *out_size) {
 
     CURLcode res = curl_easy_perform(curl);
 
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
         obs_log(LOG_ERROR, "Download failed: %s", curl_easy_strerror(res));
+        bfree(buf.data);
+        return false;
+    }
+
+    if (http_code < 200 || http_code >= 300) {
+        obs_log(LOG_ERROR, "Download failed: server returned HTTP %ld for '%s'", http_code, url);
         bfree(buf.data);
         return false;
     }

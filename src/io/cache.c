@@ -5,60 +5,78 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <util/platform.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#define CACHE_MAX_PATH MAX_PATH
-#else
 #include <limits.h>
+
 #define CACHE_MAX_PATH PATH_MAX
-#endif
 
 #include <diagnostics/log.h>
 #include <net/http/http.h>
 
 #include "common/memory.h"
 
-static const char *get_temp_dir(char *buf, size_t buf_size) {
-    // TMPDIR  — macOS and most Linux distros
-    const char *dir = getenv("TMPDIR");
-    if (dir && dir[0] != '\0')
-        return dir;
+#define CACHE_DIRECTORY "cache"
 
-    // TEMP / TMP — Windows (and some Linux environments)
-    dir = getenv("TEMP");
-    if (dir && dir[0] != '\0')
-        return dir;
+static uint32_t cache_hash_source(const char *source) {
+    /* FNV-1a 32-bit: small, stable, and sufficient for cache keying. */
+    const unsigned char *p = (const unsigned char *)(source ? source : "");
+    uint32_t             h = 2166136261u;
 
-    dir = getenv("TMP");
-    if (dir && dir[0] != '\0')
-        return dir;
+    while (*p) {
+        h ^= (uint32_t)*p++;
+        h *= 16777619u;
+    }
 
-#ifdef _WIN32
-    // Last resort on Windows: ask the OS directly
-    DWORD len = GetTempPathA((DWORD)buf_size, buf);
-    if (len > 0 && len < buf_size)
-        return buf;
-#endif
-    UNUSED_PARAMETER(buf);
-    UNUSED_PARAMETER(buf_size);
-    // Last resort on POSIX
-    return "/tmp/";
+    return h;
 }
 
-void cache_build_path(const char *type, const char *id, char *out_path, size_t path_size) {
+static bool get_cache_dir(char *buf, size_t buf_size) {
 
-    char        tmpbuf[CACHE_MAX_PATH] = {0};
-    const char *tmpdir                 = get_temp_dir(tmpbuf, sizeof(tmpbuf));
+    char *cache_dir = obs_module_config_path(CACHE_DIRECTORY);
 
-    // Ensure the temp dir ends with a separator
-    size_t dirlen = strlen(tmpdir);
-    char   sep    = (dirlen > 0 && (tmpdir[dirlen - 1] == '/' || tmpdir[dirlen - 1] == '\\')) ? '\0' : '/';
+    if (!cache_dir) {
+        if (buf && buf_size > 0) {
+            buf[0] = '\0';
+        }
+
+        return false;
+    }
+
+    os_mkdirs(cache_dir);
+    snprintf(buf, buf_size, "%s", cache_dir);
+    bfree(cache_dir);
+    return true;
+}
+
+void cache_build_path(const char *type, const char *id, const char *source, char *out_path, size_t path_size) {
+
+    char     cache_dir[CACHE_MAX_PATH] = {0};
+    uint32_t source_hash               = cache_hash_source(source);
+
+    if (!get_cache_dir(cache_dir, sizeof(cache_dir))) {
+        if (out_path && path_size > 0) {
+            out_path[0] = '\0';
+        }
+
+        return;
+    }
+
+    // Ensure the cache dir ends with a separator
+    size_t dirlen = strlen(cache_dir);
+    char   sep    = (dirlen > 0 && (cache_dir[dirlen - 1] == '/' || cache_dir[dirlen - 1] == '\\')) ? '\0' : '/';
 
     if (sep)
-        snprintf(out_path, path_size, "%s%cobs_achievement_tracker_%s_%s.png", tmpdir, sep, type, id);
+        snprintf(out_path,
+                 path_size,
+                 "%s%cobs_achievement_tracker_%s_%s_%08x.png",
+                 cache_dir,
+                 sep,
+                 type,
+                 id,
+                 source_hash);
     else
-        snprintf(out_path, path_size, "%sobs_achievement_tracker_%s_%s.png", tmpdir, type, id);
+        snprintf(out_path, path_size, "%sobs_achievement_tracker_%s_%s_%08x.png", cache_dir, type, id, source_hash);
 }
 
 bool cache_download(const char *url, const char *type, const char *id, char *out_path, size_t path_size) {
@@ -68,7 +86,12 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
     }
 
     char path_buf[1024];
-    cache_build_path(type, id, path_buf, sizeof(path_buf));
+    cache_build_path(type, id, url, path_buf, sizeof(path_buf));
+
+    if (path_buf[0] == '\0') {
+        obs_log(LOG_ERROR, "[Cache] Failed to resolve the OBS module cache directory");
+        return false;
+    }
 
     /* Copy the resolved path to the caller's buffer when provided */
     if (out_path) {
@@ -78,8 +101,17 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
     /* Already cached — nothing to do */
     struct stat st;
     if (stat(path_buf, &st) == 0) {
-        obs_log(LOG_DEBUG, "[Cache] Hit: %s", path_buf);
-        return false;
+        if (st.st_size == 0) {
+            obs_log(LOG_WARNING, "[Cache] Discarding zero-byte cached file '%s'", path_buf);
+
+            if (remove(path_buf) != 0) {
+                obs_log(LOG_WARNING, "[Cache] Failed to delete zero-byte cached file '%s'", path_buf);
+                return false;
+            }
+        } else {
+            obs_log(LOG_DEBUG, "[Cache] Hit: %s", path_buf);
+            return true;
+        }
     }
 
     /* Download into memory */
@@ -100,6 +132,12 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
     }
 
     bfree(encoded_url);
+
+    if (size == 0) {
+        obs_log(LOG_WARNING, "[Cache] Downloaded zero bytes from '%s'", download_url);
+        free_memory((void **)&data);
+        return false;
+    }
 
     /* Write to disk */
     FILE *file = fopen(path_buf, "wb");
