@@ -420,6 +420,13 @@ jobs:
 
       - name: Install Dependencies 🔐
         run: |
+          # Update vcpkg to the latest port definitions before installing.
+          # The port snapshots bundled with the windows-2022 runner image can
+          # become stale: if GitHub regenerates a release tarball the recorded
+          # SHA-512 hash in the port no longer matches and the download fails.
+          # Pulling the latest vcpkg tree ensures we get corrected hashes.
+          git -C "$env:VCPKG_INSTALLATION_ROOT" pull --ff-only
+
           # Install OpenSSL and libwebsockets for x64 via vcpkg.
           # The obs-deps prebuilt package does not ship either on Windows.
           # The system OpenSSL must be replaced with the vcpkg one: the system
@@ -471,6 +478,10 @@ jobs:
 
       - name: Install OpenSSL for ARM64 🔐
         run: |
+          # Update vcpkg to the latest port definitions before installing.
+          # See the x64 step for the full explanation.
+          git -C "$env:VCPKG_INSTALLATION_ROOT" pull --ff-only
+
           # Install OpenSSL and libwebsockets for ARM64 via vcpkg.
           # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
           # The system OpenSSL is x64-only; we need an arm64-windows build.
