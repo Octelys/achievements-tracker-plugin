@@ -83,6 +83,22 @@ static identity_t *g_retro_identity = NULL;
 static game_t *g_xbox_game  = NULL;
 static game_t *g_retro_game = NULL;
 
+static const identity_t *get_current_active_identity(void) {
+    if (g_retro_game && g_retro_identity)
+        return g_retro_identity;
+
+    if (g_xbox_game && g_xbox_identity)
+        return g_xbox_identity;
+
+    if (g_retro_identity)
+        return g_retro_identity;
+
+    if (g_xbox_identity)
+        return g_xbox_identity;
+
+    return NULL;
+}
+
 /** Cached generic achievements for the current game (owned by this module). */
 static achievement_t *g_current_achievements = NULL;
 
@@ -177,10 +193,15 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
                         g_xbox_identity->name,
                         g_xbox_identity->score,
                         g_xbox_identity->avatar_url ? g_xbox_identity->avatar_url : "(none)");
+
+                notify_active_identity(get_current_active_identity());
             }
         }
     } else {
         free_identity_t(&g_xbox_identity);
+
+        if (g_xbox_game || !g_retro_identity)
+            notify_active_identity(get_current_active_identity());
     }
 
     if (g_connection_changed_callback)
@@ -218,7 +239,11 @@ static void on_xbox_game_played(const game_t *game) {
     /* Clear cached achievements — they belong to the previous game */
     replace_current_achievements(NULL);
 
-    notify_active_identity(g_xbox_identity);
+    /* Use get_current_active_identity() rather than g_xbox_identity directly:
+     * during the initial connection the game-played notification may arrive
+     * before the connection-changed notification (which sets g_xbox_identity),
+     * so g_xbox_identity might still be NULL at this point. */
+    notify_active_identity(get_current_active_identity());
 
     notify_game_played(g_xbox_game);
 }
@@ -370,6 +395,8 @@ void monitoring_subscribe_active_identity(on_monitoring_active_identity_changed_
     node->callback                  = callback;
     node->next                      = g_active_identity_subscriptions;
     g_active_identity_subscriptions = node;
+
+    callback(get_current_active_identity());
 }
 
 void monitoring_subscribe_game_played(on_monitoring_game_played_t callback) {
@@ -395,6 +422,10 @@ void monitoring_subscribe_achievements_changed(on_monitoring_achievements_change
 
 void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback) {
     g_session_ready_callback = callback;
+}
+
+const identity_t *monitoring_get_current_active_identity(void) {
+    return get_current_active_identity();
 }
 
 const achievement_t *monitoring_get_current_game_achievements(void) {

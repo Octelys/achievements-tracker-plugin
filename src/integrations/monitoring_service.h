@@ -145,6 +145,20 @@ void monitoring_subscribe_achievements_changed(on_monitoring_achievements_change
 void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback);
 
 /**
+ * @brief Get the currently active identity, if any.
+ *
+ * Returns the same identity that would be delivered to active-identity
+ * subscribers right now. Useful for sources that need to seed their initial
+ * state at creation time, after the monitor has already connected.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitoring service
+ * and may be replaced on the next identity update. Do not free it.
+ *
+ * @return The active identity, or NULL if no session is established.
+ */
+const identity_t *monitoring_get_current_active_identity(void);
+
+/**
  * @brief Get the cached generic achievements list for the current game.
  *
  * Returns the achievements converted to generic @ref achievement_t form,

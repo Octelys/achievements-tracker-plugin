@@ -544,6 +544,13 @@ static void on_websocket_connected() {
 
     xbox_presence_subscribe();
 
+    /* Notify subscribers that we are connected BEFORE fetching the current
+     * game.  This ensures that monitoring_service.c has g_xbox_identity set
+     * (via on_xbox_connection_changed) when the subsequent game-played and
+     * session-ready notifications arrive, so the gamertag source never
+     * briefly shows "Not connected". */
+    notify_connection_changed(NULL);
+
     /* Immediately retrieves the game being played, if any */
     game_t *current_game = xbox_get_current_game();
     xbox_change_game(current_game);
@@ -553,8 +560,6 @@ static void on_websocket_connected() {
     if (g_current_session.game != NULL) {
         xbox_achievements_progress_subscribe(&g_current_session);
     }
-
-    notify_connection_changed(NULL);
 }
 
 /**
