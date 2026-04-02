@@ -9,6 +9,16 @@
 
 #include <limits.h>
 
+/* PATH_MAX is a POSIX constant absent from Windows / MSVC's limits.h.
+ * MAX_PATH (260) is the traditional Win32 limit; use it as a fallback. */
+#ifndef PATH_MAX
+#ifdef MAX_PATH
+#define PATH_MAX MAX_PATH
+#else
+#define PATH_MAX 4096
+#endif
+#endif
+
 #define CACHE_MAX_PATH PATH_MAX
 
 #include <diagnostics/log.h>
