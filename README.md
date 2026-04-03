@@ -65,28 +65,28 @@ After installation, restart OBS Studio.
 
 All Xbox sources in the plugin share the same authenticated account. RetroAchievements sources connect automatically when a RetroArch WebSocket server is detected on the local machine.
 
-![Xbox Account dialog](plugin-xbox-account.png)
+![Xbox Account dialog](images/plugin-xbox-account.png)
 
 ### Available OBS Sources
 
 #### Account & profile
 
-- **Xbox Gamertag**: text source for the current gamertag or RetroAchievements display name
-- **Xbox Gamerpic**: image source for the current gamerpic or RetroAchievements avatar
-- **Xbox Gamerscore**: text source for the current gamerscore or RetroAchievements score
+- **Gamertag**: text source for the current gamertag or RetroAchievements display name
+- **Gamerpic**: image source for the current gamerpic or RetroAchievements avatar
+- **Gamerscore**: text source for the current gamerscore or RetroAchievements score
 
 Account sign-in and sign-out are managed globally from **Tools** → **Xbox Account**.
 
 #### Game
 
-- **Xbox Game Cover**: image source for the currently active game's cover art
+- **Game Cover**: image source for the currently active game's cover art
 
 #### Achievements
 
-- **Xbox Achievement (Name)**: current achievement name, including gamerscore when available
-- **Xbox Achievement (Description)**: current achievement description
-- **Xbox Achievement (Icon)**: current achievement icon
-- **Xbox Achievements Count**: unlocked / total achievements for the current game (for example `12 / 50`)
+- **Achievement (Name)**: current achievement name, including gamerscore when available
+- **Achievement (Description)**: current achievement description
+- **Achievement (Icon)**: current achievement icon
+- **Achievements’ Count**: unlocked / total achievements for the current game (for example `12 / 50`)
 
 #### Real-time updates
 
