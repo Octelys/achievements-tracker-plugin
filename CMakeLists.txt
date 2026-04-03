@@ -746,6 +746,7 @@ if(BUILD_TESTING)
     test/stubs/integrations/xbox_monitor_stub.c
     test/stubs/integrations/retro_achievements_monitor_stub.c
     test/stubs/io/cache_stub.c
+    test/stubs/time/time_stub.c
   )
 
   add_test(NAME test_monitoring_service COMMAND test_monitoring_service)
