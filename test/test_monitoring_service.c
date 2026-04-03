@@ -20,14 +20,15 @@
  *   7. Retro user + game → retro identity notified
  *   8. Retro game before user → NULL, then identity once user arrives
  *   9. Retro user before game → NULL, then identity once game arrives
- *  10. Retro no_game → active identity becomes NULL
- *  11. Retro no_user → active identity becomes NULL
+ *  10. Retro no_game → active identity callback fires with NULL
+ *  11. Retro no_user (game active) → active identity callback fires with NULL
  *  12. Retro game stops (no_game) after active identity → NULL notified
  *
  *  Last-game-source priority:
  *  13. Xbox game then retro game → retro identity active
  *  14. Retro game then Xbox game → Xbox identity active
  *  15. Xbox game, then retro game, then Xbox game again → Xbox identity active
+ *  16. Retro no_user while Xbox game also active → Xbox identity takes over
  */
 
 #include "unity.h"
@@ -286,7 +287,7 @@ static void monitoring_subscribe_active_identity__retro_user_before_game__identi
     TEST_ASSERT_EQUAL_STRING("Octelys", s_last_identity->name);
 }
 
-/* 10. Retro no_game → active identity becomes NULL */
+/* 10. Retro no_game → active identity becomes NULL and callback fires */
 static void monitoring_subscribe_active_identity__retro_no_game__null_returned(void) {
     retro_user_t user;
     fill_retro_user(&user, "octelys", "Octelys");
@@ -300,13 +301,12 @@ static void monitoring_subscribe_active_identity__retro_no_game__null_returned(v
     s_identity_cb_count = 0;
     mock_retro_monitor_fire_no_game();
 
-    /* no_game clears the game; next notify_game_played(NULL) should follow.
-     * The active-identity callback itself is not fired by on_retro_no_game,
-     * but monitoring_get_current_active_identity() must now return NULL. */
+    TEST_ASSERT_EQUAL_INT(1, s_identity_cb_count);
+    TEST_ASSERT_NULL(s_last_identity);
     TEST_ASSERT_NULL(monitoring_get_current_active_identity());
 }
 
-/* 11. Retro no_user → active identity becomes NULL */
+/* 11. Retro no_user (while game is active) → active identity becomes NULL and callback fires */
 static void monitoring_subscribe_active_identity__retro_no_user__null_returned(void) {
     retro_user_t user;
     fill_retro_user(&user, "octelys", "Octelys");
@@ -320,7 +320,8 @@ static void monitoring_subscribe_active_identity__retro_no_user__null_returned(v
     s_identity_cb_count = 0;
     mock_retro_monitor_fire_no_user();
 
-    /* Identity is gone → current should be NULL */
+    TEST_ASSERT_EQUAL_INT(1, s_identity_cb_count);
+    TEST_ASSERT_NULL(s_last_identity);
     TEST_ASSERT_NULL(monitoring_get_current_active_identity());
 }
 
@@ -344,8 +345,42 @@ static void monitoring_subscribe_active_identity__retro_no_game_after_active__nu
 
     mock_retro_monitor_fire_no_game();
 
-    /* After no_game the active identity must be NULL */
+    /* After no_game the callback must have fired with NULL */
+    TEST_ASSERT_EQUAL_INT(1, s_identity_cb_count);
+    TEST_ASSERT_NULL(s_last_identity);
     TEST_ASSERT_NULL(monitoring_get_current_active_identity());
+}
+
+/* 16. Retro no_user while Xbox game also active → Xbox identity takes over */
+static void monitoring_subscribe_active_identity__retro_no_user_with_xbox_game_active__xbox_identity_notified(void) {
+    /* Both Xbox and retro connected and playing */
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    retro_user_t user;
+    fill_retro_user(&user, "octelys", "Octelys");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_user(&user);
+    retro_game_t retro_game;
+    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_game_playing(&retro_game);
+
+    /* Retro is now the last game source */
+    TEST_ASSERT_NOT_NULL(s_last_identity);
+    TEST_ASSERT_EQUAL_STRING("Octelys", s_last_identity->name);
+
+    s_identity_cb_count = 0;
+
+    /* Retro loses user → Xbox identity should become active */
+    mock_retro_monitor_fire_no_user();
+
+    TEST_ASSERT_EQUAL_INT(1, s_identity_cb_count);
+    TEST_ASSERT_NOT_NULL(s_last_identity);
+    TEST_ASSERT_EQUAL_STRING("MasterChief", s_last_identity->name);
+    TEST_ASSERT_EQUAL_INT(IDENTITY_SOURCE_XBOX, s_last_identity->source);
 }
 
 /* =========================================================================
@@ -460,6 +495,7 @@ int main(void) {
     RUN_TEST(monitoring_subscribe_active_identity__xbox_game_then_retro_game__retro_identity_active);
     RUN_TEST(monitoring_subscribe_active_identity__retro_game_then_xbox_game__xbox_identity_active);
     RUN_TEST(monitoring_subscribe_active_identity__xbox_retro_xbox__xbox_identity_active);
+    RUN_TEST(monitoring_subscribe_active_identity__retro_no_user_with_xbox_game_active__xbox_identity_notified);
 
     return UNITY_END();
 }

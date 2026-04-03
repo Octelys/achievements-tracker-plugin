@@ -308,6 +308,11 @@ static void on_retro_user(const retro_user_t *user) {
 
 static void on_retro_no_user(void) {
     free_identity_t(&g_retro_identity);
+
+    /* If retro was the active source, losing the identity means the active
+     * identity is now NULL (or falls back to Xbox if an Xbox game is active). */
+    if (g_last_game_source == IDENTITY_SOURCE_RETRO)
+        notify_active_identity(get_current_active_identity());
 }
 
 static void on_retro_game_playing(const retro_game_t *retro_game) {
@@ -336,11 +341,11 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
 
 static void on_retro_no_game(void) {
     free_game(&g_retro_game);
-    /* Clear achievements and notify game-played subscribers that no game is
-     * active. The active-identity is not re-notified here; callers can query
-     * monitoring_get_current_active_identity() to confirm it is now NULL. */
+    /* Clear achievements and notify all subscribers: no game is active and
+     * therefore no identity is active either. */
     replace_current_achievements(NULL);
     notify_game_played(NULL);
+    notify_active_identity(get_current_active_identity());
 }
 
 /**
