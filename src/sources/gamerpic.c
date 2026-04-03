@@ -61,7 +61,7 @@ static const char *source_get_name(void *unused) {
 
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Gamerpic";
+    return "Gamerpic";
 }
 
 /**

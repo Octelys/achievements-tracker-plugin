@@ -171,7 +171,7 @@ static obs_properties_t *source_get_properties(void *data) {
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
 
-    return "Xbox Gamerscore";
+    return "Gamerscore";
 }
 
 /**
