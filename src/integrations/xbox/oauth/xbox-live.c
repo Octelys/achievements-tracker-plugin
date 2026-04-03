@@ -296,7 +296,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!proof_key) {
         ctx->result.error_message = "Unable retrieve a sisu token: could not serialize proof key";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -309,7 +309,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
              ctx->device_token->value,
              proof_key);
 
-    obs_log(LOG_DEBUG, "Body: %s", json_body);
+    obs_log(LOG_DEBUG, "[XboxAuth] Sisu token request body: %s", json_body);
 
     /* Signs the request */
     size_t signature_len = 0;
@@ -325,11 +325,11 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!signature_b64) {
         ctx->result.error_message = "Unable retrieve a sisu token: encoding of the signature failed";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Signature (base64): %s", signature_b64);
+    obs_log(LOG_DEBUG, "[XboxAuth] Signature (base64): %s", signature_b64);
 
     /* Sets up the headers */
     char extra_headers[4096];
@@ -341,7 +341,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
              "x-xbl-contract-version: 1\r\n",
              signature_b64);
 
-    obs_log(LOG_DEBUG, "Sending request for sisu token: %s", json_body);
+    obs_log(LOG_DEBUG, "[XboxAuth] Sending sisu token request: %s", json_body);
 
     /*
      * Sends the request
@@ -354,11 +354,11 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Received response with status code %d: %s", http_code, sisu_token_response);
+    obs_log(LOG_DEBUG, "[XboxAuth] Sisu token response (status %d): %s", http_code, sisu_token_response);
 
     if (http_code < 200 || http_code >= 300) {
         ctx->result.error_message = "Unable to retrieve a sisu token: received error from the server";
-        obs_log(LOG_ERROR, "Unable to retrieve a sisu token: received status code '%d'", http_code);
+        obs_log(LOG_ERROR, "[XboxAuth] Unable to retrieve sisu token: received status code %d", http_code);
         goto cleanup;
     }
 
@@ -374,7 +374,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!token_node) {
         ctx->result.error_message = "Unable to retrieve a sisu token: no token found";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -383,7 +383,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!xid_node) {
         ctx->result.error_message = "Unable to retrieve the xid: no value found";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -392,7 +392,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!uhs_node) {
         ctx->result.error_message = "Unable to retrieve the uhs: no value found";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -401,7 +401,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!not_after_date_node) {
         ctx->result.error_message = "Unable to retrieve the NotAfter: no value found";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -410,7 +410,7 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!convert_iso8601_utc_to_unix(not_after_date_node->valuestring, &unix_timestamp, &fraction)) {
         ctx->result.error_message = "Unable retrieve a device token: unable to read the NotAfter date";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -419,17 +419,17 @@ static bool retrieve_sisu_token(authentication_ctx_t *ctx) {
 
     if (!gtg_node) {
         ctx->result.error_message = "Unable to retrieve the gtg: no value found";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Sisu authentication succeeded!");
+    obs_log(LOG_INFO, "[XboxAuth] Sisu authentication succeeded");
 
-    obs_log(LOG_DEBUG, "gtg: %s", gtg_node->valuestring);
-    obs_log(LOG_DEBUG, "XID: %s", xid_node->valuestring);
-    obs_log(LOG_DEBUG, "Hash: %s", uhs_node->valuestring);
-    obs_log(LOG_DEBUG, "Now: %d", now());
-    obs_log(LOG_DEBUG, "Expires: %d (%s)", unix_timestamp, not_after_date_node->valuestring);
+    obs_log(LOG_DEBUG, "[XboxAuth] Gamertag: %s", gtg_node->valuestring);
+    obs_log(LOG_DEBUG, "[XboxAuth] XID: %s", xid_node->valuestring);
+    obs_log(LOG_DEBUG, "[XboxAuth] UHS: %s", uhs_node->valuestring);
+    obs_log(LOG_DEBUG, "[XboxAuth] Now: %d", now());
+    obs_log(LOG_DEBUG, "[XboxAuth] Expires: %d (%s)", unix_timestamp, not_after_date_node->valuestring);
 
     /* Creates the Xbox identity */
     token_t *xbox_token = bzalloc(sizeof(token_t));
@@ -500,7 +500,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     token_t *existing_device_token = state_get_device_token();
 
     if (ctx->allow_cache && existing_device_token) {
-        obs_log(LOG_INFO, "Using cached device token");
+        obs_log(LOG_INFO, "[XboxAuth] Using cached device token");
         ctx->device_token = existing_device_token;
         return retrieve_sisu_token(ctx);
     }
@@ -512,14 +512,14 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     char    *proof_key             = NULL;
     cJSON   *device_token_json     = NULL;
 
-    obs_log(LOG_INFO, "No device token cached found. Requesting a new device token");
+    obs_log(LOG_INFO, "[XboxAuth] No cached device token found, requesting a new one");
 
     /* Builds the device token request */
     proof_key = crypto_to_string(ctx->device->keys, false);
 
     if (!proof_key) {
         ctx->result.error_message = "Unable retrieve a device token: could not serialize proof key";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -531,7 +531,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
              ctx->device->serial_number,
              proof_key);
 
-    obs_log(LOG_DEBUG, "Device token request is: %s", json_body);
+    obs_log(LOG_DEBUG, "[XboxAuth] Device token request body: %s", json_body);
 
     /* Signs the request */
     size_t signature_len = 0;
@@ -539,7 +539,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
     if (!signature) {
         ctx->result.error_message = "Unable retrieve a device token: signing failed";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -548,11 +548,11 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
     if (!encoded_signature) {
         ctx->result.error_message = "Unable retrieve a device token: signature encoding failed";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Encoded signature: %s", encoded_signature);
+    obs_log(LOG_DEBUG, "[XboxAuth] Device token request signature: %s", encoded_signature);
 
     /* Creates the headers */
     char extra_headers[4096];
@@ -570,7 +570,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
     if (!device_token_response) {
         ctx->result.error_message = "Unable retrieve a device token: server returned no response";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         return false;
     }
 
@@ -595,7 +595,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
     if (!token_node) {
         ctx->result.error_message = "Unable retrieve a device token: unable to read the token from the response";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -604,7 +604,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
     if (!not_after_date_node) {
         ctx->result.error_message =
             "Unable retrieve a device token: unable to read the NotAfter field from the response";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -613,7 +613,7 @@ static bool retrieve_device_token(struct authentication_ctx *ctx) {
 
     if (!convert_iso8601_utc_to_unix(not_after_date_node->valuestring, &unix_timestamp, &fraction)) {
         ctx->result.error_message = "Unable retrieve a device token: unable to read the NotAfter date";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -1034,7 +1034,7 @@ static void *start_authentication_flow(void *param) {
     if (!device_code_node || strlen(device_code_node->valuestring) == 0) {
         ctx->result.error_message =
             "Unable to received a user token: could not parse the device_code from the response";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -1042,7 +1042,7 @@ static void *start_authentication_flow(void *param) {
 
     if (!interval_node) {
         ctx->result.error_message = "Unable to received a user token: could not parse the interval from token response";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -1051,7 +1051,7 @@ static void *start_authentication_flow(void *param) {
     if (!expires_in_node) {
         ctx->result.error_message =
             "Unable to received a user token: could not parse the expires_in from token response";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -1063,11 +1063,11 @@ static void *start_authentication_flow(void *param) {
     char verification_uri[4096];
     snprintf(verification_uri, sizeof(verification_uri), "%s%s", REGISTER_ENDPOINT, user_code_node->valuestring);
 
-    obs_log(LOG_DEBUG, "Open browser for OAuth verification at URL: %s", verification_uri);
+    obs_log(LOG_DEBUG, "[XboxAuth] Opening browser for OAuth verification: %s", verification_uri);
 
     if (!open_url(verification_uri)) {
         ctx->result.error_message = "Unable to received a user token: could not open the browser";
-        obs_log(LOG_ERROR, ctx->result.error_message);
+        obs_log(LOG_ERROR, "[XboxAuth] %s", ctx->result.error_message);
         goto cleanup;
     }
 
@@ -1153,7 +1153,7 @@ bool xbox_live_authenticate(void *data, on_xbox_live_authenticated_t callback) {
     device_t *device = state_get_device();
 
     if (!device) {
-        obs_log(LOG_ERROR, "Unable to authenticate: no device identity found");
+        obs_log(LOG_ERROR, "[XboxAuth] Unable to authenticate: no device identity found");
         return false;
     }
 
@@ -1238,22 +1238,22 @@ xbox_identity_t *xbox_live_get_identity(void) {
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_INFO, "No identity found");
+        obs_log(LOG_INFO, "[XboxAuth] No identity found");
         return identity;
     }
 
     /* Checks if the Sisu token is expired */
     if (!token_is_expired(identity->token)) {
-        obs_log(LOG_DEBUG, "Token is NOT expired, reusing existing identity");
+        obs_log(LOG_DEBUG, "[XboxAuth] Token is not expired, reusing cached identity");
         return identity;
     }
 
-    obs_log(LOG_INFO, "Sisu token is expired. Retrieving device information.");
+    obs_log(LOG_INFO, "[XboxAuth] Sisu token is expired, refreshing");
 
     device_t *device = state_get_device();
 
     if (!device) {
-        obs_log(LOG_ERROR, "No device found for Xbox token refresh");
+        obs_log(LOG_ERROR, "[XboxAuth] No device found for Xbox token refresh");
         return false;
     }
 

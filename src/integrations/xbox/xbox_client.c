@@ -114,7 +114,7 @@ char *xbox_get_game_cover(const game_t *game) {
     char display_request[4096];
     snprintf(display_request, sizeof(display_request), XBOX_TITLE_HUB, identity->xid, game->id);
 
-    obs_log(LOG_DEBUG, "Display image URL: %s", display_request);
+    obs_log(LOG_DEBUG, "[XboxClient] Fetching game cover URL: %s", display_request);
 
     char headers[4096];
     snprintf(headers,
@@ -126,8 +126,6 @@ char *xbox_get_game_cover(const game_t *game) {
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
 
-    obs_log(LOG_DEBUG, "Headers: %s", headers);
-
     /*
      * Sends the request
      */
@@ -135,16 +133,16 @@ char *xbox_get_game_cover(const game_t *game) {
     titlehub_response = http_get(display_request, headers, NULL, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "Failed to fetch title image: received status code %d", http_code);
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch title image: received status code %ld", http_code);
         goto cleanup;
     }
 
     if (!titlehub_response) {
-        obs_log(LOG_ERROR, "Failed to fetch title image: received no response");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch title image: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Response: %s", titlehub_response);
+    obs_log(LOG_DEBUG, "[XboxClient] Title hub response: %s", titlehub_response);
 
     /*
      *  Process the response by trying to get the poster image URL.
@@ -178,24 +176,24 @@ char *xbox_get_game_cover(const game_t *game) {
         }
 
         display_image_url = bstrdup_n(image_url_value->valuestring, strlen(image_url_value->valuestring));
-        obs_log(LOG_INFO, "Xbox poster image found");
+        obs_log(LOG_INFO, "[XboxClient] Game cover (poster/box art) found");
         break;
     }
 
     if (!display_image_url) {
 
-        obs_log(LOG_INFO, "No Xbox game poster image found: falling back on the display image");
+        obs_log(LOG_INFO, "[XboxClient] No poster/box art image found, falling back on display image");
 
         /* No poster image found. Let's see if we can get the display image at least */
         cJSON *display_image = cJSONUtils_GetPointer(titlehub_json, XBOX_GAME_COVER_DISPLAY_IMAGE);
 
         if (!display_image) {
-            obs_log(LOG_ERROR, "Failed to fetch title image: displayName property not found");
+            obs_log(LOG_ERROR, "[XboxClient] Failed to fetch title image: displayImage property not found");
             goto cleanup;
         }
 
         display_image_url = bstrdup_n(display_image->valuestring, strlen(display_image->valuestring));
-        obs_log(LOG_INFO, "Xbox game display image found");
+        obs_log(LOG_INFO, "[XboxClient] Game display image found");
     }
 
 cleanup:
@@ -234,7 +232,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
              identity->xid,
              GAMERSCORE_SETTING);
 
-    obs_log(LOG_DEBUG, "Body: %s", json_body);
+    obs_log(LOG_DEBUG, "[XboxClient] Fetching gamerscore for XUID %s", identity->xid);
 
     char headers[4096];
     snprintf(headers,
@@ -245,8 +243,6 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
 
-    obs_log(LOG_DEBUG, "Headers: %s", headers);
-
     /*
      * Sends the request
      */
@@ -254,12 +250,12 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     profile_settings_response = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "Failed to fetch gamerscore: received status code %d", http_code);
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch gamerscore: received status code %ld", http_code);
         goto cleanup;
     }
 
     if (!profile_settings_response) {
-        obs_log(LOG_ERROR, "Failed to fetch gamerscore: received no response");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch gamerscore: received no response");
         goto cleanup;
     }
 
@@ -269,7 +265,7 @@ bool xbox_fetch_gamerscore(int64_t *out_gamerscore) {
     gamerscore_text = json_read_string(profile_settings_response, "value");
 
     if (!gamerscore_text) {
-        obs_log(LOG_ERROR, "Failed to fetch gamerscore: unable to read the value");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch gamerscore: unable to read the value");
         goto cleanup;
     }
 
@@ -309,7 +305,7 @@ char *xbox_fetch_gamerpic() {
              identity->xid,
              GAMERPIC_SETTING);
 
-    obs_log(LOG_DEBUG, "Profile settings request body: %s", json_body);
+    obs_log(LOG_DEBUG, "[XboxClient] Fetching gamerpic for XUID %s", identity->xid);
 
     char headers[4096];
     snprintf(headers,
@@ -320,28 +316,26 @@ char *xbox_fetch_gamerpic() {
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
 
-    obs_log(LOG_DEBUG, "Profile settings request headers: %s", headers);
-
     /* Sends the request */
     long http_code   = 0;
     profile_response = http_post(XBOX_PROFILE_SETTINGS_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's Gamerpic: received status code %ld", http_code);
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch gamerpic: received status code %ld", http_code);
         goto cleanup;
     }
 
     if (!profile_response) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's Gamerpic: received no response");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch gamerpic: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Profile settings response: %s", profile_response);
+    obs_log(LOG_DEBUG, "[XboxClient] Profile settings response: %s", profile_response);
 
     profile_settings_json = cJSON_Parse(profile_response);
 
     if (!profile_settings_json) {
-        obs_log(LOG_ERROR, "Failed to fetch the user's gamerpic: unable to parse the JSON response");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch gamerpic: unable to parse the JSON response");
         goto cleanup;
     }
 
@@ -349,7 +343,7 @@ char *xbox_fetch_gamerpic() {
     cJSON *user_gamerpic_url = cJSONUtils_GetPointer(profile_settings_json, "/profileUsers/0/settings/0/value");
 
     if (!user_gamerpic_url || !user_gamerpic_url->valuestring || user_gamerpic_url->valuestring[0] == '\0') {
-        obs_log(LOG_INFO, "Failed to fetch the user's gamerpic: no value found.");
+        obs_log(LOG_INFO, "[XboxClient] Failed to fetch gamerpic: no value found");
         goto cleanup;
     }
 
@@ -359,7 +353,7 @@ char *xbox_fetch_gamerpic() {
      * Xbox sometimes returns URLs containing "\\u0026" for '&'. Fix it up for curl/http. */
     str_replace(gamerpic_url, "u0026", "&");
 
-    obs_log(LOG_DEBUG, "User gamerpic URL is '%s'", gamerpic_url);
+    obs_log(LOG_DEBUG, "[XboxClient] Gamerpic URL: %s", gamerpic_url);
 
 cleanup:
     free_json_memory((void **)&profile_settings_json);
@@ -371,12 +365,12 @@ cleanup:
 
 game_t *xbox_get_current_game(void) {
 
-    obs_log(LOG_DEBUG, "Retrieving current game");
+    obs_log(LOG_DEBUG, "[XboxClient] Retrieving current game");
 
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Failed to fetch the current game: no identity found");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch current game: no identity found");
         return NULL;
     }
 
@@ -393,8 +387,6 @@ game_t *xbox_get_current_game(void) {
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
 
-    obs_log(LOG_DEBUG, "Headers: %s", headers);
-
     /* Sends the request */
     char presence_url[512];
     snprintf(presence_url, sizeof(presence_url), XBOX_PRESENCE_ENDPOINT, identity->xid);
@@ -404,21 +396,21 @@ game_t *xbox_get_current_game(void) {
 
     if (http_code < 200 || http_code >= 300) {
         /* Retry? */
-        obs_log(LOG_ERROR, "Failed to fetch the current game: received status code %d", http_code);
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch current game: received status code %ld", http_code);
         goto cleanup;
     }
 
     if (!presence_response) {
-        obs_log(LOG_ERROR, "Failed to fetch the current game: received no response");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch current game: received no response");
         goto cleanup;
     }
 
-    obs_log(LOG_WARNING, "PRESENCE Response: %s", presence_response);
+    obs_log(LOG_DEBUG, "[XboxClient] Presence response: %s", presence_response);
 
     presence_json = cJSON_Parse(presence_response);
 
     if (!presence_json) {
-        obs_log(LOG_ERROR, "Failed to fetch the current game: unable to parse the JSON response");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch current game: unable to parse the JSON response");
         goto cleanup;
     }
 
@@ -428,7 +420,7 @@ game_t *xbox_get_current_game(void) {
     cJSON *user_state_value    = cJSONUtils_GetPointer(presence_json, user_state_key);
 
     if (!user_state_value || strcmp(user_state_value->valuestring, "Offline") == 0) {
-        obs_log(LOG_INFO, "User is offline at the moment.");
+        obs_log(LOG_INFO, "[XboxClient] User is offline");
         goto cleanup;
     }
 
@@ -451,33 +443,35 @@ game_t *xbox_get_current_game(void) {
 
         if (!title_game_value || !title_id_value || !state_value) {
             /* There is nothing more */
-            obs_log(LOG_DEBUG, "No more game at %d", title_game_index);
+            obs_log(LOG_DEBUG, "[XboxClient] No more titles at index %d", title_game_index);
             break;
         }
 
         if (strcmp(title_game_value->valuestring, "Home") == 0) {
-            obs_log(LOG_DEBUG, "Skipping home at %d", title_game_index);
+            obs_log(LOG_DEBUG, "[XboxClient] Skipping home at index %d", title_game_index);
             continue;
         }
 
         if (strcmp(state_value->valuestring, "Active") != 0) {
-            obs_log(LOG_DEBUG, "Skipping inactivated game at %d", title_game_index);
+            obs_log(LOG_DEBUG, "[XboxClient] Skipping inactive title at index %d", title_game_index);
             continue;
         }
 
-        /* Retrieve the game title and its ID */
-        obs_log(LOG_DEBUG, "Game title: %s %s", title_game_value->valuestring, title_id_value->valuestring);
+        obs_log(LOG_DEBUG,
+                "[XboxClient] Active title: %s (%s)",
+                title_game_value->valuestring,
+                title_id_value->valuestring);
 
         snprintf(current_game_title, sizeof(current_game_title), "%s", title_game_value->valuestring);
         snprintf(current_game_id, sizeof(current_game_id), "%s", title_id_value->valuestring);
     }
 
     if (strlen(current_game_id) == 0) {
-        obs_log(LOG_INFO, "No game found");
+        obs_log(LOG_INFO, "[XboxClient] No active game found");
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "Game is '%s' (%s)", current_game_title, current_game_id);
+    obs_log(LOG_INFO, "[XboxClient] Current game: %s (%s)", current_game_title, current_game_id);
 
     game               = bzalloc(sizeof(game_t));
     game->id           = bstrdup(current_game_id);
@@ -502,7 +496,7 @@ xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
     xbox_identity_t *identity = state_get_xbox_identity();
 
     if (!identity) {
-        obs_log(LOG_ERROR, "Failed to fetch the game's achievements: no identity found");
+        obs_log(LOG_ERROR, "[XboxClient] Failed to fetch achievements: no identity found");
         return NULL;
     }
 
@@ -518,8 +512,6 @@ xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
              identity->uhs,
              identity->token->value,
              XBOX_PROFILE_CONTRACT_VERSION);
-
-    obs_log(LOG_DEBUG, "Headers: %s", headers);
 
     /* Pagination loop: keep fetching until no continuation token */
     do {
@@ -545,19 +537,17 @@ xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
         response_json  = http_get(achievements_url, headers, NULL, &http_code);
 
         if (http_code < 200 || http_code >= 300) {
-            obs_log(LOG_ERROR, "Failed to fetch the games achievements: received status code %ld", http_code);
+            obs_log(LOG_ERROR, "[XboxClient] Failed to fetch achievements: received status code %ld", http_code);
             FREE(response_json);
             break;
         }
 
         if (!response_json) {
-            obs_log(LOG_ERROR, "Failed to fetch the games achievements: received no response");
+            obs_log(LOG_ERROR, "[XboxClient] Failed to fetch achievements: received no response");
             break;
         }
 
-        obs_log(LOG_DEBUG, "Response length: %zu bytes", strlen(response_json));
-
-        obs_log(LOG_WARNING, "Achievemnet response: %s", response_json);
+        obs_log(LOG_DEBUG, "[XboxClient] Achievement response (%zu bytes): %s", strlen(response_json), response_json);
 
         /* Parse achievements from this page */
         page_achievements = parse_achievements(response_json);
@@ -583,7 +573,7 @@ xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
             cJSON *paging_info = cJSONUtils_GetPointer(root, "/pagingInfo/continuationToken");
             if (paging_info && paging_info->valuestring && paging_info->valuestring[0] != '\0') {
                 continuation_token = bstrdup(paging_info->valuestring);
-                obs_log(LOG_DEBUG, "Found continuation token, fetching next page...");
+                obs_log(LOG_DEBUG, "[XboxClient] Found continuation token, fetching next page...");
             }
             cJSON_Delete(root);
         }
@@ -592,7 +582,10 @@ xbox_achievement_t *xbox_get_game_achievements(const game_t *game) {
 
     } while (continuation_token);
 
-    obs_log(LOG_INFO, "Received %d achievements for game %s", xbox_count_achievements(all_achievements), game->title);
+    obs_log(LOG_INFO,
+            "[XboxClient] Received %d achievements for game %s",
+            xbox_count_achievements(all_achievements),
+            game->title);
 
     free_identity(&identity);
 

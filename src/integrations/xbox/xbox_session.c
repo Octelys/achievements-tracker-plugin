@@ -61,7 +61,7 @@ static void *prefetch_icons_thread(void *arg) {
         count++;
     }
 
-    obs_log(LOG_INFO, "[Prefetch] Finished prefetching %d achievement icons", count);
+    obs_log(LOG_INFO, "[XboxSession] Finished prefetching %d achievement icons", count);
 
     if (ctx->on_ready) {
         ctx->on_ready();
@@ -87,7 +87,7 @@ static void prefetch_achievement_icons(const xbox_achievement_t *achievements, x
     xbox_achievement_t *copy = xbox_copy_achievement(achievements);
 
     if (!copy) {
-        obs_log(LOG_WARNING, "[Prefetch] Failed to copy achievements for icon prefetch");
+        obs_log(LOG_WARNING, "[XboxSession] Failed to copy achievements for icon prefetch");
         if (on_ready) {
             on_ready();
         }
@@ -101,9 +101,9 @@ static void prefetch_achievement_icons(const xbox_achievement_t *achievements, x
     pthread_t thread;
     if (pthread_create(&thread, NULL, prefetch_icons_thread, ctx) == 0) {
         pthread_detach(thread);
-        obs_log(LOG_INFO, "[Prefetch] Started background icon prefetch thread");
+        obs_log(LOG_INFO, "[XboxSession] Started background icon prefetch thread");
     } else {
-        obs_log(LOG_ERROR, "[Prefetch] Failed to create icon prefetch thread");
+        obs_log(LOG_ERROR, "[XboxSession] Failed to create icon prefetch thread");
         xbox_free_achievement(&copy);
         free_memory((void **)&ctx);
         if (on_ready) {
@@ -156,7 +156,7 @@ bool xbox_session_is_game_played(xbox_session_t *session, const game_t *game) {
 void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_session_ready_callback_t on_ready) {
 
     if (!session) {
-        obs_log(LOG_ERROR, "Failed to change game: session is NULL");
+        obs_log(LOG_ERROR, "[XboxSession] Failed to change game: session is NULL");
         return;
     }
 
@@ -188,7 +188,7 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
 
     if (!achievement) {
         obs_log(LOG_ERROR,
-                "Failed to unlock achievement %s: not found in the game's achievements",
+                "[XboxSession] Failed to unlock achievement %s: not found in the game's achievements",
                 progress->id ? progress->id : "(null)");
         return;
     }
@@ -203,11 +203,13 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
     const xbox_reward_t *reward = achievement->rewards;
 
     if (!reward) {
-        obs_log(LOG_ERROR, "Failed to unlock achievement %s: no reward found", progress->id ? progress->id : "(null)");
+        obs_log(LOG_ERROR,
+                "[XboxSession] Failed to unlock achievement %s: no reward found",
+                progress->id ? progress->id : "(null)");
         return;
     }
 
-    obs_log(LOG_DEBUG, "Found reward %s", reward->value);
+    obs_log(LOG_DEBUG, "[XboxSession] Found reward %s", reward->value);
 
     gamerscore_t *gamerscore = session->gamerscore;
 
@@ -224,7 +226,7 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
 
     if (errno != 0 || endptr == reward->value || (endptr && *endptr != '\0')) {
         obs_log(LOG_WARNING,
-                "Unable to parse gamerscore value '%s' for achievement %s; defaulting to 0",
+                "[XboxSession] Unable to parse gamerscore value '%s' for achievement %s; defaulting to 0",
                 reward->value ? reward->value : "(null)",
                 progress->id ? progress->id : "(null)");
         parsed_value = 0;
@@ -245,7 +247,7 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
     }
 
     obs_log(LOG_INFO,
-            "New achievement unlocked: %s (%d G)! Gamerscore is now %d",
+            "[XboxSession] Achievement unlocked: %s (%d G) — gamerscore now %d",
             achievement->name,
             unlocked_achievement->value,
             xbox_session_compute_gamerscore(session));

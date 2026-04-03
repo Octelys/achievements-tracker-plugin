@@ -17,7 +17,7 @@ static void on_xbox_signed_in(void *data) {
 
 bool xbox_account_sign_in(void) {
     if (!xbox_live_authenticate(NULL, &on_xbox_signed_in)) {
-        obs_log(LOG_WARNING, "Xbox sign-in failed");
+        obs_log(LOG_WARNING, "[XboxAccount] Sign-in failed");
         return false;
     }
 
