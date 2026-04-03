@@ -206,7 +206,9 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
                         g_xbox_identity->score,
                         g_xbox_identity->avatar_url ? g_xbox_identity->avatar_url : "(none)");
 
-                notify_active_identity(get_current_active_identity());
+                /* Do not notify here — identity is only meaningful once a game
+                 * is being played. The notification will fire from
+                 * on_xbox_game_played when the first game event arrives. */
             }
         }
     } else {

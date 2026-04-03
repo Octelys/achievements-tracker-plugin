@@ -726,6 +726,48 @@ if(BUILD_TESTING)
   target_link_test_deps(test_parsers)
 
   # ------------------------------
+  # test_monitoring_service
+  # ------------------------------
+  add_executable(
+    test_monitoring_service
+    test/test_monitoring_service.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/integrations/monitoring_service.c
+    src/common/achievement.c
+    src/common/game.c
+    src/common/gamerscore.c
+    src/common/identity.c
+    src/common/token.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_identity.c
+    test/stubs/bmem_stub.c
+    test/stubs/integrations/xbox_monitor_stub.c
+    test/stubs/integrations/retro_achievements_monitor_stub.c
+    test/stubs/io/cache_stub.c
+  )
+
+  add_test(NAME test_monitoring_service COMMAND test_monitoring_service)
+
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_monitoring_service)
+  endif()
+
+  target_include_directories(
+    test_monitoring_service
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_monitoring_service PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  target_link_test_deps(test_monitoring_service)
+
+  # ------------------------------
   # test_xbox_session
   # ------------------------------
   add_executable(
@@ -811,6 +853,6 @@ if(BUILD_TESTING)
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
   if(ENABLE_COVERAGE)
-    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_xbox_session test_types)
+    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_monitoring_service test_xbox_session test_types)
   endif()
 endif()
