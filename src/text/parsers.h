@@ -52,7 +52,7 @@ bool is_achievement_message(const char *json_string);
  * @param json_string NUL-terminated JSON string.
  * @return Newly allocated game_t on success; NULL on failure.
  */
-game_t *parse_game(const char *json_string);
+char *parse_presence_game_id(const char *json_string);
 
 /**
  * @brief Parse achievement progress information from a JSON message.

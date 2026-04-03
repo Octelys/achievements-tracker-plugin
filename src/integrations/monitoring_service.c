@@ -83,18 +83,30 @@ static identity_t *g_retro_identity = NULL;
 static game_t *g_xbox_game  = NULL;
 static game_t *g_retro_game = NULL;
 
+/**
+ * @brief Tracks which integration produced the most recent game event.
+ *
+ * Updated every time on_xbox_game_played or on_retro_game_playing fires.
+ * Used by get_current_active_identity() to return the identity that belongs
+ * to the last active game rather than applying a fixed source priority.
+ */
+static identity_source_t g_last_game_source = IDENTITY_SOURCE_XBOX;
+
 static const identity_t *get_current_active_identity(void) {
-    if (g_retro_game && g_retro_identity)
-        return g_retro_identity;
-
-    if (g_xbox_game && g_xbox_identity)
-        return g_xbox_identity;
-
-    if (g_retro_identity)
-        return g_retro_identity;
-
-    if (g_xbox_identity)
-        return g_xbox_identity;
+    /* Return the identity for whichever integration last reported a game.
+     * Fall back to the other source if the primary one has no identity yet,
+     * and return NULL only when neither source has an active game. */
+    if (g_last_game_source == IDENTITY_SOURCE_XBOX) {
+        if (g_xbox_game && g_xbox_identity)
+            return g_xbox_identity;
+        if (g_retro_game && g_retro_identity)
+            return g_retro_identity;
+    } else {
+        if (g_retro_game && g_retro_identity)
+            return g_retro_identity;
+        if (g_xbox_game && g_xbox_identity)
+            return g_xbox_identity;
+    }
 
     return NULL;
 }
@@ -199,9 +211,11 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
         }
     } else {
         free_identity_t(&g_xbox_identity);
+        free_game(&g_xbox_game);
 
-        if (g_xbox_game || !g_retro_identity)
-            notify_active_identity(get_current_active_identity());
+        /* Xbox is gone – re-evaluate: retro identity takes over if a retro
+         * game is active, otherwise sources will show "Not connected". */
+        notify_active_identity(get_current_active_identity());
     }
 
     if (g_connection_changed_callback)
@@ -223,7 +237,7 @@ static void on_xbox_achievements_progressed(const gamerscore_t                *g
     replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
 
     if (g_xbox_game)
-        notify_active_identity(g_xbox_identity);
+        notify_active_identity(get_current_active_identity());
 }
 
 static void on_xbox_game_played(const game_t *game) {
@@ -236,11 +250,13 @@ static void on_xbox_game_played(const game_t *game) {
 
     obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game ? g_xbox_game->title : "(null)");
 
+    g_last_game_source = IDENTITY_SOURCE_XBOX;
+
     /* Clear cached achievements — they belong to the previous game */
     replace_current_achievements(NULL);
 
     /* Use get_current_active_identity() rather than g_xbox_identity directly:
-     * during the initial connection the game-played notification may arrive
+     * during the initial connection, the game-played notification may arrive
      * before the connection-changed notification (which sets g_xbox_identity),
      * so g_xbox_identity might still be NULL at this point. */
     notify_active_identity(get_current_active_identity());
@@ -281,10 +297,10 @@ static void on_retro_user(const retro_user_t *user) {
             g_retro_identity ? g_retro_identity->name : "(null)",
             g_retro_identity ? g_retro_identity->avatar_url : "(none)");
 
-    /* Fire if a game is already active so sources update regardless of
-     * whether the user message arrives before or after the game message. */
-    if (g_retro_game)
-        notify_active_identity(g_retro_identity);
+    /* Fire if a retro game is already active so sources update regardless
+     * of whether the user message arrives before or after the game message. */
+    if (g_retro_game && g_last_game_source == IDENTITY_SOURCE_RETRO)
+        notify_active_identity(get_current_active_identity());
 }
 
 static void on_retro_no_user(void) {
@@ -302,10 +318,14 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
 
     obs_log(LOG_INFO, "[MonitoringService] Retro game cached: %s (%s)", g_retro_game->title, g_retro_game->console_name);
 
+    g_last_game_source = IDENTITY_SOURCE_RETRO;
+
     /* Clear cached achievements — they belong to the previous game */
     replace_current_achievements(NULL);
 
-    notify_active_identity(g_retro_identity);
+    /* This is now the most recent game source, so get_current_active_identity()
+     * will return the retro identity. */
+    notify_active_identity(get_current_active_identity());
 
     notify_game_played(g_retro_game);
 }

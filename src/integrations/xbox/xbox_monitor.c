@@ -598,6 +598,7 @@ static void on_buffer_received(const char *buffer) {
 
     cJSON  *presence_item = NULL;
     game_t *game          = NULL;
+    char   *game_id       = NULL;
     char   *message       = NULL;
     cJSON  *root          = NULL;
 
@@ -630,21 +631,19 @@ static void on_buffer_received(const char *buffer) {
     }
 
     if (is_presence_message(message)) {
+
         obs_log(LOG_DEBUG, "[Monitoring] Message is a presence message");
 
         /* Parse the rich presence information however, we only want the game ID since
          * the presence game does not provide the game title; just a rich presence text */
-        game = parse_game(message);
+        game_id = parse_presence_game_id(message);
 
-        if (g_current_session.game != NULL && strcasecmp(game->id, g_current_session.game->id) == 0) {
-            obs_log(LOG_WARNING, "[Monitoring] Game ID has not changed: %s %s", game->id, game->title);
+        if (g_current_session.game != NULL && game_id != NULL && strcasecmp(game_id, g_current_session.game->id) == 0) {
+            obs_log(LOG_WARNING, "[Monitoring] Game ID has not changed: %s", game_id);
             goto cleanup;
         }
 
-        free_game(&game);
-
         game = xbox_get_current_game();
-
         on_game_update_received(game);
         goto cleanup;
     }
@@ -660,6 +659,7 @@ cleanup:
     if (message) {
         free(message);
     }
+    free_memory((void **)&game_id);
     free_game(&game);
     free_json_memory((void **)&root);
 }

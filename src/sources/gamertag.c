@@ -53,7 +53,7 @@ static void on_active_identity_changed(const identity_t *identity) {
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
     UNUSED_PARAMETER(settings);
 
-    /* Populate immediately with the current identity so the source does not
+    /* Populate immediately with the current identity, so the source does not
      * briefly show "Not connected" when added to a scene after the monitor
      * has already connected.  The subscription callback won't fire again for
      * an already-established identity. */

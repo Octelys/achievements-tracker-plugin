@@ -121,10 +121,10 @@ bool is_presence_message(const char *json_string) {
     return contains_node(json_string, "/presenceDetails");
 }
 
-game_t *parse_game(const char *json_string) {
+char *parse_presence_game_id(const char *json_string) {
 
-    cJSON  *json_root = NULL;
-    game_t *game      = NULL;
+    cJSON *json_root = NULL;
+    char  *game_id   = NULL;
 
     if (!json_string || strlen(json_string) == 0) {
         return NULL;
@@ -138,8 +138,7 @@ game_t *parse_game(const char *json_string) {
         return NULL;
     }
 
-    char current_game_title[128] = "";
-    char current_game_id[128]    = "";
+    char current_game_id[128] = "";
 
     for (int detail_index = 0; detail_index < 3; detail_index++) {
 
@@ -163,18 +162,6 @@ game_t *parse_game(const char *json_string) {
 
         obs_log(LOG_DEBUG, "Game at %d. Is game = %s", detail_index, is_game_value->valuestring);
 
-        /* Retrieve the game title and its ID */
-        char game_title_key[512];
-        snprintf(game_title_key, sizeof(game_title_key), "/presenceDetails/%d/presenceText", detail_index);
-
-        cJSON *game_title_value = cJSONUtils_GetPointer(json_root, game_title_key);
-
-        if (game_title_value->valuestring[0] == '\0') {
-            continue;
-        }
-
-        obs_log(LOG_DEBUG, "Game title: %s %s", game_title_value->string, game_title_value->valuestring);
-
         char game_id_key[512];
         snprintf(game_id_key, sizeof(game_id_key), "/presenceDetails/%d/titleId", detail_index);
 
@@ -182,7 +169,6 @@ game_t *parse_game(const char *json_string) {
 
         obs_log(LOG_DEBUG, "Game ID: %s %s", game_id_value->string, game_id_value->valuestring);
 
-        snprintf(current_game_title, sizeof(current_game_title), "%s", game_title_value->valuestring);
         snprintf(current_game_id, sizeof(current_game_id), "%s", game_id_value->valuestring);
     }
 
@@ -191,18 +177,14 @@ game_t *parse_game(const char *json_string) {
         goto cleanup;
     }
 
-    obs_log(LOG_DEBUG, "Game is %s (%s)", current_game_title, current_game_id);
+    obs_log(LOG_DEBUG, "Game ID is %s", current_game_id);
 
-    game               = bzalloc(sizeof(game_t));
-    game->id           = bstrdup(current_game_id);
-    game->title        = bstrdup(current_game_title);
-    /* TODO Figure out if it is Xbox one, Xbox series S, Xbox series X */
-    game->console_name = bstrdup("xbox");
+    game_id = bstrdup(current_game_id);
 
 cleanup:
     free_json_memory((void **)&json_root);
 
-    return game;
+    return game_id;
 }
 
 xbox_achievement_progress_t *parse_achievement_progress(const char *json_string) {
