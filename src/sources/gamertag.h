@@ -6,14 +6,14 @@ extern "C" {
 
 /**
  * @file gamertag.h
- * @brief OBS source type that renders an Xbox user's gamertag.
+ * @brief OBS source type that renders the active user's gamertag / display name.
  *
- * This module registers an OBS source that displays the currently authenticated
- * Xbox account's gamertag.
+ * This module registers an OBS source that displays the gamertag of the
+ * currently authenticated account (Xbox Live or RetroAchievements).
  */
 
 /**
- * @brief Register the "Xbox Gamertag" source with OBS.
+ * @brief Register the "Gamertag" source with OBS.
  *
  * Call once during plugin/module initialization.
  */

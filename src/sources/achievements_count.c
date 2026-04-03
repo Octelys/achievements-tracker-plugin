@@ -193,7 +193,7 @@ static const char *source_get_name(void *unused) {
 }
 
 /**
- * @brief obs_source_info describing the Xbox Achievements Total Count source.
+ * @brief obs_source_info describing the Achievements Total Count source.
  */
 static struct obs_source_info xbox_achievements_count_source = {
     .id             = "xbox_achievements_count_source",

@@ -265,7 +265,7 @@ static obs_properties_t *source_get_properties(void *data) {
  * @brief OBS callback returning the display name for this source type.
  *
  * @param unused Unused parameter.
- * @return Static string "Xbox Achievement (Description)" displayed in OBS source list.
+ * @return Static string "Achievement (Description)" displayed in OBS source list.
  */
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
@@ -274,7 +274,7 @@ static const char *source_get_name(void *unused) {
 }
 
 /**
- * @brief obs_source_info describing the Xbox Achievement Description source.
+ * @brief obs_source_info describing the Achievement Description source.
  *
  * Defines the OBS source type for displaying achievement descriptions. This structure
  * specifies the source ID, type, capabilities, and callback functions for all

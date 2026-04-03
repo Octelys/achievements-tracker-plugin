@@ -5,11 +5,11 @@ extern "C" {
 #endif
 
 /**
- * @brief Register the Xbox Achievement Icon source with OBS.
+ * @brief Register the Achievement Icon source with OBS.
  *
  * This function registers an OBS source that displays the icon image of the most
- * recently unlocked Xbox achievement. The source automatically updates when new
- * achievements are unlocked by subscribing to Xbox monitor events.
+ * recently unlocked achievement. The source automatically updates when new
+ * achievements are unlocked by subscribing to monitoring service events.
  *
  * The source provides the following features:
  * - Displays the achievement icon as a texture
@@ -20,7 +20,7 @@ extern "C" {
  * This function should be called once during plugin initialization (typically in
  * obs_module_load()) to make the source available in OBS.
  *
- * @note This function allocates resources and subscribes to Xbox monitor callbacks.
+ * @note This function allocates resources and subscribes to monitoring callbacks.
  * @note The icon image is downloaded to a temporary file and loaded as a GPU texture.
  *
  * @see xbox_achievement_name_source_register() for registering the achievement name source

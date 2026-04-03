@@ -12,7 +12,7 @@ extern "C" {
  *
  * This module registers an OBS source that displays cover art for the active
  * game. It subscribes to the monitoring service and works with any integration
- * (Xbox, RetroAchievements, etc.) through the common @c game_t type.
+ * (Xbox Live, RetroAchievements, etc.) through the common @c game_t type.
  */
 
 /**

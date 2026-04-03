@@ -5,11 +5,11 @@ extern "C" {
 #endif
 
 /**
- * @brief Register the Xbox Achievement Name source with OBS.
+ * @brief Register the Achievement Name source with OBS.
  *
  * This function registers an OBS source that displays the name and gamerscore value
- * of the most recently unlocked Xbox achievement. The source automatically updates
- * when new achievements are unlocked by subscribing to Xbox monitor events.
+ * of the most recently unlocked achievement. The source automatically updates
+ * when new achievements are unlocked by subscribing to monitoring service events.
  *
  * The source provides the following features:
  * - Displays achievement name and gamerscore value (e.g., "50G - Master Explorer")
@@ -20,7 +20,7 @@ extern "C" {
  * This function should be called once during plugin initialization (typically in
  * obs_module_load()) to make the source available in OBS.
  *
- * @note This function allocates resources and subscribes to Xbox monitor callbacks.
+ * @note This function allocates resources and subscribes to monitoring callbacks.
  *       The source configuration is persisted to disk via the state management system.
  *
  * @see xbox_gamerscore_source_register() for registering the gamerscore display source

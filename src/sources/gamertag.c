@@ -27,16 +27,25 @@ static gamertag_configuration_t *g_configuration;
 
 /**
  * @brief Update the gamertag display from the active identity.
+ *
+ * When an identity becomes available the source fades in with the new name.
+ * When the identity is lost the source fades out to blank, preserving the
+ * previous name as the "current" text so the text_source transition system
+ * can fade it out gracefully before replacing it with an empty string.
  */
 static void update_gamertag(const identity_t *identity) {
 
-    if (!identity || !identity->name) {
-        snprintf(g_gamertag, sizeof(g_gamertag), "Not connected");
+    if (!identity || !identity->name || identity->name[0] == '\0') {
+        /* Lost identity: only trigger a reload (fade to blank) if something
+         * was previously displayed. */
+        if (g_gamertag[0] != '\0') {
+            g_gamertag[0] = '\0';
+            g_must_reload = true;
+        }
     } else {
         snprintf(g_gamertag, sizeof(g_gamertag), "%s", identity->name);
+        g_must_reload = true;
     }
-
-    g_must_reload = true;
 }
 
 /**
@@ -115,7 +124,7 @@ static const char *source_get_name(void *unused) {
     return "Gamertag";
 }
 
-/** OBS source type definition for Xbox Gamertag display. */
+/** OBS source type definition for the Gamertag display. */
 static struct obs_source_info xbox_gamertag_source = {
     .id             = "xbox_gamertag_source",
     .type           = OBS_SOURCE_TYPE_INPUT,

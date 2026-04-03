@@ -30,7 +30,7 @@ static void on_active_identity_changed(const identity_t *identity) {
     if (strcasecmp(identity->avatar_url, g_gamerpic.url) != 0) {
         obs_log(LOG_DEBUG, "[Gamerpic] Avatar URL changed - downloading");
         snprintf(g_gamerpic.url, sizeof(g_gamerpic.url), "%s", identity->avatar_url);
-        /* Use the identity name as the cache id so Xbox and RA avatars
+        /* Use the identity name as the cache id so different integration avatars
          * never share the same cache file. */
         snprintf(g_gamerpic.id,
                  sizeof(g_gamerpic.id),
@@ -146,7 +146,7 @@ static obs_properties_t *source_get_properties(void *data) {
 }
 
 /**
- * @brief obs_source_info for the Xbox Gamerpic source.
+ * @brief obs_source_info for the Gamerpic source.
  */
 static struct obs_source_info xbox_gamerpic_source_info = {
     .id             = "xbox_gamerpic_source",

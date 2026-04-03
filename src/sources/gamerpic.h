@@ -7,11 +7,11 @@ extern "C" {
 #endif
 
 /**
- * @brief Register the "Xbox Gamerpic" OBS source.
+ * @brief Register the "Gamerpic" OBS source.
  *
- * This source renders the currently authenticated user's Xbox gamerpic (avatar).
- * The gamerpic is fetched via Xbox profile settings (GameDisplayPicRaw) and cached
- * locally as a GPU texture.
+ * This source renders the currently authenticated user's gamerpic (avatar).
+ * The gamerpic URL is provided by the active integration and cached locally
+ * as a GPU texture.
  *
  * Call this once from the plugin/module entry point during OBS module load.
  */

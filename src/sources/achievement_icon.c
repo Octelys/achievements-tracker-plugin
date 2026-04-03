@@ -197,7 +197,7 @@ static uint32_t source_get_height(void *data) {
  * @brief OBS callback returning the display name for this source type.
  *
  * @param unused Unused parameter.
- * @return Static string "Xbox Achievement (Icon)" displayed in OBS source list.
+ * @return Static string "Achievement (Icon)" displayed in OBS source list.
  */
 static const char *source_get_name(void *unused) {
 
@@ -382,7 +382,7 @@ static void on_source_video_tick(void *data, float seconds) {
 /**
  * @brief OBS callback constructing the properties UI for the achievement icon source.
  *
- * Shows connection status to Xbox Live. Currently, provides no editable settings.
+ * Currently, provides no editable settings.
  *
  * @param data Source instance data (unused).
  * @return Newly created obs_properties_t structure containing the UI controls.
@@ -397,7 +397,7 @@ static obs_properties_t *source_get_properties(void *data) {
 }
 
 /**
- * @brief obs_source_info describing the Xbox Achievement Icon source.
+ * @brief obs_source_info describing the Achievement Icon source.
  *
  * Defines the OBS source type for displaying achievement icons. This structure
  * specifies the source ID, type, capabilities, and callback functions for all

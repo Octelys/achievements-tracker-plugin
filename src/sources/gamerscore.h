@@ -6,14 +6,14 @@ extern "C" {
 
 /**
  * @file gamerscore.h
- * @brief OBS source type that renders an Xbox user's gamerscore.
+ * @brief OBS source type that renders the active user's score.
  *
- * This module registers an OBS source that displays the currently authenticated
- * Xbox account's gamerscore.
+ * This module registers an OBS source that displays the score of the currently
+ * authenticated account (Xbox Live gamerscore or RetroAchievements score).
  */
 
 /**
- * @brief Register the "Xbox Gamerscore" source with OBS.
+ * @brief Register the "Gamerscore" source with OBS.
  *
  * Call once during plugin/module initialization.
  */

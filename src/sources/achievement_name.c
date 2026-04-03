@@ -1,6 +1,6 @@
 /**
  * @file achievement_name.c
- * @brief OBS source for displaying Xbox achievement names.
+ * @brief OBS source for displaying achievement names.
  *
  * This module implements an OBS video source that renders the current achievement's
  * name and gamerscore as text (e.g., "50G - Master Explorer"). The source automatically
@@ -347,7 +347,7 @@ static obs_properties_t *source_get_properties(void *data) {
  * @brief OBS callback returning the display name for this source type.
  *
  * @param unused Unused parameter.
- * @return Static string "Xbox Achievement (Name)" displayed in OBS source list.
+ * @return Static string "Achievement (Name)" displayed in OBS source list.
  */
 static const char *source_get_name(void *unused) {
     UNUSED_PARAMETER(unused);
@@ -356,7 +356,7 @@ static const char *source_get_name(void *unused) {
 }
 
 /**
- * @brief obs_source_info describing the Xbox Achievement Name source.
+ * @brief obs_source_info describing the Achievement Name source.
  *
  * Defines the OBS source type for displaying achievement names. This structure
  * specifies the source ID, type, capabilities, and callback functions for all

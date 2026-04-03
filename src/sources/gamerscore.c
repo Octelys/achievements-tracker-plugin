@@ -59,7 +59,7 @@ static void on_active_identity_changed(const identity_t *identity) {
  *
  * @param settings Source settings (unused).
  * @param source   OBS source instance.
- * @return Newly allocated xbox_account_source_t.
+ * @return Newly allocated text_source_t.
  */
 static void *on_source_create(obs_data_t *settings, obs_source_t *source) {
 
@@ -175,7 +175,7 @@ static const char *source_get_name(void *unused) {
 }
 
 /**
- * @brief obs_source_info describing the Xbox Gamerscore source.
+ * @brief obs_source_info describing the Gamerscore source.
  */
 static struct obs_source_info xbox_gamerscore_source = {
     .id             = "xbox_gamerscore_source",

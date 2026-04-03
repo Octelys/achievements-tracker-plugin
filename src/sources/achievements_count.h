@@ -9,11 +9,11 @@ extern "C" {
  * @brief OBS source type that renders the total number of achievements for the current game.
  *
  * This module registers an OBS source that displays the total number of achievements
- * available for the currently played Xbox game.
+ * available for the currently played game.
  */
 
 /**
- * @brief Register the "Xbox Achievements Count" source with OBS.
+ * @brief Register the "Achievements Count" source with OBS.
  *
  * Call once during plugin/module initialization.
  */
