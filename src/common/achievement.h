@@ -1,7 +1,5 @@
 #pragma once
 
-#include "time/time.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -10,124 +8,64 @@ extern "C" {
 #endif
 
 /**
- * @brief Linked-list node describing a media asset for an achievement.
+ * @file achievement.h
+ * @brief Generic achievement abstraction shared across all integrations.
  *
- * Notes on ownership:
- * - In objects created by the copy_* helpers, @c url points to an allocated
- *   NUL-terminated string that must be freed by @ref free_media_asset.
- * - The list is singly-linked via @c next.
+ * This header provides a platform-agnostic representation of an achievement
+ * that can be populated from any integration (Xbox Live, RetroAchievements,
+ * etc.). Platform-specific contract types are kept in their respective
+ * integration folders (e.g. @c integrations/xbox/contracts/).
  */
-typedef struct media_asset {
-    /** Media URL (typically UTF-8). */
-    const char         *url;
-    /** Next node in the list, or NULL. */
-    struct media_asset *next;
-} media_asset_t;
 
 /**
- * @brief Linked-list node describing a reward associated with an achievement.
- *
- * Notes on ownership:
- * - In objects created by the copy_* helpers, @c value points to an allocated
- *   NUL-terminated string that must be freed by @ref free_reward.
- * - The list is singly-linked via @c next.
+ * @brief Source platform for an achievement.
  */
-typedef struct reward {
-    /** Reward value (the format depends on upstream service). */
-    const char    *value;
-    /** Next node in the list, or NULL. */
-    struct reward *next;
-} reward_t;
+typedef enum achievement_source {
+    ACHIEVEMENT_SOURCE_UNKNOWN = 0, /**< Source not set / unknown.              */
+    ACHIEVEMENT_SOURCE_XBOX    = 1, /**< Achievement originates from Xbox Live. */
+    ACHIEVEMENT_SOURCE_RETRO   = 2, /**< Achievement originates from RetroAchievements. */
+} achievement_source_t;
 
 /**
- * @brief Linked-list node describing an achievement and its metadata.
+ * @brief Generic, platform-agnostic achievement.
  *
- * This type is used as a singly linked list (@c next). Most fields are strings
- * coming from the service. When an @c achievement_t is produced by
- * @ref copy_achievement, all strings and nested lists are deep-copied.
+ * Fields are the common denominator across Xbox Live and RetroAchievements.
+ * All string fields are NUL-terminated and heap-allocated; use
+ * @ref copy_achievement / @ref free_achievement to manage lifetime.
+ *
+ * This type forms a singly-linked list via @c next.
  *
  * Ownership:
- * - Instances returned by @ref copy_achievement are owned by the caller and must
- *   be freed with @ref free_achievement.
- * - @c media_assets and @c rewards are nested linked lists and are freed by
- *   @ref free_achievement.
+ * - Instances returned by @ref copy_achievement are owned by the caller and
+ *   must be freed with @ref free_achievement.
  */
 typedef struct achievement {
-    /** Achievement id. */
-    char               *id;
-    /** Service configuration id. Used for monitoring. */
-    char               *service_config_id;
-    /** Display name. */
-    char               *name;
-    /** Progress state (service-provided string). */
-    char               *progress_state;
-    /** Linked list of media assets associated with this achievement. */
-    media_asset_t      *media_assets;
-    /** Whether the achievement is secret. */
-    bool                is_secret;
-    /** Description shown when not secret/unlocked. */
-    char               *description;
-    /** Description shown when locked/secret. */
-    char               *locked_description;
-    /** Linked list of rewards associated with this achievement. */
-    reward_t           *rewards;
-    /** Unix timestamp (seconds since epoch) when the achievement was unlocked, or 0 if locked. */
-    int64_t             unlocked_timestamp;
+    /** Platform-agnostic string identifier for the achievement. */
+    char                *id;
+    /** Human-readable display name. */
+    char                *name;
+    /** Description shown when the achievement is unlocked or not secret. */
+    char                *description;
+    /** Whether the achievement is secret / hidden. */
+    bool                 is_secret;
+    /** Point / score value (gamerscore, retro-points, …). */
+    int                  value;
     /**
-     * Small icon or tile image URL for the achievement.
+     * Icon URL (PNG/JPEG).
      *
-     * Typically points to a PNG/JPEG hosted by the service.
+     * Typically the unlocked-badge image.  May be NULL if unavailable.
      */
-    char               *icon_url;
+    char                *icon_url;
+    /** Unix timestamp (seconds since epoch) when unlocked; 0 if still locked. */
+    int64_t              unlocked_timestamp;
+    /** Which integration produced this achievement. */
+    achievement_source_t source;
     /** Next achievement in the list, or NULL. */
-    struct achievement *next;
+    struct achievement  *next;
 } achievement_t;
 
 /**
- * @brief Deep-copies a linked list of media assets.
- *
- * @param media_asset Head of the source list (may be NULL).
- *
- * @return Head of the newly allocated list, or NULL if @p media_asset is NULL.
- *         The caller owns the returned list and must free it with
- *         @ref free_media_asset.
- */
-media_asset_t *copy_media_asset(const media_asset_t *media_asset);
-
-/**
- * @brief Frees a linked list of media assets and sets the caller's pointer to NULL.
- *
- * Safe to call with NULL or with @c *media_asset == NULL.
- *
- * @param[in,out] media_asset Address of the head pointer to free.
- */
-void free_media_asset(media_asset_t **media_asset);
-
-/**
- * @brief Deep-copies a linked list of rewards.
- *
- * @param reward Head of the source list (may be NULL).
- *
- * @return Head of the newly allocated list, or NULL if @p reward is NULL.
- *         The caller owns the returned list and must free it with
- *         @ref free_reward.
- */
-reward_t *copy_reward(const reward_t *reward);
-
-/**
- * @brief Frees a linked list of rewards and sets the caller's pointer to NULL.
- *
- * Safe to call with NULL or with @c *reward == NULL.
- *
- * @param[in,out] reward Address of the head pointer to free.
- */
-void free_reward(reward_t **reward);
-
-/**
- * @brief Deep-copies a linked list of achievements.
- *
- * Performs a deep copy of the list, including all strings and nested
- * @c media_assets and @c rewards lists.
+ * @brief Deep-copies a linked list of generic achievements.
  *
  * @param achievement Head of the source list (may be NULL).
  *
@@ -138,9 +76,9 @@ void free_reward(reward_t **reward);
 achievement_t *copy_achievement(const achievement_t *achievement);
 
 /**
- * @brief Frees a linked list of achievements and sets the caller's pointer to NULL.
+ * @brief Frees a linked list of generic achievements and sets the caller's pointer to NULL.
  *
- * Frees all strings and nested lists, then frees the list nodes.
+ * Frees all string fields and list nodes.
  * Safe to call with NULL or with @c *achievement == NULL.
  *
  * @param[in,out] achievement Address of the head pointer to free.
@@ -152,18 +90,16 @@ void free_achievement(achievement_t **achievement);
  *
  * @param achievements Head of the list (may be NULL).
  *
- * @return Number of nodes in the list. Returns 0 if @p achievements is NULL.
+ * @return Number of nodes. Returns 0 if @p achievements is NULL.
  */
 int count_achievements(const achievement_t *achievements);
 
 /**
  * @brief Find the most recently unlocked achievement.
  *
- * Iterates through the achievements list and returns the one with the highest
- * unlocked_timestamp (most recent unlock).
- *
  * @param achievements Head of the achievements linked list.
- * @return Pointer to the most recently unlocked achievement, or NULL if none are unlocked.
+ * @return Pointer to the achievement with the highest @c unlocked_timestamp,
+ *         or NULL if none are unlocked.
  */
 const achievement_t *find_latest_unlocked_achievement(const achievement_t *achievements);
 
@@ -171,7 +107,7 @@ const achievement_t *find_latest_unlocked_achievement(const achievement_t *achie
  * @brief Count the number of locked achievements.
  *
  * @param achievements Head of the achievements linked list.
- * @return Number of locked achievements (unlocked_timestamp == 0).
+ * @return Number of locked achievements (@c unlocked_timestamp == 0).
  */
 int count_locked_achievements(const achievement_t *achievements);
 
@@ -179,7 +115,7 @@ int count_locked_achievements(const achievement_t *achievements);
  * @brief Count the number of unlocked achievements.
  *
  * @param achievements Head of the achievements linked list.
- * @return Number of unlocked achievements (unlocked_timestamp != 0).
+ * @return Number of unlocked achievements (@c unlocked_timestamp != 0).
  */
 int count_unlocked_achievements(const achievement_t *achievements);
 
@@ -191,6 +127,11 @@ int count_unlocked_achievements(const achievement_t *achievements);
  */
 const achievement_t *get_random_locked_achievement(const achievement_t *achievements);
 
+/**
+ * @brief Sort achievements in place (unlocked first, then by timestamp descending).
+ *
+ * @param achievements Address of the head pointer to sort.
+ */
 void sort_achievements(achievement_t **achievements);
 
 #ifdef __cplusplus

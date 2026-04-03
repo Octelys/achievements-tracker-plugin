@@ -1,11 +1,13 @@
 # OBS Achievements Tracker
 
-A cross-platform OBS Studio plugin that displays Xbox Live profile data, current game information, and achievement progress for the signed-in Xbox user.
+A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements profile data, current game information, and achievement progress for the signed-in user.
 
 ## Features
 
 - **Global Xbox account configuration dialog** using Microsoft's device-code flow
 - **Real-time game and achievement tracking** through Xbox Live RTA monitoring when available
+- **RetroAchievements integration** via a local RetroArch WebSocket server for retro game tracking
+- **Unified monitoring service** that handles both Xbox and RetroAchievements sessions with last-game-received priority
 - **Profile sources** for gamertag, gamerpic, and gamerscore
 - **Achievement sources** for name, description, icon, and progress count
 - **Customizable text sources** with persisted font and gradient color settings
@@ -59,32 +61,32 @@ After installation, restart OBS Studio.
 3. Use the global Xbox Account dialog to review the current status and click **Sign in with Xbox**.
 4. A browser window opens for Microsoft account authentication.
 5. Once authentication succeeds, return to OBS. The dialog will update to show the connected account.
-6. Add any of the Xbox display sources you want to use in your scene.
+6. Add any of the display sources you want to use in your scene.
 
-All Xbox sources in the plugin share the same authenticated account.
+All Xbox sources in the plugin share the same authenticated account. RetroAchievements sources connect automatically when a RetroArch WebSocket server is detected on the local machine.
 
-![Xbox Account dialog](plugin-xbox-account.png)
+![Xbox Account dialog](images/plugin-xbox-account.png)
 
 ### Available OBS Sources
 
 #### Account & profile
 
-- **Xbox Gamertag**: text source for the current gamertag
-- **Xbox Gamerpic**: image source for the current gamerpic
-- **Xbox Gamerscore**: text source for the current gamerscore
+- **Gamertag**: text source for the current gamertag or RetroAchievements display name
+- **Gamerpic**: image source for the current gamerpic or RetroAchievements avatar
+- **Gamerscore**: text source for the current gamerscore or RetroAchievements score
 
 Account sign-in and sign-out are managed globally from **Tools** → **Xbox Account**.
 
 #### Game
 
-- **Xbox Game Cover**: image source for the currently active game's cover art
+- **Game Cover**: image source for the currently active game's cover art
 
 #### Achievements
 
-- **Xbox Achievement (Name)**: current achievement name, including gamerscore when available
-- **Xbox Achievement (Description)**: current achievement description
-- **Xbox Achievement (Icon)**: current achievement icon
-- **Xbox Achievements Count**: unlocked / total achievements for the current game (for example `12 / 50`)
+- **Achievement (Name)**: current achievement name, including gamerscore when available
+- **Achievement (Description)**: current achievement description
+- **Achievement (Icon)**: current achievement icon
+- **Achievements’ Count**: unlocked / total achievements for the current game (for example `12 / 50`)
 
 #### Real-time updates
 
@@ -92,6 +94,14 @@ When Xbox Live monitoring is available, the plugin subscribes to:
 
 - current game / presence changes
 - achievement progression updates
+
+When a local RetroArch WebSocket server is detected, the plugin additionally tracks:
+
+- current retro game changes
+- achievement list and unlock updates
+- user identity (display name, score, avatar)
+
+The active identity shown in profile sources is determined by whichever integration last reported a game change. If only one integration has an active game, that integration's identity is used.
 
 Profile-derived sources such as gamerscore, gamertag, and gamerpic refresh from the authenticated session data used by the plugin.
 
@@ -104,27 +114,63 @@ Profile-derived sources such as gamerscore, gamertag, and gamerpic refresh from 
 ```text
 achievements-tracker-plugin/
 ├── src/
-│   ├── main.c                      # OBS module entry point
-│   ├── common/                     # Shared types and value objects
-│   ├── crypto/                     # Proof-of-possession signing helpers
-│   ├── diagnostics/                # Logging helpers
-│   ├── drawing/                    # Color and image rendering helpers
-│   ├── encoding/                   # Base64 helpers
-│   ├── io/                         # Persistent state and cache helpers
-│   ├── net/                        # Browser, HTTP, and JSON helpers
-│   ├── oauth/                      # Xbox/Microsoft authentication flow
+│   ├── main.c                          # OBS module entry point
+│   ├── common/                         # Shared platform-agnostic types and value objects
+│   │   ├── achievement.{c,h}           # Generic achievement abstraction
+│   │   ├── game.{c,h}                  # Generic game abstraction
+│   │   ├── gamerscore.{c,h}            # Gamerscore value object
+│   │   ├── identity.{c,h}              # Unified user identity (Xbox + RetroAchievements)
+│   │   └── token.{c,h}                 # Auth token value object
+│   ├── crypto/                         # Proof-of-possession signing helpers
+│   ├── diagnostics/                    # Logging helpers
+│   ├── drawing/                        # Color and image rendering helpers
+│   ├── encoding/                       # Base64 helpers
+│   ├── integrations/
+│   │   ├── monitoring_service.{c,h}    # Unified event fan-out for all integrations
+│   │   ├── retro-achievements/         # RetroAchievements WebSocket monitor
+│   │   └── xbox/
+│   │       ├── account_manager.{c,h}   # Xbox account lifecycle
+│   │       ├── contracts/              # Xbox-specific wire types (achievements, progress)
+│   │       ├── entities/               # Xbox identity and session value objects
+│   │       ├── oauth/                  # Xbox/Microsoft authentication flow
+│   │       ├── xbox_client.{c,h}       # Xbox REST API client
+│   │       ├── xbox_monitor.{c,h}      # Xbox Live RTA WebSocket monitor
+│   │       └── xbox_session.{c,h}      # Xbox session state
+│   ├── io/                             # Persistent state and cache helpers
+│   ├── net/
+│   │   ├── browser/                    # System browser launcher
+│   │   ├── http/                       # HTTP client helpers
+│   │   └── json/                       # JSON helpers
 │   ├── sources/
-│   │   ├── common/                 # Shared text/image source helpers
-│   │   └── xbox/                   # OBS source implementations
-│   ├── text/                       # Conversion and parsing helpers
-│   ├── time/                       # Time parsing utilities
-│   ├── util/                       # UUID and portability helpers
-│   └── xbox/                       # Xbox client, monitor, and session logic
-├── test/                           # Unity-based unit tests and stubs
-├── data/                           # Locale files and effects/resources
-├── external/cjson/                 # Vendored cJSON
-├── cmake/                          # Platform-specific CMake helpers
-├── .github/                        # CI workflows and composite actions
+│   │   ├── common/                     # Shared text/image source helpers and achievement cycle
+│   │   ├── achievement_description.{c,h}
+│   │   ├── achievement_icon.{c,h}
+│   │   ├── achievement_name.{c,h}
+│   │   ├── achievements_count.{c,h}
+│   │   ├── game_cover.{c,h}
+│   │   ├── gamerpic.{c,h}
+│   │   ├── gamerscore.{c,h}
+│   │   └── gamertag.{c,h}
+│   ├── text/                           # Conversion and parsing helpers
+│   ├── time/                           # Time parsing utilities
+│   └── util/                           # UUID and portability helpers
+├── test/                               # Unity-based unit tests and stubs
+│   ├── stubs/
+│   │   ├── integrations/               # Stubs for xbox_monitor and retro_achievements_monitor
+│   │   ├── io/                         # Stub for cache
+│   │   ├── xbox/                       # Stub for xbox_client
+│   │   └── ...
+│   ├── test_convert.c
+│   ├── test_crypto.c
+│   ├── test_encoder.c
+│   ├── test_monitoring_service.c       # Tests for the unified monitoring service
+│   ├── test_parsers.c
+│   ├── test_types.c
+│   └── test_xbox_session.c
+├── data/                               # Locale files and effects/resources
+├── external/cjson/                     # Vendored cJSON
+├── cmake/                              # Platform-specific CMake helpers
+├── .github/                            # CI workflows and composite actions
 ├── CMakeLists.txt
 ├── CMakePresets.json
 └── buildspec.json
@@ -421,6 +467,9 @@ cmake --build build_macos_dev --target test_convert --config Debug
 
 cmake --build build_macos_dev --target test_parsers --config Debug
 ./build_macos_dev/Debug/test_parsers
+
+cmake --build build_macos_dev --target test_monitoring_service --config Debug
+./build_macos_dev/Debug/test_monitoring_service
 ```
 
 ---

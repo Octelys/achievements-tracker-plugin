@@ -477,14 +477,14 @@ target_sources(
   ${CMAKE_PROJECT_NAME}
   PRIVATE
     src/main.c
-    src/sources/xbox/gamerpic.c
-    src/sources/xbox/game_cover.c
-    src/sources/xbox/gamerscore.c
-    src/sources/xbox/gamertag.c
-    src/sources/xbox/achievement_name.c
-    src/sources/xbox/achievement_description.c
-    src/sources/xbox/achievement_icon.c
-    src/sources/xbox/achievements_count.c
+    src/sources/gamerpic.c
+    src/sources/game_cover.c
+    src/sources/gamerscore.c
+    src/sources/gamertag.c
+    src/sources/achievement_name.c
+    src/sources/achievement_description.c
+    src/sources/achievement_icon.c
+    src/sources/achievements_count.c
     src/sources/common/text_source.c
     src/sources/common/image_source.c
     src/sources/common/achievement_cycle.c
@@ -494,12 +494,14 @@ target_sources(
     src/net/browser/browser.c
     src/net/http/http.c
     src/net/json/json.c
-    src/oauth/util.c
-    src/oauth/xbox-live.c
-    src/xbox/account_manager.c
-    src/xbox/xbox_session.c
-    src/xbox/xbox_client.c
-    src/xbox/xbox_monitor.c
+    src/integrations/xbox/oauth/util.c
+    src/integrations/xbox/oauth/xbox-live.c
+    src/integrations/xbox/account_manager.c
+    src/integrations/xbox/xbox_session.c
+    src/integrations/xbox/xbox_client.c
+    src/integrations/xbox/xbox_monitor.c
+    src/integrations/monitoring_service.c
+    src/integrations/retro-achievements/retro_achievements_monitor.c
     src/ui/xbox_account_config.cpp
     src/io/state.c
     src/io/cache.c
@@ -509,14 +511,16 @@ target_sources(
     src/text/parsers.c
     src/time/time.c
     src/common/achievement.c
-    src/common/achievement_progress.c
     src/common/device.c
     src/common/game.c
     src/common/gamerscore.c
+    src/common/identity.c
     src/common/token.c
-    src/common/unlocked_achievement.c
-    src/common/xbox_identity.c
-    src/common/xbox_session.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_identity.c
+    src/integrations/xbox/entities/xbox_session.c
 )
 
 # Link vendored deps
@@ -722,20 +726,64 @@ if(BUILD_TESTING)
   target_link_test_deps(test_parsers)
 
   # ------------------------------
+  # test_monitoring_service
+  # ------------------------------
+  add_executable(
+    test_monitoring_service
+    test/test_monitoring_service.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/integrations/monitoring_service.c
+    src/common/achievement.c
+    src/common/game.c
+    src/common/gamerscore.c
+    src/common/identity.c
+    src/common/token.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_identity.c
+    test/stubs/bmem_stub.c
+    test/stubs/integrations/xbox_monitor_stub.c
+    test/stubs/integrations/retro_achievements_monitor_stub.c
+    test/stubs/io/cache_stub.c
+    test/stubs/time/time_stub.c
+  )
+
+  add_test(NAME test_monitoring_service COMMAND test_monitoring_service)
+
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_monitoring_service)
+  endif()
+
+  target_include_directories(
+    test_monitoring_service
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_monitoring_service PRIVATE UNITY_INCLUDE_CONFIG_H)
+
+  target_link_test_deps(test_monitoring_service)
+
+  # ------------------------------
   # test_xbox_session
   # ------------------------------
   add_executable(
     test_xbox_session
     test/test_xbox_session.c
     ${unity_SOURCE_DIR}/src/unity.c
-    src/xbox/xbox_session.c
+    src/integrations/xbox/xbox_session.c
     src/common/achievement.c
-    src/common/achievement_progress.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c
-    src/common/unlocked_achievement.c
-    src/common/xbox_session.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_session.c
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
@@ -768,14 +816,15 @@ if(BUILD_TESTING)
     test_types
     test/test_types.c
     ${unity_SOURCE_DIR}/src/unity.c
-    src/xbox/xbox_session.c
+    src/integrations/xbox/xbox_session.c
     src/common/achievement.c
-    src/common/achievement_progress.c
     src/common/game.c
     src/common/gamerscore.c
     src/common/token.c
-    src/common/unlocked_achievement.c
-    src/common/xbox_session.c
+    src/integrations/xbox/contracts/xbox_achievement.c
+    src/integrations/xbox/contracts/xbox_achievement_progress.c
+    src/integrations/xbox/contracts/xbox_unlocked_achievement.c
+    src/integrations/xbox/entities/xbox_session.c
     test/stubs/bmem_stub.c
     test/stubs/xbox/xbox_client_stub.c
     test/stubs/time/time_stub.c
@@ -805,6 +854,6 @@ if(BUILD_TESTING)
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
   if(ENABLE_COVERAGE)
-    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_xbox_session test_types)
+    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_monitoring_service test_xbox_session test_types)
   endif()
 endif()

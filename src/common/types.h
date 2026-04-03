@@ -13,14 +13,16 @@
  */
 #include "common/memory.h"
 #include "common/achievement.h"
-#include "common/achievement_progress.h"
+#include "integrations/xbox/contracts/xbox_achievement.h"
+#include "integrations/xbox/contracts/xbox_achievement_progress.h"
+#include "integrations/xbox/contracts/xbox_unlocked_achievement.h"
 #include "common/device.h"
 #include "common/game.h"
 #include "common/gamerscore.h"
+#include "common/identity.h"
 #include "common/token.h"
-#include "common/unlocked_achievement.h"
-#include "common/xbox_identity.h"
-#include "common/xbox_session.h"
+#include "integrations/xbox/entities/xbox_identity.h"
+#include "integrations/xbox/entities/xbox_session.h"
 
 #ifdef __cplusplus
 extern "C" {

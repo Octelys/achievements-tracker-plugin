@@ -52,15 +52,15 @@ bool is_achievement_message(const char *json_string);
  * @param json_string NUL-terminated JSON string.
  * @return Newly allocated game_t on success; NULL on failure.
  */
-game_t *parse_game(const char *json_string);
+char *parse_presence_game_id(const char *json_string);
 
 /**
  * @brief Parse achievement progress information from a JSON message.
  *
  * @param json_string NUL-terminated JSON string.
- * @return Newly allocated achievement_progress_t on success; NULL on failure.
+ * @return Newly allocated xbox_achievement_progress_t on success; NULL on failure.
  */
-achievement_progress_t *parse_achievement_progress(const char *json_string);
+xbox_achievement_progress_t *parse_achievement_progress(const char *json_string);
 
 /**
  * @brief Parse achievements information from a JSON message.
@@ -69,9 +69,9 @@ achievement_progress_t *parse_achievement_progress(const char *json_string);
  * container describing multiple achievements.
  *
  * @param json_string NUL-terminated JSON string.
- * @return Newly allocated achievement_t on success; NULL on failure.
+ * @return Newly allocated xbox_achievement_t on success; NULL on failure.
  */
-achievement_t *parse_achievements(const char *json_string);
+xbox_achievement_t *parse_achievements(const char *json_string);
 
 #ifdef __cplusplus
 }

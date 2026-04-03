@@ -9,9 +9,11 @@ game_t *copy_game(const game_t *game) {
         return NULL;
     }
 
-    game_t *copy = bzalloc(sizeof(game_t));
-    copy->id     = bstrdup(game->id);
-    copy->title  = bstrdup(game->title);
+    game_t *copy       = bzalloc(sizeof(game_t));
+    copy->id           = bstrdup(game->id);
+    copy->title        = bstrdup(game->title);
+    copy->console_name = bstrdup(game->console_name);
+    copy->cover_url    = game->cover_url ? bstrdup(game->cover_url) : NULL;
 
     return copy;
 }
@@ -26,6 +28,8 @@ void free_game(game_t **game) {
 
     free_memory((void **)&current->id);
     free_memory((void **)&current->title);
+    free_memory((void **)&current->console_name);
+    free_memory((void **)&current->cover_url);
 
     bfree(current);
     *game = NULL;

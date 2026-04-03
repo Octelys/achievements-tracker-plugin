@@ -4,3 +4,8 @@
 
 /* Include the memory functions */
 #include <util/bmem.h>
+
+/* OBS utility macro used throughout the plugin source. */
+#ifndef UNUSED_PARAMETER
+#define UNUSED_PARAMETER(param) (void)(param)
+#endif

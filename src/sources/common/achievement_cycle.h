@@ -39,7 +39,7 @@ typedef void (*achievement_cycle_callback_t)(const achievement_t *achievement);
 /**
  * @brief Initialize the achievement cycle module.
  *
- * Sets up the internal state and subscribes to Xbox monitor events.
+ * Sets up the internal state and subscribes to monitoring service events.
  * Call this once during plugin initialization.
  */
 void achievement_cycle_init(void);

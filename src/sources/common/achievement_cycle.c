@@ -4,7 +4,9 @@
 #include <diagnostics/log.h>
 
 #include "common/achievement.h"
-#include "xbox/xbox_monitor.h"
+#include "integrations/monitoring_service.h"
+
+#include <stdlib.h>
 
 /** Duration to show the last unlocked achievement (seconds). */
 #define LAST_UNLOCKED_DISPLAY_DURATION 45.0f
@@ -55,7 +57,7 @@ static bool g_initialized = false;
 /**
  * @brief Whether the session is fully ready (achievements fetched + icons prefetched).
  *
- * Set to true by on_session_ready, reset to false by on_xbox_game_played.
+ * Set to true by on_session_ready, reset to false by on_game_played.
  * While false, achievement_cycle_tick and reset_display_cycle are no-ops so
  * the cycle does not start before all icons are available in the local cache.
  */
@@ -86,7 +88,7 @@ static void notify_subscribers(const achievement_t *achievement) {
  *
  * Finds the last unlocked achievement and resets all timers to start
  * a fresh display cycle. Makes a deep copy of the achievement to avoid
- * dangling pointers when the xbox_monitor session changes.
+ * dangling pointers when the session changes.
  */
 static void reset_display_cycle(void) {
 
@@ -97,13 +99,15 @@ static void reset_display_cycle(void) {
     /* Free the old cached copy */
     free_achievement(&g_last_unlocked);
 
-    const achievement_t *achievements = get_current_game_achievements();
+    achievement_t *achievements = copy_achievement(monitoring_get_current_game_achievements());
 
     /* Find the last unlocked achievement */
     const achievement_t *latest_unlocked = find_latest_unlocked_achievement(achievements);
     if (latest_unlocked) {
         g_last_unlocked = copy_achievement(latest_unlocked);
     }
+
+    free_achievement(&achievements);
 
     /* Reset display cycle to show the last unlocked achievement */
     g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
@@ -114,13 +118,13 @@ static void reset_display_cycle(void) {
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
-//  Xbox monitor event handlers
+//  Monitoring service event handlers
 //  --------------------------------------------------------------------------------------------------------------------
 
 /**
- * @brief Xbox monitor callback invoked when Xbox Live connection state changes.
+ * @brief Monitoring service callback invoked when connection state changes.
  *
- * @param is_connected Whether the Xbox account is currently connected (unused).
+ * @param is_connected Whether the account is currently connected (unused).
  * @param error_message Optional error message if disconnected (unused).
  */
 static void on_connection_changed(bool is_connected, const char *error_message) {
@@ -139,7 +143,7 @@ static void on_connection_changed(bool is_connected, const char *error_message) 
  *
  * @param game Currently played game information.
  */
-static void on_xbox_game_played(const game_t *game) {
+static void on_game_played(const game_t *game) {
 
     UNUSED_PARAMETER(game);
 
@@ -152,25 +156,17 @@ static void on_xbox_game_played(const game_t *game) {
 }
 
 /**
- * @brief Xbox monitor callback invoked when achievement progress is updated.
- *
- * @param gamerscore Updated gamerscore snapshot (unused).
- * @param progress   Achievement progress details (unused).
+ * @brief Monitoring service callback invoked when achievements are updated.
  */
-static void on_achievements_progressed(const gamerscore_t *gamerscore, const achievement_progress_t *progress) {
-
-    UNUSED_PARAMETER(gamerscore);
-    UNUSED_PARAMETER(progress);
-
+static void on_achievements_changed(void) {
     reset_display_cycle();
 }
 
 /**
- * @brief Xbox monitor callback invoked when the session is fully ready.
+ * @brief Monitoring service callback invoked when the session is fully ready.
  *
- * Called from the prefetch background thread once all achievement icons have
- * been downloaded to the local cache.  This is the signal to start (or restart)
- * the achievement display cycle.
+ * Called once all achievement icons have been downloaded to the local cache.
+ * This is the signal to start (or restart) the achievement display cycle.
  */
 static void on_session_ready(void) {
 
@@ -195,10 +191,10 @@ void achievement_cycle_init(void) {
     g_current_achievement  = NULL;
     g_subscriber_count     = 0;
 
-    xbox_subscribe_connected_changed(&on_connection_changed);
-    xbox_subscribe_game_played(&on_xbox_game_played);
-    xbox_subscribe_achievements_progressed(&on_achievements_progressed);
-    xbox_subscribe_session_ready(&on_session_ready);
+    monitoring_subscribe_connection_changed(&on_connection_changed);
+    monitoring_subscribe_game_played(&on_game_played);
+    monitoring_subscribe_achievements_changed(&on_achievements_changed);
+    monitoring_subscribe_session_ready(&on_session_ready);
 
     g_initialized = true;
 }
@@ -209,7 +205,7 @@ void achievement_cycle_destroy(void) {
         return;
     }
 
-    /* TODO: Add xbox_unsubscribe_* functions if available */
+    /* TODO: Add monitoring_unsubscribe_* functions if available */
 
     /* Free the owned achievement copy */
     free_achievement(&g_last_unlocked);
@@ -265,8 +261,8 @@ void achievement_cycle_tick(float seconds) {
         return;
     }
 
-    /* Get the current achievements list */
-    const achievement_t *achievements = get_current_game_achievements();
+    /* Get the current achievements */
+    achievement_t *achievements = copy_achievement(monitoring_get_current_game_achievements());
 
     if (!achievements) {
         return;
@@ -277,57 +273,53 @@ void achievement_cycle_tick(float seconds) {
 
     switch (g_display_phase) {
     case DISPLAY_PHASE_LAST_UNLOCKED:
-        /* Check if it's time to switch to locked achievements rotation */
         if (g_phase_timer <= 0.0f) {
             obs_log(LOG_DEBUG, "Achievement Cycle: Switching to locked achievements rotation");
-            /* Only switch if there are locked achievements to show */
             if (count_locked_achievements(achievements) > 0) {
                 g_display_phase        = DISPLAY_PHASE_LOCKED_ROTATION;
                 g_phase_timer          = LOCKED_CYCLE_TOTAL_DURATION;
                 g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
 
-                /* Show the first random locked achievement */
                 const achievement_t *locked = get_random_locked_achievement(achievements);
 
                 if (locked) {
                     obs_log(LOG_DEBUG, "Achievement Cycle: Showing random locked achievement: %s", locked->name);
-                    notify_subscribers(locked);
+                    /* Store a copy so g_current_achievement survives beyond this tick */
+                    free_achievement(&g_last_unlocked);
+                    g_last_unlocked = copy_achievement(locked);
+                    notify_subscribers(g_last_unlocked);
                 } else {
                     obs_log(LOG_WARNING, "Achievement Cycle: No locked achievements to show");
                 }
             } else {
                 obs_log(LOG_DEBUG, "Achievement Cycle: No locked achievements, keeping last unlocked");
-                /* No locked achievements, keep showing last unlocked */
                 g_phase_timer = LAST_UNLOCKED_DISPLAY_DURATION;
             }
         }
         break;
 
     case DISPLAY_PHASE_LOCKED_ROTATION:
-        /* Update the locked achievement display timer */
         g_locked_display_timer -= seconds;
 
         if (g_locked_display_timer <= 0.0f) {
-            /* Time for the next random locked achievement */
             g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
 
             const achievement_t *locked = get_random_locked_achievement(achievements);
             if (locked) {
-                notify_subscribers(locked);
+                free_achievement(&g_last_unlocked);
+                g_last_unlocked = copy_achievement(locked);
+                notify_subscribers(g_last_unlocked);
             }
         }
 
-        /* Check if the locked rotation phase is complete */
         if (g_phase_timer <= 0.0f) {
             obs_log(LOG_DEBUG, "Achievement Cycle: Locked achievements rotation complete");
             g_display_phase = DISPLAY_PHASE_LAST_UNLOCKED;
             g_phase_timer   = LAST_UNLOCKED_DISPLAY_DURATION;
 
-            /* Switch back to our owned copy of the last unlocked achievement */
             if (g_last_unlocked) {
                 notify_subscribers(g_last_unlocked);
             } else {
-                /* If we don't have a cached copy, refresh it */
                 const achievement_t *latest_unlocked = find_latest_unlocked_achievement(achievements);
                 if (latest_unlocked) {
                     g_last_unlocked = copy_achievement(latest_unlocked);
@@ -337,6 +329,8 @@ void achievement_cycle_tick(float seconds) {
         }
         break;
     }
+
+    free_achievement(&achievements);
 }
 
 const achievement_t *achievement_cycle_get_current(void) {
