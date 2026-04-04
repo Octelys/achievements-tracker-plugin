@@ -99,6 +99,7 @@ static text_source_config_t g_render_config;
  */
 static void update_render_config(void) {
     g_render_config.font_face             = g_configuration->font_face;
+    g_render_config.font_style            = g_configuration->font_style;
     g_render_config.font_size             = g_configuration->font_size;
     g_render_config.active_top_color      = g_configuration->active_top_color;
     g_render_config.active_bottom_color   = g_configuration->active_bottom_color;
@@ -160,6 +161,10 @@ static void update_achievement_name(const achievement_t *achievement) {
  * @see achievement_cycle_subscribe()
  */
 static void on_achievement_changed(const achievement_t *achievement) {
+
+    obs_log(LOG_INFO,
+            "[Achievement Name] Achievement changed: %s",
+            achievement ? (achievement->name ? achievement->name : "(no name)") : "(null)");
 
     update_achievement_name(achievement);
 }
@@ -281,6 +286,17 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     }
 
     bool use_active_color = g_is_achievement_unlocked;
+
+    static bool s_first_render = true;
+    if (s_first_render) {
+        obs_log(LOG_INFO,
+                "[Achievement Name] First render: text='%s' must_reload=%d font_face='%s'",
+                g_achievement_name,
+                g_must_reload,
+                g_render_config.font_face ? g_render_config.font_face : "(null)");
+        s_first_render = false;
+    }
+
     bool updated =
         text_source_update_text(source, &g_must_reload, &g_render_config, g_achievement_name, use_active_color);
 

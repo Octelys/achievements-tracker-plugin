@@ -139,6 +139,11 @@ void mock_xbox_monitor_fire_game_played(const game_t *game) {
         s_cb_game_played(game);
 }
 
+void mock_xbox_monitor_fire_session_ready(void) {
+    if (s_cb_session_ready)
+        s_cb_session_ready();
+}
+
 void mock_xbox_monitor_reset(void) {
     free_identity(&s_xbox_identity);
     s_cb_connection_changed      = NULL;

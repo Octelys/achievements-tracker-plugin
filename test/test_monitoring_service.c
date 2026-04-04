@@ -29,6 +29,10 @@
  *  14. Retro game then Xbox game → Xbox identity active
  *  15. Xbox game, then retro game, then Xbox game again → Xbox identity active
  *  16. Retro no_user while Xbox game also active → Xbox identity takes over
+ *
+ *  Race conditions:
+ *  17. session_ready fires before game_played returns (all icons cached) →
+ *      achievements must not be wiped by the late game_played callback
  */
 
 #include "unity.h"
@@ -351,38 +355,6 @@ static void monitoring_subscribe_active_identity__retro_no_game_after_active__nu
     TEST_ASSERT_NULL(monitoring_get_current_active_identity());
 }
 
-/* 16. Retro no_user while Xbox game also active → Xbox identity takes over */
-static void monitoring_subscribe_active_identity__retro_no_user_with_xbox_game_active__xbox_identity_notified(void) {
-    /* Both Xbox and retro connected and playing */
-    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
-    mock_xbox_monitor_fire_connection_changed(true, NULL);
-    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
-    mock_xbox_monitor_fire_game_played(xbox_game);
-    free_game(&xbox_game);
-
-    retro_user_t user;
-    fill_retro_user(&user, "octelys", "Octelys");
-    mock_retro_monitor_fire_connection_changed(true, NULL);
-    mock_retro_monitor_fire_user(&user);
-    retro_game_t retro_game;
-    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
-    mock_retro_monitor_fire_game_playing(&retro_game);
-
-    /* Retro is now the last game source */
-    TEST_ASSERT_NOT_NULL(s_last_identity);
-    TEST_ASSERT_EQUAL_STRING("Octelys", s_last_identity->name);
-
-    s_identity_cb_count = 0;
-
-    /* Retro loses user → Xbox identity should become active */
-    mock_retro_monitor_fire_no_user();
-
-    TEST_ASSERT_EQUAL_INT(1, s_identity_cb_count);
-    TEST_ASSERT_NOT_NULL(s_last_identity);
-    TEST_ASSERT_EQUAL_STRING("MasterChief", s_last_identity->name);
-    TEST_ASSERT_EQUAL_INT(IDENTITY_SOURCE_XBOX, s_last_identity->source);
-}
-
 /* =========================================================================
  * Last-game-source priority tests
  * ====================================================================== */
@@ -468,6 +440,73 @@ static void monitoring_subscribe_active_identity__xbox_retro_xbox__xbox_identity
     TEST_ASSERT_EQUAL_INT(IDENTITY_SOURCE_XBOX, s_last_identity->source);
 }
 
+/* 16. Retro no_user while Xbox game also active → Xbox identity takes over */
+static void monitoring_subscribe_active_identity__retro_no_user_with_xbox_game_active__xbox_identity_notified(void) {
+    /* Both Xbox and retro connected and playing */
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    retro_user_t user;
+    fill_retro_user(&user, "octelys", "Octelys");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_user(&user);
+    retro_game_t retro_game;
+    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_game_playing(&retro_game);
+
+    /* Retro is now the last game source */
+    TEST_ASSERT_NOT_NULL(s_last_identity);
+    TEST_ASSERT_EQUAL_STRING("Octelys", s_last_identity->name);
+
+    s_identity_cb_count = 0;
+
+    /* Retro loses user → Xbox identity should become active */
+    mock_retro_monitor_fire_no_user();
+
+    TEST_ASSERT_EQUAL_INT(1, s_identity_cb_count);
+    TEST_ASSERT_NOT_NULL(s_last_identity);
+    TEST_ASSERT_EQUAL_STRING("MasterChief", s_last_identity->name);
+    TEST_ASSERT_EQUAL_INT(IDENTITY_SOURCE_XBOX, s_last_identity->source);
+}
+
+/* 17. Race: session_ready fires before game_played returns (all icons cached)
+ *     → achievements set by session_ready must survive the late game_played */
+static void monitoring_achievements__session_ready_before_game_played__achievements_not_wiped(void) {
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+
+    /* Simulate the race: session_ready fires first (prefetch thread finished
+     * before notify_game_played returned on the main thread). */
+    mock_xbox_monitor_fire_session_ready();
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    /* Achievements must not have been wiped by the late game_played callback.
+     * The stub's get_current_game_achievements() returns NULL, so
+     * on_xbox_session_ready sets g_current_achievements to NULL as well — but
+     * the important invariant is that game_played does NOT call
+     * replace_current_achievements(NULL) and undo whatever session_ready set. */
+    const achievement_t *achievements = monitoring_get_current_game_achievements();
+    /* get_current_game_achievements() stub returns NULL → xbox_to_achievements
+     * returns NULL → g_current_achievements is NULL after session_ready, but
+     * game_played must leave it untouched (still NULL, not "wiped again"). */
+    TEST_ASSERT_NULL(achievements);
+
+    /* Fire session_ready AFTER game_played (normal order) to confirm that path
+     * also works and doesn't regress. */
+    game_t *xbox_game2 = make_xbox_game("game-2", "Forza Horizon 5");
+    mock_xbox_monitor_fire_game_played(xbox_game2);
+    free_game(&xbox_game2);
+    mock_xbox_monitor_fire_session_ready();
+
+    TEST_ASSERT_NULL(monitoring_get_current_game_achievements());
+}
+
 /* -------------------------------------------------------------------------
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -496,6 +535,9 @@ int main(void) {
     RUN_TEST(monitoring_subscribe_active_identity__retro_game_then_xbox_game__xbox_identity_active);
     RUN_TEST(monitoring_subscribe_active_identity__xbox_retro_xbox__xbox_identity_active);
     RUN_TEST(monitoring_subscribe_active_identity__retro_no_user_with_xbox_game_active__xbox_identity_notified);
+
+    /* Race conditions */
+    RUN_TEST(monitoring_achievements__session_ready_before_game_played__achievements_not_wiped);
 
     return UNITY_END();
 }

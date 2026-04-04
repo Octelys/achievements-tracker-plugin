@@ -45,6 +45,7 @@ static text_source_config_t g_render_config;
  */
 static void update_render_config(void) {
     g_render_config.font_face             = g_configuration->font_face;
+    g_render_config.font_style            = g_configuration->font_style;
     g_render_config.font_size             = g_configuration->font_size;
     g_render_config.active_top_color      = g_configuration->active_top_color;
     g_render_config.active_bottom_color   = g_configuration->active_bottom_color;

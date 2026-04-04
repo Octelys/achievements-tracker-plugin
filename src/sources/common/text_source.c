@@ -213,9 +213,13 @@ static bool ensure_private_obs_source(text_source_t *text_source, const text_sou
     }
 
     if (text_source->private_obs_source) {
-        obs_log(LOG_DEBUG, "[%s] Private OBS text source has been created", text_source->name);
+        obs_log(LOG_INFO, "[%s] Private OBS text source created successfully", text_source->name);
+        return true;
     }
 
+    obs_log(LOG_ERROR,
+            "[%s] Failed to create private OBS text source with any available text plugin",
+            text_source->name);
     return text_source->private_obs_source != NULL;
 }
 
@@ -302,7 +306,11 @@ bool text_source_update_text(text_source_t *text_source, bool *force_reload, con
     }
 
     if (!ensure_private_obs_source(text_source, config)) {
-        obs_log(LOG_ERROR, "[%s] Failed to create internal OBS text source", text_source->name);
+        obs_log(LOG_ERROR,
+                "[%s] Failed to create internal OBS text source (font_face='%s' font_size=%u)",
+                text_source->name,
+                config->font_face ? config->font_face : "(null)",
+                config->font_size);
         return false;
     }
 
