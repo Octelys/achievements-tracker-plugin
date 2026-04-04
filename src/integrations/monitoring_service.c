@@ -114,8 +114,63 @@ static const identity_t *get_current_active_identity(void) {
 /** Cached generic achievements for the current game (owned by this module). */
 static achievement_t *g_current_achievements = NULL;
 
-static on_monitoring_achievements_changed_t g_achievements_changed_callback = NULL;
-static on_monitoring_session_ready_t        g_session_ready_callback        = NULL;
+/* --------------------------------------------------------------------------
+ * Achievements-changed subscription list
+ * ----------------------------------------------------------------------- */
+
+typedef struct achievements_changed_subscription {
+    on_monitoring_achievements_changed_t      callback;
+    struct achievements_changed_subscription *next;
+} achievements_changed_subscription_t;
+
+static achievements_changed_subscription_t *g_achievements_changed_subscriptions = NULL;
+
+static void notify_achievements_changed(void) {
+    achievements_changed_subscription_t *node = g_achievements_changed_subscriptions;
+    while (node) {
+        node->callback();
+        node = node->next;
+    }
+}
+
+static void clear_achievements_changed_subscriptions(void) {
+    achievements_changed_subscription_t *node = g_achievements_changed_subscriptions;
+    while (node) {
+        achievements_changed_subscription_t *next = node->next;
+        bfree(node);
+        node = next;
+    }
+    g_achievements_changed_subscriptions = NULL;
+}
+
+/* --------------------------------------------------------------------------
+ * Session-ready subscription list
+ * ----------------------------------------------------------------------- */
+
+typedef struct session_ready_subscription {
+    on_monitoring_session_ready_t      callback;
+    struct session_ready_subscription *next;
+} session_ready_subscription_t;
+
+static session_ready_subscription_t *g_session_ready_subscriptions = NULL;
+
+static void notify_session_ready(void) {
+    session_ready_subscription_t *node = g_session_ready_subscriptions;
+    while (node) {
+        node->callback();
+        node = node->next;
+    }
+}
+
+static void clear_session_ready_subscriptions(void) {
+    session_ready_subscription_t *node = g_session_ready_subscriptions;
+    while (node) {
+        session_ready_subscription_t *next = node->next;
+        bfree(node);
+        node = next;
+    }
+    g_session_ready_subscriptions = NULL;
+}
 
 /**
  * @brief Replace the cached achievements list with a new one.
@@ -129,8 +184,7 @@ static void replace_current_achievements(achievement_t *new_achievements) {
     free_achievement(&g_current_achievements);
     g_current_achievements = new_achievements;
 
-    if (g_achievements_changed_callback)
-        g_achievements_changed_callback();
+    notify_achievements_changed();
 }
 
 /**
@@ -289,8 +343,7 @@ static void on_xbox_game_played(const game_t *game) {
 static void on_xbox_session_ready(void) {
     replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
 
-    if (g_session_ready_callback)
-        g_session_ready_callback();
+    notify_session_ready();
 }
 
 /* --------------------------------------------------------------------------
@@ -368,8 +421,7 @@ static void on_retro_no_game(void) {
 static void on_retro_achievements(const retro_achievement_t *achievements, size_t count) {
     replace_current_achievements(retro_to_achievements(achievements, count));
 
-    if (g_session_ready_callback)
-        g_session_ready_callback();
+    notify_session_ready();
 }
 
 /* --------------------------------------------------------------------------
@@ -417,9 +469,8 @@ void monitoring_stop(void) {
 
     clear_active_identity_subscriptions();
     clear_game_played_subscriptions();
-
-    g_achievements_changed_callback = NULL;
-    g_session_ready_callback        = NULL;
+    clear_achievements_changed_subscriptions();
+    clear_session_ready_subscriptions();
 }
 
 void monitoring_subscribe_connection_changed(on_monitoring_connection_changed_t callback) {
@@ -463,11 +514,37 @@ void monitoring_subscribe_game_played(on_monitoring_game_played_t callback) {
 }
 
 void monitoring_subscribe_achievements_changed(on_monitoring_achievements_changed_t callback) {
-    g_achievements_changed_callback = callback;
+    if (!callback) {
+        clear_achievements_changed_subscriptions();
+        return;
+    }
+
+    achievements_changed_subscription_t *node = bzalloc(sizeof(achievements_changed_subscription_t));
+    if (!node) {
+        obs_log(LOG_ERROR, "[MonitoringService] Failed to allocate achievements-changed subscription");
+        return;
+    }
+
+    node->callback                       = callback;
+    node->next                           = g_achievements_changed_subscriptions;
+    g_achievements_changed_subscriptions = node;
 }
 
 void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback) {
-    g_session_ready_callback = callback;
+    if (!callback) {
+        clear_session_ready_subscriptions();
+        return;
+    }
+
+    session_ready_subscription_t *node = bzalloc(sizeof(session_ready_subscription_t));
+    if (!node) {
+        obs_log(LOG_ERROR, "[MonitoringService] Failed to allocate session-ready subscription");
+        return;
+    }
+
+    node->callback                = callback;
+    node->next                    = g_session_ready_subscriptions;
+    g_session_ready_subscriptions = node;
 }
 
 const identity_t *monitoring_get_current_active_identity(void) {

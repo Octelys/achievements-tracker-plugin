@@ -234,6 +234,12 @@ void achievement_cycle_subscribe(achievement_cycle_callback_t callback) {
     }
 
     g_subscribers[g_subscriber_count++] = callback;
+
+    /* If the session is already ready, immediately notify the new subscriber
+     * with the current achievement so it does not miss the initial state. */
+    if (g_session_ready) {
+        callback(g_current_achievement);
+    }
 }
 
 void achievement_cycle_unsubscribe(achievement_cycle_callback_t callback) {
