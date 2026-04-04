@@ -130,7 +130,7 @@ char *parse_presence_game_id(const char *json_string) {
         return NULL;
     }
 
-    obs_log(LOG_WARNING, "GAME Received: %s", json_string);
+    obs_log(LOG_DEBUG, "[Parsers] Parsing presence game ID (%zu bytes)", strlen(json_string));
 
     json_root = cJSON_Parse(json_string);
 
@@ -196,7 +196,7 @@ xbox_achievement_progress_t *parse_achievement_progress(const char *json_string)
         return NULL;
     }
 
-    obs_log(LOG_WARNING, "Received: %s", json_string);
+    obs_log(LOG_DEBUG, "[Parsers] Parsing achievement progress (%zu bytes)", strlen(json_string));
 
     json_root = cJSON_Parse(json_string);
 

@@ -120,7 +120,7 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
             }
         } else {
             obs_log(LOG_DEBUG, "[Cache] Hit: %s", path_buf);
-            return true;
+            return false;
         }
     }
 

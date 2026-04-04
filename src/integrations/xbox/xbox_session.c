@@ -164,13 +164,20 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_sessio
     free_game(&session->game);
 
     if (!game) {
+        obs_log(LOG_INFO, "[XboxSession] Game stopped");
         if (on_ready) {
             on_ready();
         }
         return;
     }
 
-    session->game         = copy_game(game);
+    obs_log(LOG_INFO,
+            "[XboxSession] Loading game: %s (%s)",
+            game->title ? game->title : "(unknown)",
+            game->id ? game->id : "(no id)");
+
+    session->game = copy_game(game);
+    obs_log(LOG_INFO, "[XboxSession] Querying achievements for game: %s", game->title ? game->title : game->id);
     session->achievements = xbox_get_game_achievements(game);
 
     xbox_sort_achievements(&session->achievements);
