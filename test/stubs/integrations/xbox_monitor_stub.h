@@ -38,6 +38,16 @@ void mock_xbox_monitor_fire_connection_changed(bool connected, const char *error
 void mock_xbox_monitor_fire_game_played(const game_t *game);
 
 /**
+ * @brief Simulate an Xbox session-ready event.
+ *
+ * Invokes the callback registered via xbox_subscribe_session_ready().
+ * Call this after mock_xbox_monitor_fire_game_played() to replicate the
+ * normal sequence, or before it to reproduce the race where the prefetch
+ * thread finishes before the game-played notification returns.
+ */
+void mock_xbox_monitor_fire_session_ready(void);
+
+/**
  * @brief Reset all stub state (callbacks, stored identity, etc.).
  *
  * Call from tearDown() to prevent state leaking between tests.

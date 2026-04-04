@@ -247,16 +247,30 @@ static void on_xbox_game_played(const game_t *game) {
     free_game(&g_xbox_game);
     g_xbox_game = copy_game(game);
 
-    if (g_xbox_game && (!g_xbox_game->cover_url || g_xbox_game->cover_url[0] == '\0')) {
+    if (!g_xbox_game) {
+        /* Game stopped — clear achievements immediately since on_xbox_session_ready
+         * will not fire for a NULL game. */
+        replace_current_achievements(NULL);
+
+        notify_active_identity(get_current_active_identity());
+        notify_game_played(NULL);
+        return;
+    }
+
+    if (!g_xbox_game->cover_url || g_xbox_game->cover_url[0] == '\0') {
         g_xbox_game->cover_url = xbox_get_game_cover(g_xbox_game);
     }
 
-    obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game ? g_xbox_game->title : "(null)");
+    obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game->title);
 
     g_last_game_source = IDENTITY_SOURCE_XBOX;
 
-    /* Clear cached achievements — they belong to the previous game. */
-    replace_current_achievements(NULL);
+    /* Do NOT clear g_current_achievements here. xbox_session_change_game() has
+     * already cleared the session's internal achievement list before firing this
+     * callback. on_xbox_session_ready() — which may have already been called on
+     * the prefetch thread before this callback runs — is the sole owner of
+     * g_current_achievements for Xbox. Clearing here would wipe achievements
+     * that on_xbox_session_ready() already set (race when all icons are cached). */
 
     /* Notify with the current active identity. g_xbox_identity may be NULL
      * here if the game-played event arrives before the connection-changed
