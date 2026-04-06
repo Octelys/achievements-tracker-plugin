@@ -84,11 +84,16 @@ static void notify_subscribers(const achievement_t *achievement) {
 }
 
 /**
- * @brief Reset the display cycle to show the last unlocked achievement.
+ * @brief Reset the display cycle to show the last unlocked achievement,
+ *        or a random locked achievement if none have been unlocked yet.
  *
  * Finds the last unlocked achievement and resets all timers to start
  * a fresh display cycle. Makes a deep copy of the achievement to avoid
  * dangling pointers when the session changes.
+ *
+ * If there are no unlocked achievements but there are locked ones,
+ * immediately starts the locked rotation so sources display something
+ * straight away rather than staying blank for LAST_UNLOCKED_DISPLAY_DURATION.
  */
 static void reset_display_cycle(void) {
 
@@ -107,14 +112,37 @@ static void reset_display_cycle(void) {
         g_last_unlocked = copy_achievement(latest_unlocked);
     }
 
+    if (g_last_unlocked) {
+        /* There is a last-unlocked achievement — start with the normal phase */
+        g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+        g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+        g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+        notify_subscribers(g_last_unlocked);
+    } else {
+        /* No unlocked achievements yet — immediately show a random locked one
+         * so sources are never blank at session start. */
+        const achievement_t *locked = get_random_locked_achievement(achievements);
+        if (locked) {
+            g_last_unlocked = copy_achievement(locked);
+
+            g_display_phase        = DISPLAY_PHASE_LOCKED_ROTATION;
+            g_phase_timer          = LOCKED_CYCLE_TOTAL_DURATION;
+            g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+            obs_log(LOG_DEBUG, "Achievement Cycle: No unlocked achievements, showing random locked: %s", locked->name);
+            notify_subscribers(g_last_unlocked);
+        } else {
+            /* No achievements at all (empty list) — clear the display */
+            g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+            g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
+            g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
+
+            notify_subscribers(NULL);
+        }
+    }
+
     free_achievement(&achievements);
-
-    /* Reset display cycle to show the last unlocked achievement */
-    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
-    g_phase_timer          = LAST_UNLOCKED_DISPLAY_DURATION;
-    g_locked_display_timer = LOCKED_ACHIEVEMENT_DISPLAY_DURATION;
-
-    notify_subscribers(g_last_unlocked);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -151,7 +179,7 @@ static void on_game_played(const game_t *game) {
     g_session_ready = false;
 
     /* Clear the display while icons are being prefetched */
-    g_last_unlocked = NULL;
+    free_achievement(&g_last_unlocked);
     notify_subscribers(NULL);
 }
 
