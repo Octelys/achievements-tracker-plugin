@@ -62,6 +62,10 @@
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE "source_achievements_count_font_face"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE "source_achievements_count_font_style"
 
+#define CYCLE_LAST_UNLOCKED_DURATION   "cycle_last_unlocked_duration"
+#define CYCLE_LOCKED_EACH_DURATION     "cycle_locked_each_duration"
+#define CYCLE_LOCKED_TOTAL_DURATION    "cycle_locked_total_duration"
+
 /**
  * @brief Global in-memory persisted state.
  *
@@ -684,4 +688,35 @@ void state_free_achievements_count_configuration(achievements_count_configuratio
     }
 
     free_memory((void **)config);
+}
+
+void state_set_achievement_cycle_timings(const achievement_cycle_timings_t *timings) {
+
+    if (!timings) {
+        return;
+    }
+
+    obs_data_set_int(g_state, CYCLE_LAST_UNLOCKED_DURATION, timings->last_unlocked_duration);
+    obs_data_set_int(g_state, CYCLE_LOCKED_EACH_DURATION, timings->locked_achievement_duration);
+    obs_data_set_int(g_state, CYCLE_LOCKED_TOTAL_DURATION, timings->locked_cycle_total_duration);
+
+    save_state(g_state);
+}
+
+achievement_cycle_timings_t *state_get_achievement_cycle_timings(void) {
+
+    int last_unlocked = (int)obs_data_get_int(g_state, CYCLE_LAST_UNLOCKED_DURATION);
+    int locked_each   = (int)obs_data_get_int(g_state, CYCLE_LOCKED_EACH_DURATION);
+    int locked_total  = (int)obs_data_get_int(g_state, CYCLE_LOCKED_TOTAL_DURATION);
+
+    achievement_cycle_timings_t *timings = bzalloc(sizeof(achievement_cycle_timings_t));
+
+    timings->last_unlocked_duration      = last_unlocked > 0 ? last_unlocked
+                                                             : ACHIEVEMENT_CYCLE_DEFAULT_LAST_UNLOCKED_DURATION;
+    timings->locked_achievement_duration = locked_each > 0 ? locked_each
+                                                           : ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_EACH_DURATION;
+    timings->locked_cycle_total_duration = locked_total > 0 ? locked_total
+                                                            : ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_TOTAL_DURATION;
+
+    return timings;
 }

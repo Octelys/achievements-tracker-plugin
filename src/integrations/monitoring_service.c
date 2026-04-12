@@ -312,10 +312,17 @@ static void on_xbox_game_played(const game_t *game) {
     g_xbox_game = copy_game(game);
 
     if (!g_xbox_game) {
-        /* Game stopped — clear achievements immediately since on_xbox_session_ready
-         * will not fire for a NULL game. */
-        replace_current_achievements(NULL);
+        /* Xbox game stopped. If a retro game is still active, do not disturb
+         * its session: keep the retro achievements in place and let the cycle
+         * keep running. Only re-evaluate the active identity so the gamertag /
+         * gamerpic switch to the retro identity if needed. */
+        if (g_retro_game) {
+            notify_active_identity(get_current_active_identity());
+            return;
+        }
 
+        /* No active game on either source — clear everything. */
+        replace_current_achievements(NULL);
         notify_active_identity(get_current_active_identity());
         notify_game_played(NULL);
         return;
@@ -348,9 +355,15 @@ static void on_xbox_game_played(const game_t *game) {
  * @brief Xbox monitor callback invoked when the session is fully ready.
  *
  * Converts the Xbox achievements to generic form and caches them, then
- * notifies subscribers.
+ * notifies subscribers. Skipped when Xbox has no active game (e.g. the Xbox
+ * monitor fires a session-ready after reporting "game stopped") to avoid
+ * overwriting data from another source such as RetroAchievements.
  */
 static void on_xbox_session_ready(void) {
+    if (!g_xbox_game) {
+        return;
+    }
+
     replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
 
     notify_session_ready();

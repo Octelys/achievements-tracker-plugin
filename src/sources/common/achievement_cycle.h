@@ -104,6 +104,37 @@ const achievement_t *achievement_cycle_get_current(void);
  */
 const achievement_t *achievement_cycle_get_last_unlocked(void);
 
+/**
+ * @brief Update the display-duration settings used by the achievement cycle.
+ *
+ * Changes take effect at the start of the next phase; currently-running timers
+ * are not truncated.  Values <= 0 are silently clamped to 1 second.
+ *
+ * @param last_unlocked_secs  Seconds to show the last-unlocked achievement.
+ * @param locked_each_secs    Seconds to show each random locked achievement.
+ * @param locked_total_secs   Total seconds to spend in the locked-rotation phase.
+ */
+void achievement_cycle_set_timings(float last_unlocked_secs, float locked_each_secs, float locked_total_secs);
+
+/**
+ * @brief Advance to the next achievement in the sorted list.
+ *
+ * Immediately displays the next achievement (wrapping around at the end of the
+ * list) and resets the phase timer so it stays visible for a full interval.
+ * No-op if the session is not ready or no achievements are available.
+ */
+void achievement_cycle_navigate_next(void);
+
+/**
+ * @brief Go back to the previous achievement in the sorted list.
+ *
+ * Immediately displays the previous achievement (wrapping around at the
+ * beginning of the list) and resets the phase timer so it stays visible for a
+ * full interval.  No-op if the session is not ready or no achievements are
+ * available.
+ */
+void achievement_cycle_navigate_previous(void);
+
 #ifdef __cplusplus
 }
 #endif

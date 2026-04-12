@@ -57,7 +57,7 @@ static void free_json_memory(void **ptr) {
         return;
     }
 
-    cJSON_Delete(*ptr);
+    cJSON_Delete((cJSON *)*ptr);
     *ptr = NULL;
 }
 

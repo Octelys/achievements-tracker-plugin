@@ -201,6 +201,31 @@ typedef struct achievements_count_configuration {
     uint32_t    bottom_color;
 } achievements_count_configuration_t;
 
+/** Minimum allowed value (seconds) for any achievement cycle duration setting. */
+#define ACHIEVEMENT_CYCLE_MIN_DURATION 5
+
+/** Default seconds to display the last-unlocked achievement. */
+#define ACHIEVEMENT_CYCLE_DEFAULT_LAST_UNLOCKED_DURATION   45
+
+/** Default seconds to display each random locked achievement. */
+#define ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_EACH_DURATION     30
+
+/** Default total seconds to spend in the locked-rotation phase. */
+#define ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_TOTAL_DURATION   120
+
+/**
+ * @brief Configurable display-duration settings for the achievement cycle.
+ */
+typedef struct achievement_cycle_timings {
+    /** Seconds to display the last-unlocked achievement. Default: ACHIEVEMENT_CYCLE_DEFAULT_LAST_UNLOCKED_DURATION. */
+    int last_unlocked_duration;
+    /** Seconds to display each random locked achievement. Default: ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_EACH_DURATION. */
+    int locked_achievement_duration;
+    /** Total seconds to spend in the locked-rotation phase. Default: ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_TOTAL_DURATION.
+     */
+    int locked_cycle_total_duration;
+} achievement_cycle_timings_t;
+
 /**
  * @brief Dummy type to ensure OpenSSL public types are available to consumers.
  *

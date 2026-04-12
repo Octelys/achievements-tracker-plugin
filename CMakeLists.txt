@@ -503,6 +503,7 @@ target_sources(
     src/integrations/monitoring_service.c
     src/integrations/retro-achievements/retro_achievements_monitor.c
     src/ui/xbox_account_config.cpp
+    src/ui/achievement_tracker_config.cpp
     src/io/state.c
     src/io/cache.c
     src/encoding/base64.c

@@ -40,6 +40,14 @@ void mock_retro_monitor_fire_game_playing(const retro_game_t *game);
 void mock_retro_monitor_fire_no_game(void);
 
 /**
+ * @brief Simulate an "achievements" message arriving from the RetroArch server.
+ *
+ * @param achievements Pointer to an array of achievement records.
+ * @param count        Number of entries in @p achievements.
+ */
+void mock_retro_monitor_fire_achievements(const retro_achievement_t *achievements, size_t count);
+
+/**
  * @brief Reset all stub state. Call from tearDown().
  */
 void mock_retro_monitor_reset(void);
