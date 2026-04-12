@@ -90,6 +90,11 @@ void mock_retro_monitor_fire_no_game(void) {
         s_cb_no_game();
 }
 
+void mock_retro_monitor_fire_achievements(const retro_achievement_t *achievements, size_t count) {
+    if (s_cb_achievements)
+        s_cb_achievements(achievements, count);
+}
+
 void mock_retro_monitor_reset(void) {
     s_cb_connection_changed = NULL;
     s_cb_user               = NULL;

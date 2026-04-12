@@ -58,6 +58,12 @@ typedef struct achievement {
     char                *icon_url;
     /** Unix timestamp (seconds since epoch) when unlocked; 0 if still locked. */
     int64_t              unlocked_timestamp;
+    /**
+     * Progress string for measured achievements (e.g. "5/10").
+     *
+     * NULL when not applicable (Xbox achievements or non-measured retro ones).
+     */
+    char                *measured_progress;
     /** Which integration produced this achievement. */
     achievement_source_t source;
     /** Next achievement in the list, or NULL. */

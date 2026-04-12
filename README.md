@@ -6,10 +6,12 @@ A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements
 
 - **Global Xbox account configuration dialog** using Microsoft's device-code flow
 - **Real-time game and achievement tracking** through Xbox Live RTA monitoring when available
-- **RetroAchievements integration** via a local RetroArch WebSocket server for retro game tracking
+- **RetroAchievements integration** via a local RetroArch WebSocket server for retro game tracking — requires the [Octelys custom build of RetroArch](https://github.com/Octelys/retro-arch/releases/latest)
 - **Unified monitoring service** that handles both Xbox and RetroAchievements sessions with last-game-received priority
 - **Profile sources** for gamertag, gamerpic, and gamerscore
 - **Achievement sources** for name, description, icon, and progress count
+- **Automatic achievement cycle** that rotates through the last unlocked achievement and random locked achievements on a configurable timer
+- **Manual navigation hotkeys** (default: Shift+← / Shift+→) to step through achievements on demand
 - **Customizable text sources** with persisted font and gradient color settings
 - **Cross-platform builds** for Windows, macOS, and Linux
 
@@ -56,6 +58,8 @@ After installation, restart OBS Studio.
 
 ### Configuration
 
+#### Xbox account sign-in
+
 1. Open OBS Studio.
 2. Open **Tools** → **Xbox Account**.
 3. Use the global Xbox Account dialog to review the current status and click **Sign in with Xbox**.
@@ -65,7 +69,29 @@ After installation, restart OBS Studio.
 
 All Xbox sources in the plugin share the same authenticated account. RetroAchievements sources connect automatically when a RetroArch WebSocket server is detected on the local machine.
 
+> **⚠️ RetroAchievements requires a custom build of RetroArch**
+>
+> The standard RetroArch release does not include the WebSocket game-state server used by this plugin. You must install the **Octelys custom build of RetroArch**, which adds that server.
+>
+> Download the latest release: [github.com/Octelys/retro-arch/releases/latest](https://github.com/Octelys/retro-arch/releases/latest) (currently **RetroArch 1.22.2.37**)
+>
+> Available for **Windows (x64)**, **macOS**, and **Linux (x86_64)**.
+
 ![Xbox Account dialog](images/plugin-xbox-account.png)
+
+#### Achievement Tracker hotkeys
+
+Open **Tools** → **Achievement Tracker** to see the currently configured navigation shortcuts.
+
+| Action | Default shortcut |
+| --- | --- |
+| Previous Achievement | Shift + ← |
+| Next Achievement | Shift + → |
+| First Unlocked Achievement | Shift + ↑ |
+| First Locked Achievement | Shift + ↓ |
+| Toggle Auto Cycle | Shift + Space |
+
+To change these shortcuts, open **OBS Settings** → **Hotkeys** and search for _Achievement Tracker_. The defaults are applied automatically the first time the plugin loads; after that OBS persists any changes you make.
 
 ### Available OBS Sources
 
@@ -88,6 +114,33 @@ Account sign-in and sign-out are managed globally from **Tools** → **Xbox Acco
 - **Achievement (Icon)**: current achievement icon
 - **Achievements’ Count**: unlocked / total achievements for the current game (for example `12 / 50`)
 
+#### Achievement display cycle
+
+The four achievement sources above all stay in sync via a shared display cycle. Once the game session is fully ready (all achievement icons cached locally), the cycle runs automatically:
+
+| Phase | Default duration | What is shown |
+| --- | --- | --- |
+| Last unlocked | 45 s | The most recently unlocked achievement. If no achievement has been unlocked yet, a random locked achievement is shown instead. |
+| Locked rotation | 120 s total (30 s each) | Random locked achievements, cycling every 30 seconds. |
+
+After the locked rotation phase ends the cycle returns to the last-unlocked phase and repeats.
+
+All three durations are configurable. Open **Tools** → **Achievement Tracker**, adjust the values in the **Display Timing** section, and click **Save**. Changes take effect immediately and are persisted across OBS restarts.
+
+Constraints enforced by the UI and the cycle engine:
+- Minimum value for any duration: **5 seconds**.
+- **Locked rotation total** must be ≥ **Each locked** — guaranteeing at least one locked achievement is shown per rotation pass.
+
+**Manual navigation** lets you step through the full achievement list at any time without waiting for the timer:
+
+- **Shift + ←** — previous achievement
+- **Shift + →** — next achievement
+- **Shift + ↑** — jump to the first (most recently) unlocked achievement
+- **Shift + ↓** — jump to the first locked achievement
+- **Shift + Space** — toggle the automatic cycle on/off
+
+Pressing ← / → immediately displays the adjacent achievement in the sorted list (unlocked achievements first, ordered by unlock time; locked achievements follow) and resets the phase timer so the selected achievement stays visible for the full interval before the automatic cycle resumes.
+
 #### Real-time updates
 
 When Xbox Live monitoring is available, the plugin subscribes to:
@@ -100,6 +153,8 @@ When a local RetroArch WebSocket server is detected, the plugin additionally tra
 - current retro game changes
 - achievement list and unlock updates
 - user identity (display name, score, avatar)
+
+> This requires the [Octelys custom build of RetroArch](https://github.com/Octelys/retro-arch/releases/latest), which includes the WebSocket game-state server not present in the standard RetroArch release.
 
 The active identity shown in profile sources is determined by whichever integration last reported a game change. If only one integration has an active game, that integration's identity is used.
 

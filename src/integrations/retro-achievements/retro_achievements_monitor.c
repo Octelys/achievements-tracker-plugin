@@ -332,6 +332,14 @@ static void on_message_received(const char *buffer) {
             if (json_item_is_string(field))
                 strncpy(ach->status, field->valuestring, sizeof(ach->status) - 1);
 
+            field = cJSON_GetObjectItemCaseSensitive(item, "unlock_time");
+            if (field != NULL && (field->type & cJSON_Number))
+                ach->unlock_time = (uint64_t)field->valuedouble;
+
+            field = cJSON_GetObjectItemCaseSensitive(item, "measured_progress");
+            if (json_item_is_string(field))
+                strncpy(ach->measured_progress, field->valuestring, sizeof(ach->measured_progress) - 1);
+
             field = cJSON_GetObjectItemCaseSensitive(item, "badge_url");
             if (json_item_is_string(field))
                 strncpy(ach->badge_url, field->valuestring, sizeof(ach->badge_url) - 1);

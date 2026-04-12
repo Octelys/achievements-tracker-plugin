@@ -104,6 +104,78 @@ const achievement_t *achievement_cycle_get_current(void);
  */
 const achievement_t *achievement_cycle_get_last_unlocked(void);
 
+/**
+ * @brief Update the display-duration settings used by the achievement cycle.
+ *
+ * Changes take effect at the start of the next phase; currently-running timers
+ * are not truncated.  Values <= 0 are silently clamped to 1 second.
+ *
+ * @param last_unlocked_secs  Seconds to show the last-unlocked achievement.
+ * @param locked_each_secs    Seconds to show each random locked achievement.
+ * @param locked_total_secs   Total seconds to spend in the locked-rotation phase.
+ */
+void achievement_cycle_set_timings(float last_unlocked_secs, float locked_each_secs, float locked_total_secs);
+
+/**
+ * @brief Advance to the next achievement in the sorted list.
+ *
+ * Immediately displays the next achievement (wrapping around at the end of the
+ * list) and resets the phase timer so it stays visible for a full interval.
+ * No-op if the session is not ready or no achievements are available.
+ */
+void achievement_cycle_navigate_next(void);
+
+/**
+ * @brief Go back to the previous achievement in the sorted list.
+ *
+ * Immediately displays the previous achievement (wrapping around at the
+ * beginning of the list) and resets the phase timer so it stays visible for a
+ * full interval.  No-op if the session is not ready or no achievements are
+ * available.
+ */
+void achievement_cycle_navigate_previous(void);
+
+/**
+ * @brief Jump directly to the first locked achievement in the sorted list.
+ *
+ * The sorted order places unlocked achievements first; locked achievements
+ * follow. This function jumps to the first entry in the locked section.
+ * No-op if the session is not ready, there are no achievements, or all
+ * achievements are already unlocked.
+ */
+void achievement_cycle_navigate_first_locked(void);
+
+/**
+ * @brief Jump directly to the first unlocked achievement in the sorted list.
+ *
+ * Equivalent to jumping to index 0 of the sorted list, which holds the most
+ * recently unlocked achievement.
+ * No-op if the session is not ready, there are no achievements, or no
+ * achievement has been unlocked yet.
+ */
+void achievement_cycle_navigate_first_unlocked(void);
+
+/**
+ * @brief Enable or disable the automatic achievement rotation.
+ *
+ * When disabled, @ref achievement_cycle_tick is a no-op: the cycle freezes on
+ * the achievement currently being displayed.  Manual navigation via
+ * @ref achievement_cycle_navigate_next / @ref achievement_cycle_navigate_previous
+ * remains functional.
+ *
+ * The setting defaults to @c true and survives until the next call.
+ *
+ * @param enabled @c true to resume automatic cycling, @c false to pause it.
+ */
+void achievement_cycle_set_auto_cycle(bool enabled);
+
+/**
+ * @brief Return whether the automatic achievement rotation is currently active.
+ *
+ * @return @c true if the cycle advances automatically, @c false if it is paused.
+ */
+bool achievement_cycle_is_auto_cycle_enabled(void);
+
 #ifdef __cplusplus
 }
 #endif

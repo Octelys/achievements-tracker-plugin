@@ -33,6 +33,18 @@
  *  Race conditions:
  *  17. session_ready fires before game_played returns (all icons cached) →
  *      achievements must not be wiped by the late game_played callback
+ *
+ *  Achievement management — retro source:
+ *  18. Retro achievements arrive with game active → achievements stored, session_ready fired
+ *  19. Retro achievements arrive without a game → achievements stored, session_ready NOT fired
+ *  20. Retro disconnect with game active → achievements cleared
+ *
+ *  Achievement management — Xbox/retro coexistence (race condition fixes):
+ *  21. Xbox game stops while retro is active → retro achievements preserved
+ *  22. Xbox game stops while retro is active → game_played(NULL) NOT propagated to subscribers
+ *  23. Xbox session_ready fires without an Xbox game → achievements NOT overwritten
+ *  24. Xbox session_ready fires without an Xbox game → session_ready NOT re-fired
+ *  25. Xbox session_ready fires with an Xbox game active → session_ready fired normally
  */
 
 #include "unity.h"
@@ -87,8 +99,16 @@ static void fill_retro_game(retro_game_t *g, const char *id, const char *name) {
     strncpy(g->console_name, "SNES", sizeof(g->console_name) - 1);
 }
 
+static void fill_retro_achievement(retro_achievement_t *a, uint32_t id, const char *name, const char *status) {
+    memset(a, 0, sizeof(*a));
+    a->id     = id;
+    a->points = 10;
+    strncpy(a->name, name, sizeof(a->name) - 1);
+    strncpy(a->status, status, sizeof(a->status) - 1);
+}
+
 /* -------------------------------------------------------------------------
- * Subscriber spy
+ * Subscriber spies
  * ---------------------------------------------------------------------- */
 
 static int               s_identity_cb_count = 0;
@@ -99,19 +119,46 @@ static void on_identity_changed(const identity_t *identity) {
     s_last_identity = identity;
 }
 
+static int s_session_ready_cb_count = 0;
+
+static void on_session_ready(void) {
+    s_session_ready_cb_count++;
+}
+
+static int           s_game_played_cb_count = 0;
+static const game_t *s_last_game_played     = NULL;
+
+static void on_game_played(const game_t *game) {
+    s_game_played_cb_count++;
+    s_last_game_played = game;
+}
+
+static int s_achievements_changed_cb_count = 0;
+
+static void on_achievements_changed(void) {
+    s_achievements_changed_cb_count++;
+}
+
 /* -------------------------------------------------------------------------
  * setUp / tearDown
  * ---------------------------------------------------------------------- */
 
 void setUp(void) {
-    s_identity_cb_count = 0;
-    s_last_identity     = NULL;
+    s_identity_cb_count             = 0;
+    s_last_identity                 = NULL;
+    s_session_ready_cb_count        = 0;
+    s_game_played_cb_count          = 0;
+    s_last_game_played              = NULL;
+    s_achievements_changed_cb_count = 0;
 
     mock_xbox_monitor_reset();
     mock_retro_monitor_reset();
 
     monitoring_start();
     monitoring_subscribe_active_identity(on_identity_changed);
+    monitoring_subscribe_session_ready(on_session_ready);
+    monitoring_subscribe_game_played(on_game_played);
+    monitoring_subscribe_achievements_changed(on_achievements_changed);
 
     /* Consume the immediate callback fired by monitoring_subscribe_active_identity
      * (returns current identity, which is NULL at start). */
@@ -507,6 +554,170 @@ static void monitoring_achievements__session_ready_before_game_played__achieveme
     TEST_ASSERT_NULL(monitoring_get_current_game_achievements());
 }
 
+/* =========================================================================
+ * Achievement management — retro source
+ * ====================================================================== */
+
+/* 18. Retro achievements arrive while a game is active → achievements stored
+ *     and session_ready fired to subscribers. */
+static void monitoring_achievements__retro_achievements_with_game__achievements_stored_and_session_ready_fired(void) {
+    retro_game_t game;
+    fill_retro_game(&game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_game_playing(&game);
+
+    s_session_ready_cb_count        = 0;
+    s_achievements_changed_cb_count = 0;
+
+    retro_achievement_t achievements[2];
+    fill_retro_achievement(&achievements[0], 1, "First Win", "unlocked");
+    fill_retro_achievement(&achievements[1], 2, "Second Win", "locked");
+    mock_retro_monitor_fire_achievements(achievements, 2);
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+    TEST_ASSERT_EQUAL_INT(1, s_achievements_changed_cb_count);
+    TEST_ASSERT_EQUAL_INT(1, s_session_ready_cb_count);
+}
+
+/* 19. Retro achievements arrive without a game context → achievements stored
+ *     (ready for future use) but session_ready must NOT fire. */
+static void monitoring_achievements__retro_achievements_without_game__stored_but_session_ready_not_fired(void) {
+    /* Connect but do NOT fire game_playing. */
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+
+    s_session_ready_cb_count        = 0;
+    s_achievements_changed_cb_count = 0;
+
+    retro_achievement_t achievements[1];
+    fill_retro_achievement(&achievements[0], 1, "First Win", "locked");
+    mock_retro_monitor_fire_achievements(achievements, 1);
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+    TEST_ASSERT_EQUAL_INT(1, s_achievements_changed_cb_count);
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+}
+
+/* 20. Retro disconnects while a game is active → achievements must be cleared. */
+static void monitoring_achievements__retro_disconnected_with_game_active__achievements_cleared(void) {
+    retro_game_t game;
+    fill_retro_game(&game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_game_playing(&game);
+
+    retro_achievement_t achievements[1];
+    fill_retro_achievement(&achievements[0], 1, "First Win", "unlocked");
+    mock_retro_monitor_fire_achievements(achievements, 1);
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+
+    mock_retro_monitor_fire_connection_changed(false, NULL);
+
+    TEST_ASSERT_NULL(monitoring_get_current_game_achievements());
+}
+
+/* =========================================================================
+ * Achievement management — Xbox / retro coexistence (race condition fixes)
+ * ====================================================================== */
+
+/* 21. Xbox fires game_stopped while a retro game is active → the retro
+ *     achievements must remain in place (not wiped by the Xbox callback). */
+static void monitoring_achievements__xbox_game_stopped_while_retro_active__retro_achievements_preserved(void) {
+    retro_game_t retro_game;
+    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_game_playing(&retro_game);
+
+    retro_achievement_t achievements[1];
+    fill_retro_achievement(&achievements[0], 1, "First Win", "unlocked");
+    mock_retro_monitor_fire_achievements(achievements, 1);
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+
+    /* Xbox game stops — retro session must remain intact. */
+    mock_xbox_monitor_fire_game_played(NULL);
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+}
+
+/* 22. Xbox fires game_stopped while a retro game is active → game_played(NULL)
+ *     must NOT be propagated to subscribers, so the display cycle is not reset. */
+static void monitoring_game_played__xbox_game_stopped_while_retro_active__null_not_propagated(void) {
+    retro_game_t retro_game;
+    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_game_playing(&retro_game);
+
+    /* Reset after game_playing (which legitimately fires game_played once). */
+    s_game_played_cb_count = 0;
+    s_last_game_played     = NULL;
+
+    /* Xbox game stops — must not touch the retro session. */
+    mock_xbox_monitor_fire_game_played(NULL);
+
+    TEST_ASSERT_EQUAL_INT(0, s_game_played_cb_count);
+}
+
+/* 23. Xbox fires session_ready when it has no active game → the current
+ *     achievements (owned by a running retro session) must not be overwritten. */
+static void monitoring_achievements__xbox_session_ready_without_game__achievements_not_overwritten(void) {
+    retro_game_t retro_game;
+    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_game_playing(&retro_game);
+
+    retro_achievement_t achievements[1];
+    fill_retro_achievement(&achievements[0], 1, "First Win", "unlocked");
+    mock_retro_monitor_fire_achievements(achievements, 1);
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+
+    s_achievements_changed_cb_count = 0;
+
+    /* Xbox fires session_ready without an active game — must be a no-op. */
+    mock_xbox_monitor_fire_session_ready();
+
+    TEST_ASSERT_NOT_NULL(monitoring_get_current_game_achievements());
+    TEST_ASSERT_EQUAL_INT(0, s_achievements_changed_cb_count);
+}
+
+/* 24. Xbox fires session_ready when it has no active game → session_ready must
+ *     NOT be re-fired to subscribers (that would restart the display cycle). */
+static void monitoring_session_ready__xbox_session_ready_without_game__not_fired(void) {
+    retro_game_t retro_game;
+    fill_retro_game(&retro_game, "crc-abc", "Chrono Trigger");
+    mock_retro_monitor_fire_connection_changed(true, NULL);
+    mock_retro_monitor_fire_game_playing(&retro_game);
+
+    retro_achievement_t achievements[1];
+    fill_retro_achievement(&achievements[0], 1, "First Win", "unlocked");
+    mock_retro_monitor_fire_achievements(achievements, 1);
+
+    /* Reset after the retro session_ready that legitimately fired above. */
+    s_session_ready_cb_count = 0;
+
+    /* Xbox fires session_ready without a game — must be ignored. */
+    mock_xbox_monitor_fire_session_ready();
+
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+}
+
+/* 25. Xbox fires session_ready with an active Xbox game → session_ready fires
+ *     normally (positive path; regression guard). */
+static void monitoring_session_ready__xbox_session_ready_with_game__fired(void) {
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    s_session_ready_cb_count = 0;
+
+    mock_xbox_monitor_fire_session_ready();
+
+    TEST_ASSERT_EQUAL_INT(1, s_session_ready_cb_count);
+}
+
 /* -------------------------------------------------------------------------
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -538,6 +749,18 @@ int main(void) {
 
     /* Race conditions */
     RUN_TEST(monitoring_achievements__session_ready_before_game_played__achievements_not_wiped);
+
+    /* Achievement management — retro source */
+    RUN_TEST(monitoring_achievements__retro_achievements_with_game__achievements_stored_and_session_ready_fired);
+    RUN_TEST(monitoring_achievements__retro_achievements_without_game__stored_but_session_ready_not_fired);
+    RUN_TEST(monitoring_achievements__retro_disconnected_with_game_active__achievements_cleared);
+
+    /* Achievement management — Xbox/retro coexistence (race condition fixes) */
+    RUN_TEST(monitoring_achievements__xbox_game_stopped_while_retro_active__retro_achievements_preserved);
+    RUN_TEST(monitoring_game_played__xbox_game_stopped_while_retro_active__null_not_propagated);
+    RUN_TEST(monitoring_achievements__xbox_session_ready_without_game__achievements_not_overwritten);
+    RUN_TEST(monitoring_session_ready__xbox_session_ready_without_game__not_fired);
+    RUN_TEST(monitoring_session_ready__xbox_session_ready_with_game__fired);
 
     return UNITY_END();
 }

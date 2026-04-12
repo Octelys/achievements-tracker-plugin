@@ -26,6 +26,7 @@ achievement_t *copy_achievement(const achievement_t *achievement) {
         copy->name               = bstrdup(current->name);
         copy->description        = bstrdup(current->description);
         copy->icon_url           = bstrdup(current->icon_url);
+        copy->measured_progress  = bstrdup(current->measured_progress);
         copy->is_secret          = current->is_secret;
         copy->value              = current->value;
         copy->unlocked_timestamp = current->unlocked_timestamp;
@@ -61,6 +62,7 @@ void free_achievement(achievement_t **achievement) {
         free_memory((void **)&current->name);
         free_memory((void **)&current->description);
         free_memory((void **)&current->icon_url);
+        free_memory((void **)&current->measured_progress);
         free_memory((void **)&current);
 
         current = next;

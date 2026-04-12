@@ -3,6 +3,7 @@
 
 #include "sources/common/achievement_cycle.h"
 #include "ui/xbox_account_config.h"
+#include "ui/achievement_tracker_config.h"
 #include "sources/gamerpic.h"
 #include "sources/game_cover.h"
 #include "sources/gamerscore.h"
@@ -24,6 +25,7 @@ bool obs_module_load(void) {
     io_load();
 
     xbox_account_config_register();
+    achievement_tracker_config_register();
     monitoring_start();
 
     xbox_gamerpic_source_register();
@@ -33,6 +35,20 @@ bool obs_module_load(void) {
 
     /* Initialize the shared achievement display cycle before registering achievement sources */
     achievement_cycle_init();
+
+    /* Apply any user-configured timing values persisted from a previous session */
+    {
+        achievement_cycle_timings_t *timings = state_get_achievement_cycle_timings();
+        if (timings) {
+            achievement_cycle_set_timings((float)timings->last_unlocked_duration,
+                                          (float)timings->locked_achievement_duration,
+                                          (float)timings->locked_cycle_total_duration);
+            bfree(timings);
+        }
+    }
+
+    /* Apply the persisted auto-cycle toggle (defaults to enabled when not yet saved) */
+    achievement_cycle_set_auto_cycle(state_get_auto_cycle_enabled());
 
     xbox_achievement_name_source_register();
     xbox_achievement_description_source_register();
@@ -46,6 +62,7 @@ bool obs_module_load(void) {
 
 void obs_module_unload(void) {
     xbox_account_config_unregister();
+    achievement_tracker_config_unregister();
 
     achievement_cycle_destroy();
     image_cleanup();

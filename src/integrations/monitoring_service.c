@@ -204,13 +204,23 @@ static achievement_t *retro_to_achievements(const retro_achievement_t *retro, si
         snprintf(id_buf, sizeof(id_buf), "%u", r->id);
         a->id = bstrdup(id_buf);
 
-        a->name               = bstrdup(r->name);
-        a->description        = bstrdup(r->description);
-        a->icon_url           = bstrdup(r->badge_url);
-        a->is_secret          = false;
-        a->value              = (int)r->points;
-        a->unlocked_timestamp = (strcmp(r->status, "unlocked") == 0) ? 1 : 0;
-        a->source             = ACHIEVEMENT_SOURCE_RETRO;
+        a->name              = bstrdup(r->name);
+        a->description       = bstrdup(r->description);
+        a->icon_url          = bstrdup(r->badge_url);
+        a->measured_progress = (r->measured_progress[0] != '\0') ? bstrdup(r->measured_progress) : NULL;
+        a->is_secret         = false;
+        a->value             = (int)r->points;
+        /* Use the real unlock timestamp when available; fall back to 1 (a
+         * non-zero sentinel meaning "unlocked at unknown time") when the
+         * server reports status="unlocked" but omits unlock_time. */
+        if (r->unlock_time > 0) {
+            a->unlocked_timestamp = (int64_t)r->unlock_time;
+        } else if (strcmp(r->status, "unlocked") == 0) {
+            a->unlocked_timestamp = 1;
+        } else {
+            a->unlocked_timestamp = 0;
+        }
+        a->source = ACHIEVEMENT_SOURCE_RETRO;
 
         if (previous) {
             previous->next = a;
@@ -302,10 +312,17 @@ static void on_xbox_game_played(const game_t *game) {
     g_xbox_game = copy_game(game);
 
     if (!g_xbox_game) {
-        /* Game stopped — clear achievements immediately since on_xbox_session_ready
-         * will not fire for a NULL game. */
-        replace_current_achievements(NULL);
+        /* Xbox game stopped. If a retro game is still active, do not disturb
+         * its session: keep the retro achievements in place and let the cycle
+         * keep running. Only re-evaluate the active identity so the gamertag /
+         * gamerpic switch to the retro identity if needed. */
+        if (g_retro_game) {
+            notify_active_identity(get_current_active_identity());
+            return;
+        }
 
+        /* No active game on either source — clear everything. */
+        replace_current_achievements(NULL);
         notify_active_identity(get_current_active_identity());
         notify_game_played(NULL);
         return;
@@ -338,9 +355,15 @@ static void on_xbox_game_played(const game_t *game) {
  * @brief Xbox monitor callback invoked when the session is fully ready.
  *
  * Converts the Xbox achievements to generic form and caches them, then
- * notifies subscribers.
+ * notifies subscribers. Skipped when Xbox has no active game (e.g. the Xbox
+ * monitor fires a session-ready after reporting "game stopped") to avoid
+ * overwriting data from another source such as RetroAchievements.
  */
 static void on_xbox_session_ready(void) {
+    if (!g_xbox_game) {
+        return;
+    }
+
     replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
 
     notify_session_ready();
@@ -351,8 +374,27 @@ static void on_xbox_session_ready(void) {
  * ----------------------------------------------------------------------- */
 
 static void on_retro_connection_changed(bool connected, const char *error_message) {
-    if (!connected)
+    if (!connected) {
+        /* Treat a disconnect the same as no_game + no_user so that all
+         * subscribers (game cover, achievement sources, identity sources)
+         * are cleared immediately instead of staying stale. */
         free_identity_t(&g_retro_identity);
+
+        if (g_retro_game) {
+            free_game(&g_retro_game);
+
+            /* Fire game_played(NULL) BEFORE clearing achievements so that the
+             * achievement cycle sets g_session_ready = false first, preventing
+             * reset_display_cycle() from running with an empty list. */
+            notify_game_played(NULL);
+            notify_active_identity(get_current_active_identity());
+            replace_current_achievements(NULL);
+        } else {
+            /* No game was active, but still re-evaluate the active identity
+             * in case the retro identity was the one being shown. */
+            notify_active_identity(get_current_active_identity());
+        }
+    }
 
     if (g_connection_changed_callback)
         g_connection_changed_callback(connected, error_message);
@@ -395,33 +437,51 @@ static void on_retro_game_playing(const retro_game_t *retro_game) {
 
     g_last_game_source = IDENTITY_SOURCE_RETRO;
 
-    /* Clear cached achievements — they belong to the previous game. */
-    replace_current_achievements(NULL);
-
-    /* Retro is now the last game source. get_current_active_identity() will
-     * return the retro identity if it is cached, or NULL if the user message
-     * has not arrived yet (it will re-notify via on_retro_user). */
+    /* Notify game_played BEFORE clearing achievements so that the achievement
+     * cycle can mark the session as not-ready before on_achievements_changed
+     * fires. If we cleared achievements first while g_session_ready was still
+     * true, reset_display_cycle() would run with an empty list and notify all
+     * subscribers with NULL, causing the name/description sources to blank out
+     * permanently until the new session becomes ready. */
     notify_active_identity(get_current_active_identity());
-
     notify_game_played(g_retro_game);
+
+    /* Clear cached achievements — they belong to the previous game.
+     * Done after notify_game_played so achievement_cycle has already set
+     * g_session_ready = false, making the resulting on_achievements_changed
+     * call a no-op inside reset_display_cycle(). */
+    replace_current_achievements(NULL);
 }
 
 static void on_retro_no_game(void) {
     free_game(&g_retro_game);
-    /* Clear achievements and notify all subscribers: no game is active and
-     * therefore no identity is active either. */
-    replace_current_achievements(NULL);
+
+    /* Notify game_played BEFORE clearing achievements so that the achievement
+     * cycle sets g_session_ready = false first.  Otherwise replace_current_achievements(NULL)
+     * would fire on_achievements_changed → reset_display_cycle() while
+     * g_session_ready is still true, blanking out the sources. */
     notify_game_played(NULL);
     notify_active_identity(get_current_active_identity());
+
+    /* Clear achievements now that the cycle is no longer active. */
+    replace_current_achievements(NULL);
 }
 
 /**
  * @brief RetroAchievements callback invoked when the achievements' list is received.
+ *
+ * Only fires notify_session_ready() when a game is actually active.
+ * RetroArch may send an achievements message with count=0 after a no_game
+ * event (initial state dump on connection). Treating that as session-ready
+ * would set g_session_ready = true with no game context, which could then
+ * block the next real game's session from starting correctly.
  */
 static void on_retro_achievements(const retro_achievement_t *achievements, size_t count) {
     replace_current_achievements(retro_to_achievements(achievements, count));
 
-    notify_session_ready();
+    if (g_retro_game) {
+        notify_session_ready();
+    }
 }
 
 /* --------------------------------------------------------------------------

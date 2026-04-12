@@ -225,6 +225,44 @@ void state_set_achievements_count_configuration(const achievements_count_configu
 achievements_count_configuration_t *state_get_achievements_count_configuration();
 
 /**
+ * @brief Persist the automatic achievement cycle toggle.
+ *
+ * @param enabled @c true to enable automatic cycling, @c false to disable it.
+ */
+void state_set_auto_cycle_enabled(bool enabled);
+
+/**
+ * @brief Return the persisted automatic cycle state.
+ *
+ * Defaults to @c true when no value has been saved yet.
+ *
+ * @return @c true if automatic cycling is enabled, @c false if it is disabled.
+ */
+bool state_get_auto_cycle_enabled(void);
+
+/**
+ * @brief Set the achievement cycle display-duration configuration.
+ *
+ * Persists the three timing values to the state file so they survive restarts.
+ *
+ * @param timings Timing values to store. May be NULL (no-op).
+ */
+void state_set_achievement_cycle_timings(const achievement_cycle_timings_t *timings);
+
+/**
+ * @brief Get the stored achievement cycle display-duration configuration.
+ *
+ * Returns a newly allocated structure with defaults applied for any value that
+ * has not been persisted yet:
+ * - last_unlocked_duration:      45 s
+ * - locked_achievement_duration: 30 s
+ * - locked_cycle_total_duration: 120 s
+ *
+ * @return Newly allocated timings structure. Caller must free with bfree().
+ */
+achievement_cycle_timings_t *state_get_achievement_cycle_timings(void);
+
+/**
  * @brief Clear all in-memory state (and typically any persisted state).
  *
  * After calling this, all getters are expected to return NULL until new values
