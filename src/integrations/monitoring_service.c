@@ -204,12 +204,12 @@ static achievement_t *retro_to_achievements(const retro_achievement_t *retro, si
         snprintf(id_buf, sizeof(id_buf), "%u", r->id);
         a->id = bstrdup(id_buf);
 
-        a->name               = bstrdup(r->name);
-        a->description        = bstrdup(r->description);
-        a->icon_url           = bstrdup(r->badge_url);
-        a->measured_progress  = (r->measured_progress[0] != '\0') ? bstrdup(r->measured_progress) : NULL;
-        a->is_secret          = false;
-        a->value              = (int)r->points;
+        a->name              = bstrdup(r->name);
+        a->description       = bstrdup(r->description);
+        a->icon_url          = bstrdup(r->badge_url);
+        a->measured_progress = (r->measured_progress[0] != '\0') ? bstrdup(r->measured_progress) : NULL;
+        a->is_secret         = false;
+        a->value             = (int)r->points;
         /* Use the real unlock timestamp when available; fall back to 1 (a
          * non-zero sentinel meaning "unlocked at unknown time") when the
          * server reports status="unlocked" but omits unlock_time. */
@@ -220,7 +220,7 @@ static achievement_t *retro_to_achievements(const retro_achievement_t *retro, si
         } else {
             a->unlocked_timestamp = 0;
         }
-        a->source             = ACHIEVEMENT_SOURCE_RETRO;
+        a->source = ACHIEVEMENT_SOURCE_RETRO;
 
         if (previous) {
             previous->next = a;
