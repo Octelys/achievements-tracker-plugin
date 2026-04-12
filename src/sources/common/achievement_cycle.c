@@ -56,6 +56,9 @@ static int g_subscriber_count = 0;
 /** Whether the module has been initialized. */
 static bool g_initialized = false;
 
+/** Whether the automatic display cycle is active (true by default). */
+static bool g_auto_cycle_enabled = true;
+
 /**
  * @brief Index of the currently displayed achievement in the sorted full list.
  *
@@ -273,6 +276,51 @@ static void navigate(int direction) {
     free_achievement(&achievements);
 }
 
+/**
+ * @brief Jump directly to a specific index in the sorted achievement list.
+ *
+ * @param target_index Absolute index to jump to (0-based, from sorted list).
+ */
+static void navigate_to_index(int target_index) {
+
+    if (!g_initialized || !g_session_ready) {
+        return;
+    }
+
+    achievement_t *achievements = copy_achievement(monitoring_get_current_game_achievements());
+    if (!achievements) {
+        return;
+    }
+
+    int count = count_achievements(achievements);
+    if (count == 0 || target_index < 0 || target_index >= count) {
+        free_achievement(&achievements);
+        return;
+    }
+
+    sort_achievements(&achievements);
+
+    /* Walk the linked list to the target index. */
+    const achievement_t *target = achievements;
+    for (int i = 0; i < target_index && target->next; i++) {
+        target = target->next;
+    }
+
+    g_nav_index = target_index;
+
+    free_achievement(&g_last_unlocked);
+    g_last_unlocked = copy_achievement(target);
+
+    g_display_phase        = DISPLAY_PHASE_LAST_UNLOCKED;
+    g_phase_timer          = g_last_unlocked_duration;
+    g_locked_display_timer = g_locked_each_duration;
+
+    obs_log(LOG_DEBUG, "Achievement Cycle: Jumped to index %d: %s", g_nav_index, target->name ? target->name : "(null)");
+
+    notify_subscribers(g_last_unlocked);
+    free_achievement(&achievements);
+}
+
 //  --------------------------------------------------------------------------------------------------------------------
 //  Public API
 //  --------------------------------------------------------------------------------------------------------------------
@@ -362,7 +410,7 @@ void achievement_cycle_unsubscribe(achievement_cycle_callback_t callback) {
 
 void achievement_cycle_tick(float seconds) {
 
-    if (!g_initialized || !g_session_ready) {
+    if (!g_initialized || !g_session_ready || !g_auto_cycle_enabled) {
         return;
     }
 
@@ -462,6 +510,67 @@ void achievement_cycle_navigate_next(void) {
 
 void achievement_cycle_navigate_previous(void) {
     navigate(-1);
+}
+
+void achievement_cycle_navigate_first_locked(void) {
+
+    if (!g_initialized || !g_session_ready) {
+        return;
+    }
+
+    achievement_t *achievements = copy_achievement(monitoring_get_current_game_achievements());
+    if (!achievements) {
+        return;
+    }
+
+    sort_achievements(&achievements);
+
+    /* In the sorted list, unlocked achievements come first. The first locked
+     * achievement is therefore at index == count_unlocked_achievements(). */
+    int first_locked_index = count_unlocked_achievements(achievements);
+    int total              = count_achievements(achievements);
+
+    free_achievement(&achievements);
+
+    if (first_locked_index >= total) {
+        obs_log(LOG_DEBUG, "Achievement Cycle: No locked achievements to jump to");
+        return;
+    }
+
+    obs_log(LOG_DEBUG, "Achievement Cycle: Jumping to first locked achievement at index %d", first_locked_index);
+    navigate_to_index(first_locked_index);
+}
+
+void achievement_cycle_navigate_first_unlocked(void) {
+
+    if (!g_initialized || !g_session_ready) {
+        return;
+    }
+
+    achievement_t *achievements = copy_achievement(monitoring_get_current_game_achievements());
+    if (!achievements) {
+        return;
+    }
+
+    int unlocked_count = count_unlocked_achievements(achievements);
+    free_achievement(&achievements);
+
+    if (unlocked_count == 0) {
+        obs_log(LOG_DEBUG, "Achievement Cycle: No unlocked achievements to jump to");
+        return;
+    }
+
+    obs_log(LOG_DEBUG, "Achievement Cycle: Jumping to first unlocked achievement (index 0)");
+    navigate_to_index(0);
+}
+
+void achievement_cycle_set_auto_cycle(bool enabled) {
+    g_auto_cycle_enabled = enabled;
+    obs_log(LOG_DEBUG, "Achievement Cycle: auto-cycle %s", enabled ? "enabled" : "disabled");
+}
+
+bool achievement_cycle_is_auto_cycle_enabled(void) {
+    return g_auto_cycle_enabled;
 }
 
 void achievement_cycle_set_timings(float last_unlocked_secs, float locked_each_secs, float locked_total_secs) {

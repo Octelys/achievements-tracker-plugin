@@ -225,6 +225,22 @@ void state_set_achievements_count_configuration(const achievements_count_configu
 achievements_count_configuration_t *state_get_achievements_count_configuration();
 
 /**
+ * @brief Persist the automatic achievement cycle toggle.
+ *
+ * @param enabled @c true to enable automatic cycling, @c false to disable it.
+ */
+void state_set_auto_cycle_enabled(bool enabled);
+
+/**
+ * @brief Return the persisted automatic cycle state.
+ *
+ * Defaults to @c true when no value has been saved yet.
+ *
+ * @return @c true if automatic cycling is enabled, @c false if it is disabled.
+ */
+bool state_get_auto_cycle_enabled(void);
+
+/**
  * @brief Set the achievement cycle display-duration configuration.
  *
  * Persists the three timing values to the state file so they survive restarts.

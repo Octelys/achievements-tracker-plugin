@@ -135,6 +135,47 @@ void achievement_cycle_navigate_next(void);
  */
 void achievement_cycle_navigate_previous(void);
 
+/**
+ * @brief Jump directly to the first locked achievement in the sorted list.
+ *
+ * The sorted order places unlocked achievements first; locked achievements
+ * follow. This function jumps to the first entry in the locked section.
+ * No-op if the session is not ready, there are no achievements, or all
+ * achievements are already unlocked.
+ */
+void achievement_cycle_navigate_first_locked(void);
+
+/**
+ * @brief Jump directly to the first unlocked achievement in the sorted list.
+ *
+ * Equivalent to jumping to index 0 of the sorted list, which holds the most
+ * recently unlocked achievement.
+ * No-op if the session is not ready, there are no achievements, or no
+ * achievement has been unlocked yet.
+ */
+void achievement_cycle_navigate_first_unlocked(void);
+
+/**
+ * @brief Enable or disable the automatic achievement rotation.
+ *
+ * When disabled, @ref achievement_cycle_tick is a no-op: the cycle freezes on
+ * the achievement currently being displayed.  Manual navigation via
+ * @ref achievement_cycle_navigate_next / @ref achievement_cycle_navigate_previous
+ * remains functional.
+ *
+ * The setting defaults to @c true and survives until the next call.
+ *
+ * @param enabled @c true to resume automatic cycling, @c false to pause it.
+ */
+void achievement_cycle_set_auto_cycle(bool enabled);
+
+/**
+ * @brief Return whether the automatic achievement rotation is currently active.
+ *
+ * @return @c true if the cycle advances automatically, @c false if it is paused.
+ */
+bool achievement_cycle_is_auto_cycle_enabled(void);
+
 #ifdef __cplusplus
 }
 #endif

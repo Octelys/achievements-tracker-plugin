@@ -47,6 +47,9 @@ bool obs_module_load(void) {
         }
     }
 
+    /* Apply the persisted auto-cycle toggle (defaults to enabled when not yet saved) */
+    achievement_cycle_set_auto_cycle(state_get_auto_cycle_enabled());
+
     xbox_achievement_name_source_register();
     xbox_achievement_description_source_register();
     xbox_achievement_icon_source_register();

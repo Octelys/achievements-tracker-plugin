@@ -9,6 +9,7 @@
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPointer>
 #include <QPushButton>
@@ -25,8 +26,11 @@ extern "C" {
 // Hotkey IDs
 // ----------------------------------------------------------------------------
 
-static obs_hotkey_id g_hotkey_next_id     = OBS_INVALID_HOTKEY_ID;
-static obs_hotkey_id g_hotkey_previous_id = OBS_INVALID_HOTKEY_ID;
+static obs_hotkey_id g_hotkey_next_id           = OBS_INVALID_HOTKEY_ID;
+static obs_hotkey_id g_hotkey_previous_id       = OBS_INVALID_HOTKEY_ID;
+static obs_hotkey_id g_hotkey_toggle_cycle_id   = OBS_INVALID_HOTKEY_ID;
+static obs_hotkey_id g_hotkey_first_locked_id   = OBS_INVALID_HOTKEY_ID;
+static obs_hotkey_id g_hotkey_first_unlocked_id = OBS_INVALID_HOTKEY_ID;
 
 // ----------------------------------------------------------------------------
 // Hotkey callbacks
@@ -48,6 +52,35 @@ static void on_previous_achievement(void *, obs_hotkey_id, obs_hotkey_t *, bool 
 
     obs_log(LOG_DEBUG, "Achievement Tracker: hotkey 'Previous Achievement' pressed");
     achievement_cycle_navigate_previous();
+}
+
+static void on_first_locked_achievement(void *, obs_hotkey_id, obs_hotkey_t *, bool pressed) {
+    if (!pressed) {
+        return;
+    }
+
+    obs_log(LOG_DEBUG, "Achievement Tracker: hotkey 'First Locked Achievement' pressed");
+    achievement_cycle_navigate_first_locked();
+}
+
+static void on_first_unlocked_achievement(void *, obs_hotkey_id, obs_hotkey_t *, bool pressed) {
+    if (!pressed) {
+        return;
+    }
+
+    obs_log(LOG_DEBUG, "Achievement Tracker: hotkey 'First Unlocked Achievement' pressed");
+    achievement_cycle_navigate_first_unlocked();
+}
+
+static void on_toggle_auto_cycle(void *, obs_hotkey_id, obs_hotkey_t *, bool pressed) {
+    if (!pressed) {
+        return;
+    }
+
+    const bool enabled = !achievement_cycle_is_auto_cycle_enabled();
+    achievement_cycle_set_auto_cycle(enabled);
+    state_set_auto_cycle_enabled(enabled);
+    obs_log(LOG_INFO, "Achievement Tracker: auto-cycle toggled %s", enabled ? "on" : "off");
 }
 
 // ----------------------------------------------------------------------------
@@ -125,6 +158,7 @@ static QString format_binding(obs_hotkey_id id) {
         {"RIGHT", "→"},
         {"UP", "↑"},
         {"DOWN", "↓"},
+        {"SPACE", "Space"},
         {nullptr, nullptr},
     };
     for (int i = 0; key_map[i].from; ++i) {
@@ -165,25 +199,73 @@ class AchievementTrackerDialog final : public QDialog {
         hotkeysHelp->setWordWrap(true);
         hotkeysHelp->setText(
             "Keyboard shortcuts for cycling through achievements. "
-            "To reconfigure, open OBS Settings \u2192 Hotkeys and search for \"Achievement Tracker\".");
+            "To reconfigure, open OBS Settings \u2192 Hotkeys and search for \"Achievement Tracker\".\n\n"
+            "On macOS, global hotkeys require Input Monitoring permission "
+            "(System Settings \u2192 Privacy & Security \u2192 Input Monitoring). "
+            "Use the buttons below as a fallback when that permission is not granted.");
 
         auto *hotkeysForm = new QFormLayout();
         hotkeysForm->setLabelAlignment(Qt::AlignLeft);
         hotkeysForm->setVerticalSpacing(6);
 
-        m_prevBinding = new QLabel(this);
-        m_nextBinding = new QLabel(this);
+        m_prevBinding          = new QLabel(this);
+        m_nextBinding          = new QLabel(this);
+        m_firstUnlockedBinding = new QLabel(this);
+        m_firstLockedBinding   = new QLabel(this);
+        m_toggleCycleBinding   = new QLabel(this);
+        m_autoCycleState       = new QLabel(this);
         m_prevBinding->setTextInteractionFlags(Qt::TextSelectableByMouse);
         m_nextBinding->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        m_firstUnlockedBinding->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        m_firstLockedBinding->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        m_toggleCycleBinding->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
         hotkeysForm->addRow("Previous Achievement", m_prevBinding);
         hotkeysForm->addRow("Next Achievement", m_nextBinding);
+        hotkeysForm->addRow("First Unlocked Achievement", m_firstUnlockedBinding);
+        hotkeysForm->addRow("First Locked Achievement", m_firstLockedBinding);
+        hotkeysForm->addRow("Toggle Auto Cycle", m_toggleCycleBinding);
+        hotkeysForm->addRow("Auto Cycle Status", m_autoCycleState);
+
+        // Manual navigation buttons — fallback when global hotkeys are unavailable.
+        auto *navLayout       = new QHBoxLayout();
+        m_prevButton          = new QPushButton("← Previous", this);
+        m_nextButton          = new QPushButton("Next →", this);
+        m_firstUnlockedButton = new QPushButton("⊤ First Unlocked", this);
+        m_firstLockedButton   = new QPushButton("⊥ First Locked", this);
+        m_toggleCycleButton   = new QPushButton("Toggle Cycle", this);
+        m_prevButton->setToolTip("Show the previous achievement");
+        m_nextButton->setToolTip("Show the next achievement");
+        m_firstUnlockedButton->setToolTip("Jump to the first (most recent) unlocked achievement");
+        m_firstLockedButton->setToolTip("Jump to the first locked achievement");
+        m_toggleCycleButton->setToolTip("Toggle the automatic achievement rotation on/off");
+        navLayout->addWidget(m_prevButton);
+        navLayout->addWidget(m_nextButton);
+        navLayout->addWidget(m_firstUnlockedButton);
+        navLayout->addWidget(m_firstLockedButton);
+        navLayout->addWidget(m_toggleCycleButton);
+
+        connect(m_prevButton, &QPushButton::clicked, this, []() { achievement_cycle_navigate_previous(); });
+        connect(m_nextButton, &QPushButton::clicked, this, []() { achievement_cycle_navigate_next(); });
+        connect(m_firstUnlockedButton, &QPushButton::clicked, this, []() {
+            achievement_cycle_navigate_first_unlocked();
+        });
+        connect(m_firstLockedButton, &QPushButton::clicked, this, []() { achievement_cycle_navigate_first_locked(); });
+        connect(m_toggleCycleButton, &QPushButton::clicked, this, [this]() {
+            const bool enabled = !achievement_cycle_is_auto_cycle_enabled();
+            achievement_cycle_set_auto_cycle(enabled);
+            state_set_auto_cycle_enabled(enabled);
+            obs_log(LOG_INFO, "Achievement Tracker: auto-cycle toggled %s via dialog", enabled ? "on" : "off");
+            refreshBindings();
+        });
 
         rootLayout->addWidget(hotkeysLabel);
         rootLayout->addSpacing(4);
         rootLayout->addWidget(hotkeysHelp);
         rootLayout->addSpacing(6);
         rootLayout->addLayout(hotkeysForm);
+        rootLayout->addSpacing(6);
+        rootLayout->addLayout(navLayout);
 
         // ---- Separator -------------------------------------------------------
         auto *separator = new QFrame(this);
@@ -256,6 +338,10 @@ class AchievementTrackerDialog final : public QDialog {
     void refreshBindings() {
         m_prevBinding->setText(format_binding(g_hotkey_previous_id));
         m_nextBinding->setText(format_binding(g_hotkey_next_id));
+        m_firstUnlockedBinding->setText(format_binding(g_hotkey_first_unlocked_id));
+        m_firstLockedBinding->setText(format_binding(g_hotkey_first_locked_id));
+        m_toggleCycleBinding->setText(format_binding(g_hotkey_toggle_cycle_id));
+        m_autoCycleState->setText(achievement_cycle_is_auto_cycle_enabled() ? "On" : "Off");
     }
 
     void loadTimings() {
@@ -293,6 +379,15 @@ class AchievementTrackerDialog final : public QDialog {
 
     QLabel      *m_prevBinding;
     QLabel      *m_nextBinding;
+    QLabel      *m_firstUnlockedBinding;
+    QLabel      *m_firstLockedBinding;
+    QLabel      *m_toggleCycleBinding;
+    QLabel      *m_autoCycleState;
+    QPushButton *m_prevButton;
+    QPushButton *m_nextButton;
+    QPushButton *m_firstUnlockedButton;
+    QPushButton *m_firstLockedButton;
+    QPushButton *m_toggleCycleButton;
     QSpinBox    *m_lastUnlockedSpin;
     QSpinBox    *m_lockedEachSpin;
     QSpinBox    *m_lockedTotalSpin;
@@ -334,16 +429,38 @@ extern "C" void achievement_tracker_config_register(void) {
                                                     on_next_achievement,
                                                     nullptr);
 
+    g_hotkey_first_unlocked_id = obs_hotkey_register_frontend("achievement_tracker.first_unlocked_achievement",
+                                                              "Achievement Tracker: First Unlocked Achievement",
+                                                              on_first_unlocked_achievement,
+                                                              nullptr);
+
+    g_hotkey_first_locked_id = obs_hotkey_register_frontend("achievement_tracker.first_locked_achievement",
+                                                            "Achievement Tracker: First Locked Achievement",
+                                                            on_first_locked_achievement,
+                                                            nullptr);
+
+    g_hotkey_toggle_cycle_id = obs_hotkey_register_frontend("achievement_tracker.toggle_auto_cycle",
+                                                            "Achievement Tracker: Toggle Auto Cycle",
+                                                            on_toggle_auto_cycle,
+                                                            nullptr);
+
     // Apply default bindings only when the user has not yet configured the hotkey.
     load_default_binding(g_hotkey_previous_id, "OBS_KEY_LEFT", /*shift=*/true, /*ctrl=*/false, /*alt=*/false);
     load_default_binding(g_hotkey_next_id, "OBS_KEY_RIGHT", /*shift=*/true, /*ctrl=*/false, /*alt=*/false);
+    load_default_binding(g_hotkey_first_unlocked_id, "OBS_KEY_UP", /*shift=*/true, /*ctrl=*/false, /*alt=*/false);
+    load_default_binding(g_hotkey_first_locked_id, "OBS_KEY_DOWN", /*shift=*/true, /*ctrl=*/false, /*alt=*/false);
+    load_default_binding(g_hotkey_toggle_cycle_id, "OBS_KEY_SPACE", /*shift=*/true, /*ctrl=*/false, /*alt=*/false);
 
     obs_frontend_add_tools_menu_item("Achievement Tracker", show_achievement_tracker_dialog, nullptr);
 
     obs_log(LOG_INFO,
-            "Achievement Tracker: hotkeys registered (previous=%llu, next=%llu)",
+            "Achievement Tracker: hotkeys registered "
+            "(previous=%llu, next=%llu, first_unlocked=%llu, first_locked=%llu, toggle_cycle=%llu)",
             (unsigned long long)g_hotkey_previous_id,
-            (unsigned long long)g_hotkey_next_id);
+            (unsigned long long)g_hotkey_next_id,
+            (unsigned long long)g_hotkey_first_unlocked_id,
+            (unsigned long long)g_hotkey_first_locked_id,
+            (unsigned long long)g_hotkey_toggle_cycle_id);
 }
 
 extern "C" void achievement_tracker_config_unregister(void) {
