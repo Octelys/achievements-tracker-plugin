@@ -3,8 +3,21 @@
 #include <math.h>
 #include <util/platform.h>
 
+/** Nanoseconds-to-seconds conversion factor for os_gettime_ns(). */
+#define NS_TO_SECONDS 1000000000.0
+
 static float clamp_non_negative(float value) {
     return value < 0.0f ? 0.0f : value;
+}
+
+static float fade_progress(float phase_time, float fade_duration, float start_opacity, float end_opacity) {
+
+    if (fade_duration <= 0.0f) {
+        return end_opacity;
+    }
+
+    const float t = phase_time / fade_duration;
+    return start_opacity + ((end_opacity - start_opacity) * t);
 }
 
 void auto_visibility_add_properties(obs_properties_t *props) {
@@ -89,7 +102,7 @@ float auto_visibility_get_opacity(const auto_visibility_config_t *config) {
         return 1.0f;
     }
 
-    const double now_seconds = (double)os_gettime_ns() / 1000000000.0;
+    const double now_seconds = (double)os_gettime_ns() / NS_TO_SECONDS;
     float        phase_time  = (float)fmod(now_seconds, cycle);
 
     if (phase_time < show_duration) {
@@ -98,10 +111,7 @@ float auto_visibility_get_opacity(const auto_visibility_config_t *config) {
     phase_time -= show_duration;
 
     if (phase_time < fade_duration) {
-        if (fade_duration <= 0.0f) {
-            return 0.0f;
-        }
-        return 1.0f - (phase_time / fade_duration);
+        return fade_progress(phase_time, fade_duration, 1.0f, 0.0f);
     }
     phase_time -= fade_duration;
 
@@ -111,10 +121,7 @@ float auto_visibility_get_opacity(const auto_visibility_config_t *config) {
     phase_time -= hide_duration;
 
     if (phase_time < fade_duration) {
-        if (fade_duration <= 0.0f) {
-            return 1.0f;
-        }
-        return phase_time / fade_duration;
+        return fade_progress(phase_time, fade_duration, 0.0f, 1.0f);
     }
 
     return 1.0f;
