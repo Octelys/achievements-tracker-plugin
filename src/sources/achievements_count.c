@@ -2,24 +2,11 @@
 
 /**
  * @file achievements_total_count.c
- * @brief OBS source that renders the total number of achievements for the current game.
- *
- * This source displays the total count of achievements available for the currently
- * played game. The count is updated when the game changes or achievements progress.
- *
- * Data flow:
- *  - The monitoring service notifies this module when the connection state changes,
- *    when the game changes, or when achievements are updated.
- *  - The module counts total achievements and stores the result in a global.
- *  - During rendering, the count is formatted to text and rendered.
- *
- * Threading notes:
- *  - Event handlers may be invoked from non-graphics threads.
- *  - Texture creation must happen on the OBS graphics thread; this file lazily
- *    initializes the texture in the video_render callback.
+ * ...existing code...
  */
 
 #include "sources/common/text_source.h"
+#include "sources/common/visibility_cycle.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -41,6 +28,18 @@ static bool g_must_reload;
  * xbox_achievements_total_count_source_register().
  */
 static achievements_count_configuration_t *g_configuration;
+static text_source_config_t                g_render_config;
+
+static void update_render_config(void) {
+    g_render_config.font_face             = g_configuration->font_face;
+    g_render_config.font_style            = g_configuration->font_style;
+    g_render_config.font_size             = g_configuration->font_size;
+    g_render_config.active_top_color      = g_configuration->top_color;
+    g_render_config.active_bottom_color   = g_configuration->bottom_color;
+    g_render_config.inactive_top_color    = g_configuration->top_color;
+    g_render_config.inactive_bottom_color = g_configuration->bottom_color;
+    g_render_config.auto_visibility       = g_configuration->auto_visibility;
+}
 
 /**
  * @brief Recompute and store the total achievements count.
@@ -134,7 +133,14 @@ static uint32_t source_get_height(void *data) {
 static void on_source_update(void *data, obs_data_t *settings) {
     UNUSED_PARAMETER(data);
 
-    text_source_update_properties(settings, (text_source_config_t *)g_configuration, &g_must_reload);
+    text_source_update_properties(settings, &g_render_config, &g_must_reload);
+
+    g_configuration->font_face       = g_render_config.font_face;
+    g_configuration->font_style      = g_render_config.font_style;
+    g_configuration->font_size       = g_render_config.font_size;
+    g_configuration->top_color       = g_render_config.active_top_color;
+    g_configuration->bottom_color    = g_render_config.active_bottom_color;
+    g_configuration->auto_visibility = g_render_config.auto_visibility;
 
     state_set_achievements_count_configuration(g_configuration);
 }
@@ -152,15 +158,11 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_update_text(source,
-                                 &g_must_reload,
-                                 (const text_source_config_t *)g_configuration,
-                                 g_total_count,
-                                 true)) {
+    if (!text_source_update_text(source, &g_must_reload, &g_render_config, g_total_count, true)) {
         return;
     }
 
-    text_source_render(source, (const text_source_config_t *)g_configuration, effect);
+    text_source_render(source, &g_render_config, effect);
 }
 
 /**
@@ -170,7 +172,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
  */
 static void on_source_video_tick(void *data, float seconds) {
 
-    text_source_tick(data, (const text_source_config_t *)g_configuration, seconds);
+    text_source_tick(data, &g_render_config, seconds);
 }
 
 /**
@@ -225,8 +227,11 @@ void xbox_achievements_count_source_register(void) {
 
     g_configuration = state_get_achievements_count_configuration();
     state_set_achievements_count_configuration(g_configuration);
+    update_render_config();
 
     obs_register_source(xbox_source_get());
+
+    auto_visibility_register_config(&g_render_config.auto_visibility);
 
     monitoring_subscribe_achievements_changed(&on_achievements_changed);
     monitoring_subscribe_game_played(&on_game_played);

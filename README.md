@@ -12,6 +12,7 @@ A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements
 - **Achievement sources** for name, description, icon, and progress count
 - **Automatic achievement cycle** that rotates through the last unlocked achievement and random locked achievements on a configurable timer
 - **Manual navigation hotkeys** (default: Shift+← / Shift+→) to step through achievements on demand
+- **Auto show/hide** per-source toggle with globally shared visible / hidden / fade durations configurable from one place
 - **Customizable text sources** with persisted font and gradient color settings
 - **Cross-platform builds** for Windows, macOS, and Linux
 
@@ -79,9 +80,11 @@ All Xbox sources in the plugin share the same authenticated account. RetroAchiev
 
 ![Xbox Account dialog](images/plugin-xbox-account.png)
 
-#### Achievement Tracker hotkeys
+#### Achievement Tracker dialog
 
-Open **Tools** → **Achievement Tracker** to see the currently configured navigation shortcuts.
+Open **Tools** → **Achievement Tracker** to access navigation hotkeys, display timing, and auto show/hide settings.
+
+##### Navigation hotkeys
 
 | Action | Default shortcut |
 | --- | --- |
@@ -93,6 +96,36 @@ Open **Tools** → **Achievement Tracker** to see the currently configured navig
 
 To change these shortcuts, open **OBS Settings** → **Hotkeys** and search for _Achievement Tracker_. The defaults are applied automatically the first time the plugin loads; after that OBS persists any changes you make.
 
+The dialog also provides **← Previous**, **Next →**, **⊤ First Unlocked**, **⊥ First Locked**, and **Toggle Cycle** buttons as a fallback when global hotkeys are unavailable (for example on macOS without Input Monitoring permission).
+
+##### Display Timing
+
+Controls how long each phase of the automatic achievement cycle is displayed.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Last unlocked | 45 s | Seconds to show the most recently unlocked achievement. |
+| Each locked | 30 s | Seconds to show each random locked achievement during the rotation. |
+| Locked rotation total | 120 s | Total seconds to spend in the locked-rotation phase. |
+
+Constraints enforced by the UI and the cycle engine:
+- Minimum value for any duration: **5 seconds**.
+- **Locked rotation total** must be ≥ **Each locked** — guaranteeing at least one locked achievement is shown per rotation pass.
+
+##### Auto Show/Hide Durations
+
+Controls the shared timing used by all sources whose per-source **Auto show/hide** toggle is enabled.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| Visible for | 10 s | Seconds to keep the source fully visible. |
+| Hidden for | 10 s | Seconds to keep the source fully hidden. |
+| Fade duration | 0.35 s | Duration of each fade-in / fade-out transition. |
+
+These durations are **global** — they apply to every source that has its toggle enabled. Changing them here and clicking **Save** takes effect immediately across all active sources.
+
+The toggle itself is configured **per source**: open the source's properties panel in OBS and check or uncheck **Auto show/hide** to enable or disable the cycle for that individual source independently.
+
 ### Available OBS Sources
 
 #### Account & profile
@@ -103,6 +136,8 @@ To change these shortcuts, open **OBS Settings** → **Hotkeys** and search for 
 
 Account sign-in and sign-out are managed globally from **Tools** → **Xbox Account**.
 
+Each text and image source exposes an **Auto show/hide** toggle in its properties panel. When enabled, the source fades in and out on the shared schedule configured in **Tools** → **Achievement Tracker** → **Auto Show/Hide Durations**.
+
 #### Game
 
 - **Game Cover**: image source for the currently active game's cover art
@@ -112,7 +147,9 @@ Account sign-in and sign-out are managed globally from **Tools** → **Xbox Acco
 - **Achievement (Name)**: current achievement name, including gamerscore when available
 - **Achievement (Description)**: current achievement description
 - **Achievement (Icon)**: current achievement icon
-- **Achievements’ Count**: unlocked / total achievements for the current game (for example `12 / 50`)
+- **Achievements' Count**: unlocked / total achievements for the current game (for example `12 / 50`)
+
+Each achievement source also exposes an **Auto show/hide** toggle in its properties panel (see [Auto Show/Hide Durations](#auto-showhide-durations) above).
 
 #### Achievement display cycle
 
@@ -125,11 +162,7 @@ The four achievement sources above all stay in sync via a shared display cycle. 
 
 After the locked rotation phase ends the cycle returns to the last-unlocked phase and repeats.
 
-All three durations are configurable. Open **Tools** → **Achievement Tracker**, adjust the values in the **Display Timing** section, and click **Save**. Changes take effect immediately and are persisted across OBS restarts.
-
-Constraints enforced by the UI and the cycle engine:
-- Minimum value for any duration: **5 seconds**.
-- **Locked rotation total** must be ≥ **Each locked** — guaranteeing at least one locked achievement is shown per rotation pass.
+All three durations are configurable from **Tools** → **Achievement Tracker** → **Display Timing**. Changes take effect immediately and are persisted across OBS restarts.
 
 **Manual navigation** lets you step through the full achievement list at any time without waiting for the timer:
 

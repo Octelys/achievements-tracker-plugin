@@ -10,6 +10,7 @@
  */
 
 #include "sources/common/text_source.h"
+#include "sources/common/visibility_cycle.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -24,6 +25,18 @@ static char g_gamerscore[64];
 static bool g_must_reload;
 
 static gamerscore_configuration_t *g_default_configuration;
+static text_source_config_t        g_render_config;
+
+static void update_render_config(void) {
+    g_render_config.font_face             = g_default_configuration->font_face;
+    g_render_config.font_style            = g_default_configuration->font_style;
+    g_render_config.font_size             = g_default_configuration->font_size;
+    g_render_config.active_top_color      = g_default_configuration->top_color;
+    g_render_config.active_bottom_color   = g_default_configuration->bottom_color;
+    g_render_config.inactive_top_color    = g_default_configuration->top_color;
+    g_render_config.inactive_bottom_color = g_default_configuration->bottom_color;
+    g_render_config.auto_visibility       = g_default_configuration->auto_visibility;
+}
 
 /**
  * @brief Update the score display from the active identity.
@@ -103,7 +116,14 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     UNUSED_PARAMETER(data);
 
-    text_source_update_properties(settings, (text_source_config_t *)g_default_configuration, &g_must_reload);
+    text_source_update_properties(settings, &g_render_config, &g_must_reload);
+
+    g_default_configuration->font_face       = g_render_config.font_face;
+    g_default_configuration->font_style      = g_render_config.font_style;
+    g_default_configuration->font_size       = g_render_config.font_size;
+    g_default_configuration->top_color       = g_render_config.active_top_color;
+    g_default_configuration->bottom_color    = g_render_config.active_bottom_color;
+    g_default_configuration->auto_visibility = g_render_config.auto_visibility;
 
     state_set_gamerscore_configuration(g_default_configuration);
 }
@@ -125,15 +145,11 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_update_text(source,
-                                 &g_must_reload,
-                                 (const text_source_config_t *)g_default_configuration,
-                                 g_gamerscore,
-                                 true)) {
+    if (!text_source_update_text(source, &g_must_reload, &g_render_config, g_gamerscore, true)) {
         return;
     }
 
-    text_source_render(source, (const text_source_config_t *)g_default_configuration, effect);
+    text_source_render(source, &g_render_config, effect);
 }
 
 /**
@@ -149,7 +165,7 @@ static void on_source_video_tick(void *data, float seconds) {
         return;
     }
 
-    text_source_tick(source, (const text_source_config_t *)g_default_configuration, seconds);
+    text_source_tick(source, &g_render_config, seconds);
 }
 
 /**
@@ -207,8 +223,11 @@ void xbox_gamerscore_source_register(void) {
 
     g_default_configuration = state_get_gamerscore_configuration();
     state_set_gamerscore_configuration(g_default_configuration);
+    update_render_config();
 
     obs_register_source(xbox_source_get());
+
+    auto_visibility_register_config(&g_render_config.auto_visibility);
 
     monitoring_subscribe_active_identity(on_active_identity_changed);
 }

@@ -33,12 +33,20 @@
 #define GAMERSCORE_CONFIGURATION_SIZE "source_gamerscore_size"
 #define GAMERSCORE_CONFIGURATION_FONT_FACE "source_gamerscore_font_face"
 #define GAMERSCORE_CONFIGURATION_FONT_STYLE "source_gamerscore_font_style"
+#define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_gamerscore_auto_visibility_enabled"
+#define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_gamerscore_auto_visibility_show_duration"
+#define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_gamerscore_auto_visibility_hide_duration"
+#define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION "source_gamerscore_auto_visibility_fade_duration"
 
 #define GAMERTAG_CONFIGURATION_TOP_COLOR "source_gamertag_top_color"
 #define GAMERTAG_CONFIGURATION_BOTTOM_COLOR "source_gamertag_bottom_color"
 #define GAMERTAG_CONFIGURATION_SIZE "source_gamertag_size"
 #define GAMERTAG_CONFIGURATION_FONT_FACE "source_gamertag_font_face"
 #define GAMERTAG_CONFIGURATION_FONT_STYLE "source_gamertag_font_style"
+#define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_gamertag_auto_visibility_enabled"
+#define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_gamertag_auto_visibility_show_duration"
+#define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_gamertag_auto_visibility_hide_duration"
+#define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION "source_gamertag_auto_visibility_fade_duration"
 
 #define ACHIEVEMENT_NAME_CONFIGURATION_ACTIVE_TOP_COLOR "source_achievement_name_active_top_color"
 #define ACHIEVEMENT_NAME_CONFIGURATION_ACTIVE_BOTTOM_COLOR "source_achievement_name_active_bottom_color"
@@ -47,6 +55,10 @@
 #define ACHIEVEMENT_NAME_CONFIGURATION_SIZE "source_achievement_name_size"
 #define ACHIEVEMENT_NAME_CONFIGURATION_FONT_FACE "source_achievement_name_font_face"
 #define ACHIEVEMENT_NAME_CONFIGURATION_FONT_STYLE "source_achievement_name_font_style"
+#define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_achievement_name_auto_visibility_enabled"
+#define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_achievement_name_auto_visibility_show_duration"
+#define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievement_name_auto_visibility_hide_duration"
+#define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION "source_achievement_name_auto_visibility_fade_duration"
 
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ACTIVE_TOP_COLOR "source_achievement_description_active_top_color"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_ACTIVE_BOTTOM_COLOR "source_achievement_description_active_bottom_color"
@@ -55,18 +67,31 @@
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE "source_achievement_description_size"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_FACE "source_achievement_description_font_face"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_STYLE "source_achievement_description_font_style"
+#define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_achievement_description_auto_visibility_enabled"
+#define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_achievement_description_auto_visibility_show_duration"
+#define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievement_description_auto_visibility_hide_duration"
+#define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION "source_achievement_description_auto_visibility_fade_duration"
 
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_TOP_COLOR "source_achievements_count_top_color"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_BOTTOM_COLOR "source_achievements_count_bottom_color"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE "source_achievements_count_size"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE "source_achievements_count_font_face"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE "source_achievements_count_font_style"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_achievements_count_auto_visibility_enabled"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_achievements_count_auto_visibility_show_duration"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievements_count_auto_visibility_hide_duration"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION "source_achievements_count_auto_visibility_fade_duration"
 
 #define CYCLE_LAST_UNLOCKED_DURATION   "cycle_last_unlocked_duration"
 #define CYCLE_LOCKED_EACH_DURATION     "cycle_locked_each_duration"
 #define CYCLE_LOCKED_TOTAL_DURATION    "cycle_locked_total_duration"
 /* Stored as int: 0 = not set (default: enabled), 1 = enabled, 2 = disabled. */
 #define CYCLE_AUTO_CYCLE_ENABLED       "cycle_auto_cycle_enabled"
+
+/* Global auto-visibility durations shared by all sources. */
+#define AUTO_VISIBILITY_SHARED_SHOW_DURATION "auto_visibility_shared_show_duration"
+#define AUTO_VISIBILITY_SHARED_HIDE_DURATION "auto_visibility_shared_hide_duration"
+#define AUTO_VISIBILITY_SHARED_FADE_DURATION "auto_visibility_shared_fade_duration"
 
 /**
  * @brief Global in-memory persisted state.
@@ -376,25 +401,54 @@ void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamers
     obs_data_set_int(g_state, GAMERSCORE_CONFIGURATION_SIZE, gamerscore_configuration->font_size);
     obs_data_set_string(g_state, GAMERSCORE_CONFIGURATION_FONT_FACE, gamerscore_configuration->font_face);
     obs_data_set_string(g_state, GAMERSCORE_CONFIGURATION_FONT_STYLE, gamerscore_configuration->font_style);
+    obs_data_set_bool(g_state,
+                      GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
+                      gamerscore_configuration->auto_visibility.enabled);
+    obs_data_set_double(g_state,
+                        GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
+                        gamerscore_configuration->auto_visibility.show_duration);
+    obs_data_set_double(g_state,
+                        GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION,
+                        gamerscore_configuration->auto_visibility.hide_duration);
+    obs_data_set_double(g_state,
+                        GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION,
+                        gamerscore_configuration->auto_visibility.fade_duration);
 
     save_state(g_state);
 }
 
 gamerscore_configuration_t *state_get_gamerscore_configuration() {
 
-    uint32_t    top_color    = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_TOP_COLOR);
-    uint32_t    bottom_color = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_BOTTOM_COLOR);
-    uint32_t    size         = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_SIZE);
-    const char *font_face    = obs_data_get_string(g_state, GAMERSCORE_CONFIGURATION_FONT_FACE);
-    const char *font_style   = obs_data_get_string(g_state, GAMERSCORE_CONFIGURATION_FONT_STYLE);
+    uint32_t    top_color               = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_TOP_COLOR);
+    uint32_t    bottom_color            = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_BOTTOM_COLOR);
+    uint32_t    size                    = (uint32_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_SIZE);
+    const char *font_face               = obs_data_get_string(g_state, GAMERSCORE_CONFIGURATION_FONT_FACE);
+    const char *font_style              = obs_data_get_string(g_state, GAMERSCORE_CONFIGURATION_FONT_STYLE);
+    bool        auto_visibility_enabled = obs_data_get_bool(g_state, GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_ENABLED);
+    float       auto_visibility_show_duration =
+        (float)obs_data_get_double(g_state, GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION);
+    float auto_visibility_hide_duration =
+        (float)obs_data_get_double(g_state, GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION);
+    float auto_visibility_fade_duration =
+        (float)obs_data_get_double(g_state, GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION);
 
     gamerscore_configuration_t *gamerscore_configuration = bzalloc(sizeof(gamerscore_configuration_t));
 
-    gamerscore_configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
-    gamerscore_configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    gamerscore_configuration->font_size    = size == 0 ? 48 : size;
-    gamerscore_configuration->font_face    = bstrdup(font_face);
-    gamerscore_configuration->font_style   = bstrdup(font_style);
+    gamerscore_configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
+    gamerscore_configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    gamerscore_configuration->font_size                     = size == 0 ? 48 : size;
+    gamerscore_configuration->font_face                     = bstrdup(font_face);
+    gamerscore_configuration->font_style                    = bstrdup(font_style);
+    gamerscore_configuration->auto_visibility.enabled       = auto_visibility_enabled;
+    gamerscore_configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
+                                                                  ? auto_visibility_show_duration
+                                                                  : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    gamerscore_configuration->auto_visibility.hide_duration = auto_visibility_hide_duration > 0.0f
+                                                                  ? auto_visibility_hide_duration
+                                                                  : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    gamerscore_configuration->auto_visibility.fade_duration = auto_visibility_fade_duration > 0.0f
+                                                                  ? auto_visibility_fade_duration
+                                                                  : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
 
     return gamerscore_configuration;
 }
@@ -410,25 +464,52 @@ void state_set_gamertag_configuration(const gamertag_configuration_t *configurat
     obs_data_set_int(g_state, GAMERTAG_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, GAMERTAG_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, GAMERTAG_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_bool(g_state, GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_ENABLED, configuration->auto_visibility.enabled);
+    obs_data_set_double(g_state,
+                        GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
+                        configuration->auto_visibility.show_duration);
+    obs_data_set_double(g_state,
+                        GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION,
+                        configuration->auto_visibility.hide_duration);
+    obs_data_set_double(g_state,
+                        GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION,
+                        configuration->auto_visibility.fade_duration);
 
     save_state(g_state);
 }
 
 gamertag_configuration_t *state_get_gamertag_configuration() {
 
-    uint32_t    top_color    = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_TOP_COLOR);
-    uint32_t    bottom_color = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_BOTTOM_COLOR);
-    uint32_t    size         = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_SIZE);
-    const char *font_face    = obs_data_get_string(g_state, GAMERTAG_CONFIGURATION_FONT_FACE);
-    const char *font_style   = obs_data_get_string(g_state, GAMERTAG_CONFIGURATION_FONT_STYLE);
+    uint32_t    top_color               = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_TOP_COLOR);
+    uint32_t    bottom_color            = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_BOTTOM_COLOR);
+    uint32_t    size                    = (uint32_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_SIZE);
+    const char *font_face               = obs_data_get_string(g_state, GAMERTAG_CONFIGURATION_FONT_FACE);
+    const char *font_style              = obs_data_get_string(g_state, GAMERTAG_CONFIGURATION_FONT_STYLE);
+    bool        auto_visibility_enabled = obs_data_get_bool(g_state, GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_ENABLED);
+    float       auto_visibility_show_duration =
+        (float)obs_data_get_double(g_state, GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION);
+    float auto_visibility_hide_duration =
+        (float)obs_data_get_double(g_state, GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION);
+    float auto_visibility_fade_duration =
+        (float)obs_data_get_double(g_state, GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION);
 
     gamertag_configuration_t *configuration = bzalloc(sizeof(gamertag_configuration_t));
 
-    configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
-    configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    configuration->font_size    = size == 0 ? 48 : size;
-    configuration->font_face    = bstrdup(font_face);
-    configuration->font_style   = bstrdup(font_style);
+    configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
+    configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    configuration->font_size                     = size == 0 ? 48 : size;
+    configuration->font_face                     = bstrdup(font_face);
+    configuration->font_style                    = bstrdup(font_style);
+    configuration->auto_visibility.enabled       = auto_visibility_enabled;
+    configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
+                                                       ? auto_visibility_show_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    configuration->auto_visibility.hide_duration = auto_visibility_hide_duration > 0.0f
+                                                       ? auto_visibility_hide_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    configuration->auto_visibility.fade_duration = auto_visibility_fade_duration > 0.0f
+                                                       ? auto_visibility_fade_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
 
     return configuration;
 }
@@ -448,6 +529,18 @@ void state_set_achievement_name_configuration(const achievement_name_configurati
     obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_bool(g_state,
+                      ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
+                      configuration->auto_visibility.enabled);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
+                        configuration->auto_visibility.show_duration);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION,
+                        configuration->auto_visibility.hide_duration);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION,
+                        configuration->auto_visibility.fade_duration);
 
     save_state(g_state);
 }
@@ -461,19 +554,36 @@ achievement_name_configuration_t *state_get_achievement_name_configuration() {
         (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_INACTIVE_TOP_COLOR);
     uint32_t inactive_bottom_color =
         (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_INACTIVE_BOTTOM_COLOR);
-    uint32_t    size       = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE);
-    const char *font_face  = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_FACE);
-    const char *font_style = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_STYLE);
+    uint32_t    size              = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE);
+    const char *font_face         = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_FACE);
+    const char *font_style        = obs_data_get_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_STYLE);
+    bool  auto_visibility_enabled = obs_data_get_bool(g_state, ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED);
+    float auto_visibility_show_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION);
+    float auto_visibility_hide_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION);
+    float auto_visibility_fade_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION);
 
     achievement_name_configuration_t *configuration = bzalloc(sizeof(achievement_name_configuration_t));
 
-    configuration->active_top_color      = active_top_color == 0 ? 0xFFFFFFFF : active_top_color;
-    configuration->active_bottom_color   = active_bottom_color == 0 ? 0xFFFFFFFF : active_bottom_color;
-    configuration->inactive_top_color    = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
-    configuration->inactive_bottom_color = inactive_bottom_color == 0 ? 0x7F7F7FFF : inactive_bottom_color;
-    configuration->font_size             = size == 0 ? 12 : size;
-    configuration->font_face             = bstrdup(font_face);
-    configuration->font_style            = bstrdup(font_style);
+    configuration->active_top_color              = active_top_color == 0 ? 0xFFFFFFFF : active_top_color;
+    configuration->active_bottom_color           = active_bottom_color == 0 ? 0xFFFFFFFF : active_bottom_color;
+    configuration->inactive_top_color            = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
+    configuration->inactive_bottom_color         = inactive_bottom_color == 0 ? 0x7F7F7FFF : inactive_bottom_color;
+    configuration->font_size                     = size == 0 ? 12 : size;
+    configuration->font_face                     = bstrdup(font_face);
+    configuration->font_style                    = bstrdup(font_style);
+    configuration->auto_visibility.enabled       = auto_visibility_enabled;
+    configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
+                                                       ? auto_visibility_show_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    configuration->auto_visibility.hide_duration = auto_visibility_hide_duration > 0.0f
+                                                       ? auto_visibility_hide_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    configuration->auto_visibility.fade_duration = auto_visibility_fade_duration > 0.0f
+                                                       ? auto_visibility_fade_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
 
     return configuration;
 }
@@ -497,6 +607,18 @@ void state_set_achievement_description_configuration(const achievement_descripti
     obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_bool(g_state,
+                      ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
+                      configuration->auto_visibility.enabled);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
+                        configuration->auto_visibility.show_duration);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION,
+                        configuration->auto_visibility.hide_duration);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION,
+                        configuration->auto_visibility.fade_duration);
 
     save_state(g_state);
 }
@@ -514,16 +636,34 @@ achievement_description_configuration_t *state_get_achievement_description_confi
     uint32_t    size       = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE);
     const char *font_face  = obs_data_get_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_FACE);
     const char *font_style = obs_data_get_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_STYLE);
+    bool        auto_visibility_enabled =
+        obs_data_get_bool(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_ENABLED);
+    float auto_visibility_show_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION);
+    float auto_visibility_hide_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION);
+    float auto_visibility_fade_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION);
 
     achievement_description_configuration_t *configuration = bzalloc(sizeof(achievement_description_configuration_t));
 
-    configuration->active_top_color      = active_top_color == 0 ? 0xFFFFFFFF : active_top_color;
-    configuration->active_bottom_color   = active_bottom_color == 0 ? 0xFFFFFFFF : active_bottom_color;
-    configuration->inactive_top_color    = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
-    configuration->inactive_bottom_color = inactive_bottom_color == 0 ? 0x7F7F7FFF : inactive_bottom_color;
-    configuration->font_size             = size == 0 ? 12 : size;
-    configuration->font_face             = bstrdup(font_face);
-    configuration->font_style            = bstrdup(font_style);
+    configuration->active_top_color              = active_top_color == 0 ? 0xFFFFFFFF : active_top_color;
+    configuration->active_bottom_color           = active_bottom_color == 0 ? 0xFFFFFFFF : active_bottom_color;
+    configuration->inactive_top_color            = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
+    configuration->inactive_bottom_color         = inactive_bottom_color == 0 ? 0x7F7F7FFF : inactive_bottom_color;
+    configuration->font_size                     = size == 0 ? 12 : size;
+    configuration->font_face                     = bstrdup(font_face);
+    configuration->font_style                    = bstrdup(font_style);
+    configuration->auto_visibility.enabled       = auto_visibility_enabled;
+    configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
+                                                       ? auto_visibility_show_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    configuration->auto_visibility.hide_duration = auto_visibility_hide_duration > 0.0f
+                                                       ? auto_visibility_hide_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    configuration->auto_visibility.fade_duration = auto_visibility_fade_duration > 0.0f
+                                                       ? auto_visibility_fade_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
 
     return configuration;
 }
@@ -539,25 +679,54 @@ void state_set_achievements_count_configuration(const achievements_count_configu
     obs_data_set_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_bool(g_state,
+                      ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
+                      configuration->auto_visibility.enabled);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
+                        configuration->auto_visibility.show_duration);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION,
+                        configuration->auto_visibility.hide_duration);
+    obs_data_set_double(g_state,
+                        ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION,
+                        configuration->auto_visibility.fade_duration);
 
     save_state(g_state);
 }
 
 achievements_count_configuration_t *state_get_achievements_count_configuration() {
 
-    uint32_t    top_color    = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TOP_COLOR);
-    uint32_t    bottom_color = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_BOTTOM_COLOR);
-    uint32_t    size         = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE);
-    const char *font_face    = obs_data_get_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE);
-    const char *font_style   = obs_data_get_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE);
+    uint32_t    top_color        = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TOP_COLOR);
+    uint32_t    bottom_color     = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_BOTTOM_COLOR);
+    uint32_t    size             = (uint32_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE);
+    const char *font_face        = obs_data_get_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE);
+    const char *font_style       = obs_data_get_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE);
+    bool auto_visibility_enabled = obs_data_get_bool(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_ENABLED);
+    float auto_visibility_show_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION);
+    float auto_visibility_hide_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION);
+    float auto_visibility_fade_duration =
+        (float)obs_data_get_double(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION);
 
     achievements_count_configuration_t *configuration = bzalloc(sizeof(achievements_count_configuration_t));
 
-    configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
-    configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    configuration->font_size    = size == 0 ? 48 : size;
-    configuration->font_face    = bstrdup(font_face);
-    configuration->font_style   = bstrdup(font_style);
+    configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
+    configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    configuration->font_size                     = size == 0 ? 48 : size;
+    configuration->font_face                     = bstrdup(font_face);
+    configuration->font_style                    = bstrdup(font_style);
+    configuration->auto_visibility.enabled       = auto_visibility_enabled;
+    configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
+                                                       ? auto_visibility_show_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    configuration->auto_visibility.hide_duration = auto_visibility_hide_duration > 0.0f
+                                                       ? auto_visibility_hide_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    configuration->auto_visibility.fade_duration = auto_visibility_fade_duration > 0.0f
+                                                       ? auto_visibility_fade_duration
+                                                       : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
 
     return configuration;
 }
@@ -732,4 +901,32 @@ achievement_cycle_timings_t *state_get_achievement_cycle_timings(void) {
                                                             : ACHIEVEMENT_CYCLE_DEFAULT_LOCKED_TOTAL_DURATION;
 
     return timings;
+}
+
+void state_set_auto_visibility_durations(const auto_visibility_durations_t *durations) {
+
+    if (!durations) {
+        return;
+    }
+
+    obs_data_set_double(g_state, AUTO_VISIBILITY_SHARED_SHOW_DURATION, durations->show_duration);
+    obs_data_set_double(g_state, AUTO_VISIBILITY_SHARED_HIDE_DURATION, durations->hide_duration);
+    obs_data_set_double(g_state, AUTO_VISIBILITY_SHARED_FADE_DURATION, durations->fade_duration);
+
+    save_state(g_state);
+}
+
+auto_visibility_durations_t *state_get_auto_visibility_durations(void) {
+
+    float show = (float)obs_data_get_double(g_state, AUTO_VISIBILITY_SHARED_SHOW_DURATION);
+    float hide = (float)obs_data_get_double(g_state, AUTO_VISIBILITY_SHARED_HIDE_DURATION);
+    float fade = (float)obs_data_get_double(g_state, AUTO_VISIBILITY_SHARED_FADE_DURATION);
+
+    auto_visibility_durations_t *d = bzalloc(sizeof(auto_visibility_durations_t));
+
+    d->show_duration = show > 0.0f ? show : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    d->hide_duration = hide > 0.0f ? hide : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    d->fade_duration = fade > 0.0f ? fade : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
+
+    return d;
 }
