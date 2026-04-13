@@ -488,6 +488,7 @@ target_sources(
     src/sources/common/text_source.c
     src/sources/common/image_source.c
     src/sources/common/achievement_cycle.c
+    src/sources/common/visibility_cycle.c
     src/crypto/crypto.c
     src/drawing/color.c
     src/drawing/image.c

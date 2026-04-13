@@ -1,6 +1,7 @@
 #pragma once
 
 #include <openssl/evp.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 /**
@@ -86,6 +87,23 @@ typedef struct source_size {
     uint32_t height;
 } source_size_t;
 
+/** Default seconds to keep a source visible during auto visibility cycling. */
+#define AUTO_VISIBILITY_DEFAULT_SHOW_DURATION 10.0f
+/** Default seconds to keep a source hidden during auto visibility cycling. */
+#define AUTO_VISIBILITY_DEFAULT_HIDE_DURATION 10.0f
+/** Default seconds for fade in/out during auto visibility cycling. */
+#define AUTO_VISIBILITY_DEFAULT_FADE_DURATION 0.35f
+
+/**
+ * @brief Shared auto visibility (show/hide/fade) configuration.
+ */
+typedef struct auto_visibility_config {
+    bool  enabled;
+    float show_duration;
+    float hide_duration;
+    float fade_duration;
+} auto_visibility_config_t;
+
 /**
  * @brief Common configuration for text-based sources.
  *
@@ -102,6 +120,7 @@ typedef struct text_source_config {
     /** Alternate color for locked achievements (0xRRGGBBAA format). */
     uint32_t    inactive_top_color;
     uint32_t    inactive_bottom_color;
+    auto_visibility_config_t auto_visibility;
 } text_source_config_t;
 
 /**
@@ -120,6 +139,7 @@ typedef struct gamerscore_configuration {
     uint32_t    top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
     uint32_t    bottom_color;
+    auto_visibility_config_t auto_visibility;
 } gamerscore_configuration_t;
 
 /**
@@ -138,6 +158,7 @@ typedef struct gamertag_configuration {
     uint32_t    top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
     uint32_t    bottom_color;
+    auto_visibility_config_t auto_visibility;
 } gamertag_configuration_t;
 
 /**
@@ -160,6 +181,7 @@ typedef struct achievement_name_configuration {
     uint32_t    inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
     uint32_t    inactive_bottom_color;
+    auto_visibility_config_t auto_visibility;
 } achievement_name_configuration_t;
 
 /**
@@ -182,6 +204,7 @@ typedef struct achievement_description_configuration {
     uint32_t    inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
     uint32_t    inactive_bottom_color;
+    auto_visibility_config_t auto_visibility;
 } achievement_description_configuration_t;
 
 /**
@@ -199,6 +222,7 @@ typedef struct achievements_count_configuration {
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t    top_color;
     uint32_t    bottom_color;
+    auto_visibility_config_t auto_visibility;
 } achievements_count_configuration_t;
 
 /** Minimum allowed value (seconds) for any achievement cycle duration setting. */

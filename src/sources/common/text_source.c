@@ -7,6 +7,7 @@
 
 #include "drawing/color.h"
 #include "diagnostics/log.h"
+#include "sources/common/visibility_cycle.h"
 
 /**
  * @file text_source.c
@@ -344,9 +345,12 @@ void text_source_render(text_source_t *text_source, const text_source_config_t *
         return;
     }
 
-    if (text_source->transition.last_opacity != text_source->transition.opacity) {
+    const float visibility_opacity = auto_visibility_get_opacity(&config->auto_visibility);
+    const float final_opacity      = text_source->transition.opacity * visibility_opacity;
+
+    if (fabsf(text_source->transition.last_opacity - final_opacity) > 0.0001f) {
         obs_data_t *settings = obs_source_get_settings(text_source->private_obs_source);
-        set_color_with_opacity(text_source, settings, config, text_source->transition.opacity);
+        set_color_with_opacity(text_source, settings, config, final_opacity);
         obs_source_update(text_source->private_obs_source, settings);
         obs_data_release(settings);
     }
@@ -354,7 +358,7 @@ void text_source_render(text_source_t *text_source, const text_source_config_t *
     // Opacity is handled by updating the text color's alpha channel in tick()
     obs_source_video_render(text_source->private_obs_source);
 
-    text_source->transition.last_opacity = text_source->transition.opacity;
+    text_source->transition.last_opacity = final_opacity;
 }
 
 void text_source_tick(text_source_t *text_source, const text_source_config_t *config, float seconds) {
@@ -408,6 +412,8 @@ void text_source_add_properties(obs_properties_t *props, bool supports_inactive_
         obs_properties_add_color(props, "text_inactive_top_color", "Inactive text color (Top)");
         obs_properties_add_color(props, "text_inactive_bottom_color", "Inactive text color (Bottom)");
     }
+
+    auto_visibility_add_properties(props);
 }
 
 void text_source_update_properties(obs_data_t *settings, text_source_config_t *config, bool *must_reload) {
@@ -459,6 +465,10 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
             obs_data_release(font_obj);
             *must_reload = true;
         }
+    }
+
+    if (auto_visibility_update_properties(settings, &config->auto_visibility)) {
+        *must_reload = true;
     }
 }
 

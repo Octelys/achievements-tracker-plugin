@@ -51,6 +51,7 @@ static void update_render_config(void) {
     g_render_config.active_bottom_color   = g_configuration->active_bottom_color;
     g_render_config.inactive_top_color    = g_configuration->inactive_top_color;
     g_render_config.inactive_bottom_color = g_configuration->inactive_bottom_color;
+    g_render_config.auto_visibility       = g_configuration->auto_visibility;
 }
 
 /**

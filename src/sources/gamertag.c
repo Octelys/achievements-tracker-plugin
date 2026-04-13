@@ -24,6 +24,18 @@ static bool g_must_reload;
 
 /** Global configuration for gamertag display (font, color, size). */
 static gamertag_configuration_t *g_configuration;
+static text_source_config_t      g_render_config;
+
+static void update_render_config(void) {
+    g_render_config.font_face             = g_configuration->font_face;
+    g_render_config.font_style            = g_configuration->font_style;
+    g_render_config.font_size             = g_configuration->font_size;
+    g_render_config.active_top_color      = g_configuration->top_color;
+    g_render_config.active_bottom_color   = g_configuration->bottom_color;
+    g_render_config.inactive_top_color    = g_configuration->top_color;
+    g_render_config.inactive_bottom_color = g_configuration->bottom_color;
+    g_render_config.auto_visibility       = g_configuration->auto_visibility;
+}
 
 /**
  * @brief Update the gamertag display from the active identity.
@@ -89,7 +101,14 @@ static uint32_t source_get_height(void *data) {
 static void on_source_update(void *data, obs_data_t *settings) {
     UNUSED_PARAMETER(data);
 
-    text_source_update_properties(settings, (text_source_config_t *)g_configuration, &g_must_reload);
+    text_source_update_properties(settings, &g_render_config, &g_must_reload);
+
+    g_configuration->font_face       = g_render_config.font_face;
+    g_configuration->font_style      = g_render_config.font_style;
+    g_configuration->font_size       = g_render_config.font_size;
+    g_configuration->top_color       = g_render_config.active_top_color;
+    g_configuration->bottom_color    = g_render_config.active_bottom_color;
+    g_configuration->auto_visibility = g_render_config.auto_visibility;
 
     state_set_gamertag_configuration(g_configuration);
 }
@@ -99,15 +118,15 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 
     if (text_source_update_text(source,
                                 &g_must_reload,
-                                (const text_source_config_t *)g_configuration,
+                                &g_render_config,
                                 g_gamertag,
                                 true)) {
-        text_source_render(source, (const text_source_config_t *)g_configuration, effect);
+        text_source_render(source, &g_render_config, effect);
     }
 }
 
 static void on_source_video_tick(void *data, float seconds) {
-    text_source_tick(data, (const text_source_config_t *)g_configuration, seconds);
+    text_source_tick(data, &g_render_config, seconds);
 }
 
 static obs_properties_t *source_get_properties(void *data) {
@@ -148,6 +167,7 @@ void xbox_gamertag_source_register(void) {
 
     g_configuration = state_get_gamertag_configuration();
     state_set_gamertag_configuration(g_configuration);
+    update_render_config();
 
     obs_register_source(&xbox_gamertag_source);
 

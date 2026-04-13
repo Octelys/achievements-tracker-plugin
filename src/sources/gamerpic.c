@@ -4,6 +4,7 @@
 #include <diagnostics/log.h>
 
 #include "sources/common/image_source.h"
+#include "sources/common/visibility_cycle.h"
 #include "common/memory.h"
 #include "integrations/monitoring_service.h"
 
@@ -14,6 +15,12 @@
  * in a global cache.
  */
 static image_t g_gamerpic;
+static auto_visibility_config_t g_auto_visibility = {
+    .enabled       = false,
+    .show_duration = AUTO_VISIBILITY_DEFAULT_SHOW_DURATION,
+    .hide_duration = AUTO_VISIBILITY_DEFAULT_HIDE_DURATION,
+    .fade_duration = AUTO_VISIBILITY_DEFAULT_FADE_DURATION,
+};
 
 //  --------------------------------------------------------------------------------------------------------------------
 //	Event handlers
@@ -107,8 +114,13 @@ static void on_source_destroy(void *data) {
  */
 static void on_source_update(void *data, obs_data_t *settings) {
 
-    UNUSED_PARAMETER(settings);
     UNUSED_PARAMETER(data);
+
+    auto_visibility_update_properties(settings, &g_auto_visibility);
+}
+
+static void source_get_defaults(obs_data_t *settings) {
+    auto_visibility_set_defaults(settings);
 }
 
 /**
@@ -127,8 +139,8 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
     /* Load image if needed (deferred load in graphics context) */
     image_source_reload_if_needed(&g_gamerpic);
 
-    /* Render the image if we have a texture */
-    image_source_render_active(&g_gamerpic, source->size, effect);
+    const float opacity = auto_visibility_get_opacity(&g_auto_visibility);
+    image_source_render_active_with_opacity(&g_gamerpic, source->size, effect, opacity);
 }
 
 /**
@@ -142,6 +154,7 @@ static obs_properties_t *source_get_properties(void *data) {
 
     obs_properties_t *p = obs_properties_create();
     obs_properties_add_text(p, "info", "Displays the active user's profile picture.", OBS_TEXT_INFO);
+    auto_visibility_add_properties(p);
     return p;
 }
 
@@ -156,6 +169,7 @@ static struct obs_source_info xbox_gamerpic_source_info = {
     .create         = on_source_create,
     .destroy        = on_source_destroy,
     .update         = on_source_update,
+    .get_defaults   = source_get_defaults,
     .video_render   = on_source_video_render,
     .get_properties = source_get_properties,
     .get_width      = source_get_width,
