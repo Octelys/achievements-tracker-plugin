@@ -225,6 +225,30 @@ void state_set_achievements_count_configuration(const achievements_count_configu
 achievements_count_configuration_t *state_get_achievements_count_configuration();
 
 /**
+ * @brief Set the global auto-visibility duration settings shared by all sources.
+ *
+ * Persists the show / hide / fade durations to the state file so they survive
+ * restarts.  These durations are edited in the global Achievement Tracker dialog
+ * and applied to every source whose per-source toggle is enabled.
+ *
+ * @param durations Duration values to store.  May be NULL (no-op).
+ */
+void state_set_auto_visibility_durations(const auto_visibility_durations_t *durations);
+
+/**
+ * @brief Get the stored global auto-visibility duration settings.
+ *
+ * Returns a newly allocated structure with defaults applied for any value that
+ * has not been persisted yet:
+ * - show_duration: AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION  (10 s)
+ * - hide_duration: AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION  (10 s)
+ * - fade_duration: AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION  (0.35 s)
+ *
+ * @return Newly allocated durations structure.  Caller must free with bfree().
+ */
+auto_visibility_durations_t *state_get_auto_visibility_durations(void);
+
+/**
  * @brief Persist the automatic achievement cycle toggle.
  *
  * @param enabled @c true to enable automatic cycling, @c false to disable it.

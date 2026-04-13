@@ -10,6 +10,7 @@
  */
 
 #include "sources/common/text_source.h"
+#include "sources/common/visibility_cycle.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -144,11 +145,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_update_text(source,
-                                 &g_must_reload,
-                                 &g_render_config,
-                                 g_gamerscore,
-                                 true)) {
+    if (!text_source_update_text(source, &g_must_reload, &g_render_config, g_gamerscore, true)) {
         return;
     }
 
@@ -229,6 +226,8 @@ void xbox_gamerscore_source_register(void) {
     update_render_config();
 
     obs_register_source(xbox_source_get());
+
+    auto_visibility_register_config(&g_render_config.auto_visibility);
 
     monitoring_subscribe_active_identity(on_active_identity_changed);
 }

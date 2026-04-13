@@ -110,16 +110,16 @@ typedef struct auto_visibility_config {
  * Contains all the shared configuration fields used across text sources.
  */
 typedef struct text_source_config {
-    const char *font_face;
-    const char *font_style;
+    const char              *font_face;
+    const char              *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
+    uint32_t                 font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    active_top_color;
-    uint32_t    active_bottom_color;
+    uint32_t                 active_top_color;
+    uint32_t                 active_bottom_color;
     /** Alternate color for locked achievements (0xRRGGBBAA format). */
-    uint32_t    inactive_top_color;
-    uint32_t    inactive_bottom_color;
+    uint32_t                 inactive_top_color;
+    uint32_t                 inactive_bottom_color;
     auto_visibility_config_t auto_visibility;
 } text_source_config_t;
 
@@ -131,14 +131,14 @@ typedef struct text_source_config {
  *   caller.
  */
 typedef struct gamerscore_configuration {
-    const char *font_face;
-    const char *font_style;
+    const char              *font_face;
+    const char              *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
+    uint32_t                 font_size;
     /** Top gradient color in 0xRRGGBBAA format. */
-    uint32_t    top_color;
+    uint32_t                 top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
-    uint32_t    bottom_color;
+    uint32_t                 bottom_color;
     auto_visibility_config_t auto_visibility;
 } gamerscore_configuration_t;
 
@@ -150,14 +150,14 @@ typedef struct gamerscore_configuration {
  *   caller.
  */
 typedef struct gamertag_configuration {
-    const char *font_face;
-    const char *font_style;
+    const char              *font_face;
+    const char              *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
+    uint32_t                 font_size;
     /** Top gradient color in 0xRRGGBBAA format. */
-    uint32_t    top_color;
+    uint32_t                 top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
-    uint32_t    bottom_color;
+    uint32_t                 bottom_color;
     auto_visibility_config_t auto_visibility;
 } gamertag_configuration_t;
 
@@ -169,18 +169,18 @@ typedef struct gamertag_configuration {
  *   caller.
  */
 typedef struct achievement_name_configuration {
-    const char *font_face;
-    const char *font_style;
+    const char              *font_face;
+    const char              *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
+    uint32_t                 font_size;
     /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t    active_top_color;
+    uint32_t                 active_top_color;
     /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t    active_bottom_color;
+    uint32_t                 active_bottom_color;
     /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t    inactive_top_color;
+    uint32_t                 inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t    inactive_bottom_color;
+    uint32_t                 inactive_bottom_color;
     auto_visibility_config_t auto_visibility;
 } achievement_name_configuration_t;
 
@@ -192,18 +192,18 @@ typedef struct achievement_name_configuration {
  *   caller.
  */
 typedef struct achievement_description_configuration {
-    const char *font_face;
-    const char *font_style;
+    const char              *font_face;
+    const char              *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
+    uint32_t                 font_size;
     /** Top gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t    active_top_color;
+    uint32_t                 active_top_color;
     /** Bottom gradient color for unlocked achievements in 0xRRGGBBAA format. */
-    uint32_t    active_bottom_color;
+    uint32_t                 active_bottom_color;
     /** Top gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t    inactive_top_color;
+    uint32_t                 inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
-    uint32_t    inactive_bottom_color;
+    uint32_t                 inactive_bottom_color;
     auto_visibility_config_t auto_visibility;
 } achievement_description_configuration_t;
 
@@ -215,15 +215,34 @@ typedef struct achievement_description_configuration {
  *   caller.
  */
 typedef struct achievements_count_configuration {
-    const char *font_face;
-    const char *font_style;
+    const char              *font_face;
+    const char              *font_style;
     /** Font size in pixels (height passed to FreeType). */
-    uint32_t    font_size;
+    uint32_t                 font_size;
     /** Packed RGBA color in 0xRRGGBBAA format. */
-    uint32_t    top_color;
-    uint32_t    bottom_color;
+    uint32_t                 top_color;
+    uint32_t                 bottom_color;
     auto_visibility_config_t auto_visibility;
 } achievements_count_configuration_t;
+
+/** Default seconds for the auto-visibility show phase (shared across all sources). */
+#define AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION 30.0f
+/** Default seconds for the auto-visibility hide phase (shared across all sources). */
+#define AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION 120.0f
+/** Default seconds for the auto-visibility fade phase (shared across all sources). */
+#define AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION 0.35f
+
+/**
+ * @brief Shared auto-visibility duration settings (global, not per-source).
+ *
+ * The show/hide/fade durations are configured once in the global Achievement Tracker
+ * dialog and applied to every source that has its per-source toggle enabled.
+ */
+typedef struct auto_visibility_durations {
+    float show_duration;
+    float hide_duration;
+    float fade_duration;
+} auto_visibility_durations_t;
 
 /** Minimum allowed value (seconds) for any achievement cycle duration setting. */
 #define ACHIEVEMENT_CYCLE_MIN_DURATION 5

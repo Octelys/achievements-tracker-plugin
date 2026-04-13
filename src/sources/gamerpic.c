@@ -14,12 +14,12 @@
  * This source is implemented as a singleton that stores the current user gamerpic
  * in a global cache.
  */
-static image_t g_gamerpic;
+static image_t                  g_gamerpic;
 static auto_visibility_config_t g_auto_visibility = {
     .enabled       = false,
-    .show_duration = AUTO_VISIBILITY_DEFAULT_SHOW_DURATION,
-    .hide_duration = AUTO_VISIBILITY_DEFAULT_HIDE_DURATION,
-    .fade_duration = AUTO_VISIBILITY_DEFAULT_FADE_DURATION,
+    .show_duration = AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION,
+    .hide_duration = AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION,
+    .fade_duration = AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION,
 };
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -116,7 +116,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     UNUSED_PARAMETER(data);
 
-    auto_visibility_update_properties(settings, &g_auto_visibility);
+    auto_visibility_update_toggle(settings, &g_auto_visibility);
 }
 
 static void source_get_defaults(obs_data_t *settings) {
@@ -154,7 +154,7 @@ static obs_properties_t *source_get_properties(void *data) {
 
     obs_properties_t *p = obs_properties_create();
     obs_properties_add_text(p, "info", "Displays the active user's profile picture.", OBS_TEXT_INFO);
-    auto_visibility_add_properties(p);
+    auto_visibility_add_toggle_property(p);
     return p;
 }
 
@@ -195,6 +195,8 @@ void xbox_gamerpic_source_register(void) {
     snprintf(g_gamerpic.type, sizeof(g_gamerpic.type), "gamerpic");
 
     obs_register_source(xbox_gamerpic_source_get());
+
+    auto_visibility_register_config(&g_auto_visibility);
 
     monitoring_subscribe_active_identity(on_active_identity_changed);
 }

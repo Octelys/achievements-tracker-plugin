@@ -9,6 +9,7 @@
  */
 
 #include "sources/common/text_source.h"
+#include "sources/common/visibility_cycle.h"
 
 #include <obs-module.h>
 #include <diagnostics/log.h>
@@ -116,11 +117,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 static void on_source_video_render(void *data, gs_effect_t *effect) {
     text_source_t *source = data;
 
-    if (text_source_update_text(source,
-                                &g_must_reload,
-                                &g_render_config,
-                                g_gamertag,
-                                true)) {
+    if (text_source_update_text(source, &g_must_reload, &g_render_config, g_gamertag, true)) {
         text_source_render(source, &g_render_config, effect);
     }
 }
@@ -170,6 +167,8 @@ void xbox_gamertag_source_register(void) {
     update_render_config();
 
     obs_register_source(&xbox_gamertag_source);
+
+    auto_visibility_register_config(&g_render_config.auto_visibility);
 
     monitoring_subscribe_active_identity(on_active_identity_changed);
 }

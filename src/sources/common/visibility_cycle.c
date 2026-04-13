@@ -6,6 +6,23 @@
 /** Nanoseconds-to-seconds conversion factor for os_gettime_ns(). */
 #define NS_TO_SECONDS 1000000000.0
 
+/* --------------------------------------------------------------------------
+ * Module-level shared durations + registration list
+ * -------------------------------------------------------------------------- */
+
+#define MAX_REGISTERED_CONFIGS 16
+
+static auto_visibility_durations_t g_shared_durations = {
+    .show_duration = AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION,
+    .hide_duration = AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION,
+    .fade_duration = AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION,
+};
+
+static auto_visibility_config_t *g_registered_configs[MAX_REGISTERED_CONFIGS];
+static int                       g_registered_count = 0;
+
+/* -------------------------------------------------------------------------- */
+
 static float clamp_non_negative(float value) {
     return value < 0.0f ? 0.0f : value;
 }
@@ -20,16 +37,17 @@ static float fade_progress(float phase_time, float fade_duration, float start_op
     return start_opacity + ((end_opacity - start_opacity) * t);
 }
 
-void auto_visibility_add_properties(obs_properties_t *props) {
+/* --------------------------------------------------------------------------
+ * Per-source properties helpers
+ * -------------------------------------------------------------------------- */
+
+void auto_visibility_add_toggle_property(obs_properties_t *props) {
 
     if (!props) {
         return;
     }
 
     obs_properties_add_bool(props, AUTO_VISIBILITY_ENABLED_PROPERTY, "Auto show/hide");
-    obs_properties_add_float_slider(props, AUTO_VISIBILITY_SHOW_PROPERTY, "Visible for (seconds)", 0.0, 120.0, 0.1);
-    obs_properties_add_float_slider(props, AUTO_VISIBILITY_HIDE_PROPERTY, "Hidden for (seconds)", 0.0, 120.0, 0.1);
-    obs_properties_add_float_slider(props, AUTO_VISIBILITY_FADE_PROPERTY, "Fade duration (seconds)", 0.0, 10.0, 0.05);
 }
 
 void auto_visibility_set_defaults(obs_data_t *settings) {
@@ -39,53 +57,87 @@ void auto_visibility_set_defaults(obs_data_t *settings) {
     }
 
     obs_data_set_default_bool(settings, AUTO_VISIBILITY_ENABLED_PROPERTY, false);
-    obs_data_set_default_double(settings, AUTO_VISIBILITY_SHOW_PROPERTY, AUTO_VISIBILITY_DEFAULT_SHOW_DURATION);
-    obs_data_set_default_double(settings, AUTO_VISIBILITY_HIDE_PROPERTY, AUTO_VISIBILITY_DEFAULT_HIDE_DURATION);
-    obs_data_set_default_double(settings, AUTO_VISIBILITY_FADE_PROPERTY, AUTO_VISIBILITY_DEFAULT_FADE_DURATION);
 }
 
-bool auto_visibility_update_properties(obs_data_t *settings, auto_visibility_config_t *config) {
+bool auto_visibility_update_toggle(obs_data_t *settings, auto_visibility_config_t *config) {
 
     if (!settings || !config) {
         return false;
     }
 
-    bool changed = false;
-
-    if (obs_data_has_user_value(settings, AUTO_VISIBILITY_ENABLED_PROPERTY)) {
-        bool enabled = obs_data_get_bool(settings, AUTO_VISIBILITY_ENABLED_PROPERTY);
-        if (config->enabled != enabled) {
-            config->enabled = enabled;
-            changed         = true;
-        }
+    if (!obs_data_has_user_value(settings, AUTO_VISIBILITY_ENABLED_PROPERTY)) {
+        return false;
     }
 
-    if (obs_data_has_user_value(settings, AUTO_VISIBILITY_SHOW_PROPERTY)) {
-        float show_duration = clamp_non_negative((float)obs_data_get_double(settings, AUTO_VISIBILITY_SHOW_PROPERTY));
-        if (fabsf(config->show_duration - show_duration) > 0.0001f) {
-            config->show_duration = show_duration;
-            changed               = true;
-        }
+    bool enabled = obs_data_get_bool(settings, AUTO_VISIBILITY_ENABLED_PROPERTY);
+    if (config->enabled != enabled) {
+        config->enabled = enabled;
+        return true;
     }
 
-    if (obs_data_has_user_value(settings, AUTO_VISIBILITY_HIDE_PROPERTY)) {
-        float hide_duration = clamp_non_negative((float)obs_data_get_double(settings, AUTO_VISIBILITY_HIDE_PROPERTY));
-        if (fabsf(config->hide_duration - hide_duration) > 0.0001f) {
-            config->hide_duration = hide_duration;
-            changed               = true;
-        }
-    }
-
-    if (obs_data_has_user_value(settings, AUTO_VISIBILITY_FADE_PROPERTY)) {
-        float fade_duration = clamp_non_negative((float)obs_data_get_double(settings, AUTO_VISIBILITY_FADE_PROPERTY));
-        if (fabsf(config->fade_duration - fade_duration) > 0.0001f) {
-            config->fade_duration = fade_duration;
-            changed               = true;
-        }
-    }
-
-    return changed;
+    return false;
 }
+
+/* --------------------------------------------------------------------------
+ * Shared durations
+ * -------------------------------------------------------------------------- */
+
+void auto_visibility_apply_durations(auto_visibility_config_t *config, const auto_visibility_durations_t *durations) {
+
+    if (!config || !durations) {
+        return;
+    }
+
+    config->show_duration = durations->show_duration > 0.0f ? durations->show_duration
+                                                            : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
+    config->hide_duration = durations->hide_duration > 0.0f ? durations->hide_duration
+                                                            : AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION;
+    config->fade_duration = durations->fade_duration > 0.0f ? durations->fade_duration
+                                                            : AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION;
+}
+
+void auto_visibility_set_shared_durations(const auto_visibility_durations_t *durations) {
+
+    if (!durations) {
+        return;
+    }
+
+    g_shared_durations = *durations;
+
+    /* Push to every registered per-source config */
+    for (int i = 0; i < g_registered_count; i++) {
+        if (g_registered_configs[i]) {
+            auto_visibility_apply_durations(g_registered_configs[i], &g_shared_durations);
+        }
+    }
+}
+
+const auto_visibility_durations_t *auto_visibility_get_shared_durations(void) {
+    return &g_shared_durations;
+}
+
+void auto_visibility_register_config(auto_visibility_config_t *config) {
+
+    if (!config || g_registered_count >= MAX_REGISTERED_CONFIGS) {
+        return;
+    }
+
+    /* Avoid double-registration */
+    for (int i = 0; i < g_registered_count; i++) {
+        if (g_registered_configs[i] == config) {
+            return;
+        }
+    }
+
+    g_registered_configs[g_registered_count++] = config;
+
+    /* Apply current shared durations immediately */
+    auto_visibility_apply_durations(config, &g_shared_durations);
+}
+
+/* --------------------------------------------------------------------------
+ * Opacity calculation
+ * -------------------------------------------------------------------------- */
 
 float auto_visibility_get_opacity(const auto_visibility_config_t *config) {
 

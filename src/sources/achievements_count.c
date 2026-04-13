@@ -2,24 +2,11 @@
 
 /**
  * @file achievements_total_count.c
- * @brief OBS source that renders the total number of achievements for the current game.
- *
- * This source displays the total count of achievements available for the currently
- * played game. The count is updated when the game changes or achievements progress.
- *
- * Data flow:
- *  - The monitoring service notifies this module when the connection state changes,
- *    when the game changes, or when achievements are updated.
- *  - The module counts total achievements and stores the result in a global.
- *  - During rendering, the count is formatted to text and rendered.
- *
- * Threading notes:
- *  - Event handlers may be invoked from non-graphics threads.
- *  - Texture creation must happen on the OBS graphics thread; this file lazily
- *    initializes the texture in the video_render callback.
+ * ...existing code...
  */
 
 #include "sources/common/text_source.h"
+#include "sources/common/visibility_cycle.h"
 
 #include <graphics/graphics.h>
 #include <obs-module.h>
@@ -41,7 +28,7 @@ static bool g_must_reload;
  * xbox_achievements_total_count_source_register().
  */
 static achievements_count_configuration_t *g_configuration;
-static text_source_config_t               g_render_config;
+static text_source_config_t                g_render_config;
 
 static void update_render_config(void) {
     g_render_config.font_face             = g_configuration->font_face;
@@ -171,11 +158,7 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
         return;
     }
 
-    if (!text_source_update_text(source,
-                                 &g_must_reload,
-                                 &g_render_config,
-                                 g_total_count,
-                                 true)) {
+    if (!text_source_update_text(source, &g_must_reload, &g_render_config, g_total_count, true)) {
         return;
     }
 
@@ -247,6 +230,8 @@ void xbox_achievements_count_source_register(void) {
     update_render_config();
 
     obs_register_source(xbox_source_get());
+
+    auto_visibility_register_config(&g_render_config.auto_visibility);
 
     monitoring_subscribe_achievements_changed(&on_achievements_changed);
     monitoring_subscribe_game_played(&on_game_played);

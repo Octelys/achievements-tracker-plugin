@@ -413,7 +413,7 @@ void text_source_add_properties(obs_properties_t *props, bool supports_inactive_
         obs_properties_add_color(props, "text_inactive_bottom_color", "Inactive text color (Bottom)");
     }
 
-    auto_visibility_add_properties(props);
+    auto_visibility_add_toggle_property(props);
 }
 
 void text_source_update_properties(obs_data_t *settings, text_source_config_t *config, bool *must_reload) {
@@ -467,7 +467,7 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
         }
     }
 
-    if (auto_visibility_update_properties(settings, &config->auto_visibility)) {
+    if (auto_visibility_update_toggle(settings, &config->auto_visibility)) {
         *must_reload = true;
     }
 }

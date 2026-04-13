@@ -18,12 +18,12 @@
 static image_t *g_achievement_icon;
 static image_t *g_next_achievement_icon;
 
-static bool g_is_achievement_unlocked = false;
-static auto_visibility_config_t g_auto_visibility = {
-    .enabled       = false,
-    .show_duration = AUTO_VISIBILITY_DEFAULT_SHOW_DURATION,
-    .hide_duration = AUTO_VISIBILITY_DEFAULT_HIDE_DURATION,
-    .fade_duration = AUTO_VISIBILITY_DEFAULT_FADE_DURATION,
+static bool                     g_is_achievement_unlocked = false;
+static auto_visibility_config_t g_auto_visibility         = {
+            .enabled       = false,
+            .show_duration = AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION,
+            .hide_duration = AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION,
+            .fade_duration = AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION,
 };
 
 /** Default duration for each fade phase (in seconds). */
@@ -267,7 +267,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
     UNUSED_PARAMETER(data);
 
-    auto_visibility_update_properties(settings, &g_auto_visibility);
+    auto_visibility_update_toggle(settings, &g_auto_visibility);
 }
 
 static void source_get_defaults(obs_data_t *settings) {
@@ -404,7 +404,7 @@ static obs_properties_t *source_get_properties(void *data) {
     UNUSED_PARAMETER(data);
 
     obs_properties_t *p = obs_properties_create();
-    auto_visibility_add_properties(p);
+    auto_visibility_add_toggle_property(p);
 
     return p;
 }
@@ -460,6 +460,8 @@ void xbox_achievement_icon_source_register(void) {
     snprintf(g_next_achievement_icon->type, sizeof(g_next_achievement_icon->type), "achievement_icon");
 
     obs_register_source(xbox_achievement_icon_source_get());
+
+    auto_visibility_register_config(&g_auto_visibility);
 
     achievement_cycle_subscribe(&on_achievement_changed);
 }

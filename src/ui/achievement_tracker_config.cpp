@@ -7,6 +7,7 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -19,6 +20,7 @@
 
 extern "C" {
 #include "sources/common/achievement_cycle.h"
+#include "sources/common/visibility_cycle.h"
 #include "io/state.h"
 }
 
@@ -320,6 +322,59 @@ class AchievementTrackerDialog final : public QDialog {
         rootLayout->addSpacing(6);
         rootLayout->addLayout(timingForm);
 
+        // ---- Separator -------------------------------------------------------
+        auto *separator2 = new QFrame(this);
+        separator2->setFrameShape(QFrame::HLine);
+        separator2->setFrameShadow(QFrame::Sunken);
+        rootLayout->addSpacing(8);
+        rootLayout->addWidget(separator2);
+        rootLayout->addSpacing(8);
+
+        // ---- Auto Show/Hide section ------------------------------------------
+        auto *visibilityLabel = new QLabel("<b>Auto Show/Hide Durations</b>", this);
+
+        auto *visibilityHelp = new QLabel(this);
+        visibilityHelp->setWordWrap(true);
+        visibilityHelp->setText("Shared show / hide / fade durations used by all sources whose per-source "
+                                "\"Auto show/hide\" toggle is enabled. Enable the toggle in each source's "
+                                "properties panel individually.");
+
+        auto *visibilityForm = new QFormLayout();
+        visibilityForm->setLabelAlignment(Qt::AlignLeft);
+        visibilityForm->setVerticalSpacing(6);
+        visibilityForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+
+        m_visShowSpin = new QDoubleSpinBox(this);
+        m_visShowSpin->setRange(0.0, 3600.0);
+        m_visShowSpin->setDecimals(1);
+        m_visShowSpin->setSingleStep(0.5);
+        m_visShowSpin->setSuffix(" s");
+        m_visShowSpin->setToolTip("Seconds to keep each source fully visible.");
+
+        m_visHideSpin = new QDoubleSpinBox(this);
+        m_visHideSpin->setRange(0.0, 3600.0);
+        m_visHideSpin->setDecimals(1);
+        m_visHideSpin->setSingleStep(0.5);
+        m_visHideSpin->setSuffix(" s");
+        m_visHideSpin->setToolTip("Seconds to keep each source fully hidden.");
+
+        m_visFadeSpin = new QDoubleSpinBox(this);
+        m_visFadeSpin->setRange(0.0, 30.0);
+        m_visFadeSpin->setDecimals(2);
+        m_visFadeSpin->setSingleStep(0.05);
+        m_visFadeSpin->setSuffix(" s");
+        m_visFadeSpin->setToolTip("Duration of each fade-in / fade-out transition.");
+
+        visibilityForm->addRow("Visible for", m_visShowSpin);
+        visibilityForm->addRow("Hidden for", m_visHideSpin);
+        visibilityForm->addRow("Fade duration", m_visFadeSpin);
+
+        rootLayout->addWidget(visibilityLabel);
+        rootLayout->addSpacing(4);
+        rootLayout->addWidget(visibilityHelp);
+        rootLayout->addSpacing(6);
+        rootLayout->addLayout(visibilityForm);
+
         // ---- Buttons ---------------------------------------------------------
         auto *buttonBox = new QDialogButtonBox(this);
         m_saveButton    = buttonBox->addButton("Save", QDialogButtonBox::AcceptRole);
@@ -333,6 +388,7 @@ class AchievementTrackerDialog final : public QDialog {
 
         refreshBindings();
         loadTimings();
+        loadVisibility();
     }
 
     void refreshBindings() {
@@ -357,6 +413,19 @@ class AchievementTrackerDialog final : public QDialog {
         bfree(timings);
     }
 
+    void loadVisibility() {
+        auto_visibility_durations_t *d = state_get_auto_visibility_durations();
+        if (!d) {
+            return;
+        }
+
+        m_visShowSpin->setValue(d->show_duration);
+        m_visHideSpin->setValue(d->hide_duration);
+        m_visFadeSpin->setValue(d->fade_duration);
+
+        bfree(d);
+    }
+
     private:
     void onSave() {
         achievement_cycle_timings_t timings;
@@ -375,23 +444,40 @@ class AchievementTrackerDialog final : public QDialog {
                 timings.last_unlocked_duration,
                 timings.locked_achievement_duration,
                 timings.locked_cycle_total_duration);
+
+        auto_visibility_durations_t durations;
+        durations.show_duration = (float)m_visShowSpin->value();
+        durations.hide_duration = (float)m_visHideSpin->value();
+        durations.fade_duration = (float)m_visFadeSpin->value();
+
+        state_set_auto_visibility_durations(&durations);
+        auto_visibility_set_shared_durations(&durations);
+
+        obs_log(LOG_INFO,
+                "Achievement Tracker: auto-visibility durations saved — show=%.1fs, hide=%.1fs, fade=%.2fs",
+                durations.show_duration,
+                durations.hide_duration,
+                durations.fade_duration);
     }
 
-    QLabel      *m_prevBinding;
-    QLabel      *m_nextBinding;
-    QLabel      *m_firstUnlockedBinding;
-    QLabel      *m_firstLockedBinding;
-    QLabel      *m_toggleCycleBinding;
-    QLabel      *m_autoCycleState;
-    QPushButton *m_prevButton;
-    QPushButton *m_nextButton;
-    QPushButton *m_firstUnlockedButton;
-    QPushButton *m_firstLockedButton;
-    QPushButton *m_toggleCycleButton;
-    QSpinBox    *m_lastUnlockedSpin;
-    QSpinBox    *m_lockedEachSpin;
-    QSpinBox    *m_lockedTotalSpin;
-    QPushButton *m_saveButton;
+    QLabel         *m_prevBinding;
+    QLabel         *m_nextBinding;
+    QLabel         *m_firstUnlockedBinding;
+    QLabel         *m_firstLockedBinding;
+    QLabel         *m_toggleCycleBinding;
+    QLabel         *m_autoCycleState;
+    QPushButton    *m_prevButton;
+    QPushButton    *m_nextButton;
+    QPushButton    *m_firstUnlockedButton;
+    QPushButton    *m_firstLockedButton;
+    QPushButton    *m_toggleCycleButton;
+    QSpinBox       *m_lastUnlockedSpin;
+    QSpinBox       *m_lockedEachSpin;
+    QSpinBox       *m_lockedTotalSpin;
+    QDoubleSpinBox *m_visShowSpin;
+    QDoubleSpinBox *m_visHideSpin;
+    QDoubleSpinBox *m_visFadeSpin;
+    QPushButton    *m_saveButton;
 };
 
 QPointer<AchievementTrackerDialog> g_dialog;
@@ -406,6 +492,7 @@ void show_achievement_tracker_dialog(void *) {
 
     g_dialog->refreshBindings();
     g_dialog->loadTimings();
+    g_dialog->loadVisibility();
     g_dialog->show();
     g_dialog->raise();
     g_dialog->activateWindow();
@@ -418,6 +505,16 @@ void show_achievement_tracker_dialog(void *) {
 // ----------------------------------------------------------------------------
 
 extern "C" void achievement_tracker_config_register(void) {
+
+    /* Restore and broadcast the global auto-visibility durations so all sources
+     * start up with the correct shared durations from persisted state. */
+    {
+        auto_visibility_durations_t *d = state_get_auto_visibility_durations();
+        if (d) {
+            auto_visibility_set_shared_durations(d);
+            bfree(d);
+        }
+    }
 
     g_hotkey_previous_id = obs_hotkey_register_frontend("achievement_tracker.previous_achievement",
                                                         "Achievement Tracker: Previous Achievement",

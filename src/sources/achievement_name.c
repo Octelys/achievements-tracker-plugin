@@ -25,6 +25,7 @@
 
 #include "sources/common/achievement_cycle.h"
 #include "sources/common/text_source.h"
+#include "sources/common/visibility_cycle.h"
 #include "common/achievement.h"
 
 #include <graphics/graphics.h>
@@ -417,6 +418,8 @@ void xbox_achievement_name_source_register(void) {
     update_render_config();
 
     obs_register_source(xbox_source_get());
+
+    auto_visibility_register_config(&g_render_config.auto_visibility);
 
     achievement_cycle_subscribe(&on_achievement_changed);
 }
