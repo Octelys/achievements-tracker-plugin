@@ -147,7 +147,9 @@ Each text and image source exposes an **Auto show/hide** toggle in its propertie
 - **Achievement (Name)**: current achievement name, including gamerscore when available
 - **Achievement (Description)**: current achievement description
 - **Achievement (Icon)**: current achievement icon
-- **Achievements’ Count**: unlocked / total achievements for the current game (for example `12 / 50`)
+- **Achievements' Count**: unlocked / total achievements for the current game (for example `12 / 50`)
+
+Each achievement source also exposes an **Auto show/hide** toggle in its properties panel (see [Auto Show/Hide Durations](#auto-showhide-durations) above).
 
 #### Achievement display cycle
 
@@ -160,11 +162,7 @@ The four achievement sources above all stay in sync via a shared display cycle. 
 
 After the locked rotation phase ends the cycle returns to the last-unlocked phase and repeats.
 
-All three durations are configurable. Open **Tools** → **Achievement Tracker**, adjust the values in the **Display Timing** section, and click **Save**. Changes take effect immediately and are persisted across OBS restarts.
-
-Constraints enforced by the UI and the cycle engine:
-- Minimum value for any duration: **5 seconds**.
-- **Locked rotation total** must be ≥ **Each locked** — guaranteeing at least one locked achievement is shown per rotation pass.
+All three durations are configurable from **Tools** → **Achievement Tracker** → **Display Timing**. Changes take effect immediately and are persisted across OBS restarts.
 
 **Manual navigation** lets you step through the full achievement list at any time without waiting for the timer:
 
