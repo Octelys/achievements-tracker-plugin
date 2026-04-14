@@ -138,9 +138,23 @@ static void update_achievement_icon(const achievement_t *achievement) {
     bool has_url_changed             = strcmp(g_achievement_icon->url, achievement->icon_url) != 0;
     bool has_state_changed           = g_is_achievement_unlocked != is_new_unlocked_achievement;
 
-    if (!has_url_changed && g_transition.phase == ICON_TRANSITION_NONE) {
+    if (!has_url_changed && !has_state_changed && g_transition.phase == ICON_TRANSITION_NONE) {
         return;
     }
+
+    /* Same icon URL but lock state changed: update visual state immediately
+     * without triggering a redundant image download. */
+    if (!has_url_changed && has_state_changed) {
+        g_is_achievement_unlocked = is_new_unlocked_achievement;
+        return;
+    }
+
+    /* A different achievement icon is being requested: hide the previous icon
+     * immediately so name/description can continue cycling while this image is
+     * still downloading. */
+    image_source_clear(g_achievement_icon);
+    g_transition.phase   = ICON_TRANSITION_NONE;
+    g_transition.opacity = 1.0f;
 
     //  Dispatch the download to a background thread so we never block the
     //  OBS video/render thread with HTTP I/O.

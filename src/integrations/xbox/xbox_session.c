@@ -24,9 +24,7 @@
  */
 typedef struct prefetch_context {
     /** Deep-copied achievement list. Freed by the thread when done. */
-    xbox_achievement_t           *achievements;
-    /** Optional callback invoked after all icons have been downloaded. */
-    xbox_session_ready_callback_t on_ready;
+    xbox_achievement_t *achievements;
 } prefetch_context_t;
 
 /**
@@ -56,16 +54,14 @@ static void *prefetch_icons_thread(void *arg) {
 
     for (const xbox_achievement_t *achievement = achievements; achievement != NULL; achievement = achievement->next) {
         if (download_icon_to_cache(achievement)) {
-            sleep_ms(5000);
+            /* Keep a small throttle between successful downloads to avoid
+             * hammering the endpoint while still completing prefetch quickly. */
+            sleep_ms(150);
         }
         count++;
     }
 
     obs_log(LOG_INFO, "[XboxSession] Finished prefetching %d achievement icons", count);
-
-    if (ctx->on_ready) {
-        ctx->on_ready();
-    }
 
     xbox_free_achievement(&achievements);
     free_memory((void **)&ctx);
@@ -75,12 +71,9 @@ static void *prefetch_icons_thread(void *arg) {
 /**
  * @brief Starts a background thread to prefetch all achievement icons.
  */
-static void prefetch_achievement_icons(const xbox_achievement_t *achievements, xbox_session_ready_callback_t on_ready) {
+static void prefetch_achievement_icons(const xbox_achievement_t *achievements) {
 
     if (!achievements) {
-        if (on_ready) {
-            on_ready();
-        }
         return;
     }
 
@@ -88,15 +81,11 @@ static void prefetch_achievement_icons(const xbox_achievement_t *achievements, x
 
     if (!copy) {
         obs_log(LOG_WARNING, "[XboxSession] Failed to copy achievements for icon prefetch");
-        if (on_ready) {
-            on_ready();
-        }
         return;
     }
 
     prefetch_context_t *ctx = bzalloc(sizeof(prefetch_context_t));
     ctx->achievements       = copy;
-    ctx->on_ready           = on_ready;
 
     pthread_t thread;
     if (pthread_create(&thread, NULL, prefetch_icons_thread, ctx) == 0) {
@@ -106,9 +95,6 @@ static void prefetch_achievement_icons(const xbox_achievement_t *achievements, x
         obs_log(LOG_ERROR, "[XboxSession] Failed to create icon prefetch thread");
         xbox_free_achievement(&copy);
         free_memory((void **)&ctx);
-        if (on_ready) {
-            on_ready();
-        }
     }
 }
 
@@ -182,7 +168,13 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_sessio
 
     xbox_sort_achievements(&session->achievements);
 
-    prefetch_achievement_icons(session->achievements, on_ready);
+    /* Session is considered ready as soon as achievements are fetched/sorted.
+     * Icon prefetching continues in the background and should not block the cycle. */
+    if (on_ready) {
+        on_ready();
+    }
+
+    prefetch_achievement_icons(session->achievements);
 }
 
 void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achievement_progress_t *progress) {

@@ -60,11 +60,8 @@ typedef void (*on_xbox_connection_changed_t)(bool connected, const char *error_m
 /**
  * @brief Callback invoked when the session is fully ready.
  *
- * "Ready" means the current game's achievements have been fetched and all
- * achievement icons have been prefetched to the local cache.  This is the
- * appropriate moment to start the achievement display cycle.
- *
- * Threading: may be invoked from the background prefetch thread.
+ * "Ready" means the current game's achievements have been fetched and sorted.
+ * Icon prefetching may still be in progress in the background.
  */
 typedef void (*on_xbox_session_ready_t)(void);
 
@@ -152,8 +149,8 @@ void xbox_subscribe_connected_changed(on_xbox_connection_changed_t callback);
 /**
  * @brief Subscribe to session-ready events.
  *
- * The callback is invoked once per game change after all achievement icons
- * have been prefetched.  Passing NULL clears/unsubscribes the callback.
+ * The callback is invoked once per game change after achievements are loaded.
+ * Passing NULL clears/unsubscribes the callback.
  *
  * @param callback Callback invoked when the session is fully ready.
  */

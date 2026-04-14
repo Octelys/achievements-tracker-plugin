@@ -69,11 +69,10 @@ static bool g_auto_cycle_enabled = true;
 static int g_nav_index = 0;
 
 /**
- * @brief Whether the session is fully ready (achievements fetched + icons prefetched).
+ * @brief Whether the session is ready to cycle achievements.
  *
  * Set to true by on_session_ready, reset to false by on_game_played.
- * While false, achievement_cycle_tick and reset_display_cycle are no-ops so
- * the cycle does not start before all icons are available in the local cache.
+ * While false, achievement_cycle_tick and reset_display_cycle are no-ops.
  */
 static bool g_session_ready = false;
 
@@ -210,7 +209,7 @@ static void on_achievements_changed(void) {
 /**
  * @brief Monitoring service callback invoked when the session is fully ready.
  *
- * Called once all achievement icons have been downloaded to the local cache.
+ * Called once achievements are loaded for the active game.
  * This is the signal to start (or restart) the achievement display cycle.
  */
 static void on_session_ready(void) {

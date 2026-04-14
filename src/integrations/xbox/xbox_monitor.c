@@ -271,7 +271,7 @@ static void notify_connection_changed(const char *error_message) {
 /**
  * @brief Invoke all registered session-ready subscribers.
  *
- * Called from the prefetch background thread when all icons have been downloaded.
+ * Called when the game achievements are loaded and ready for cycling.
  */
 static void notify_session_ready(void) {
 
@@ -493,8 +493,8 @@ static void xbox_change_game(game_t *game) {
      */
     notify_game_played(game);
 
-    /* Change the game which includes getting the new list of achievements
-     * and spawning a background thread to prefetch icons. */
+    /* Change the game: fetch achievements, notify session-ready, and prefetch
+     * icons in the background. */
     xbox_session_change_game(&g_current_session, game, &notify_session_ready);
 
     /* Now let's subscribe to the new achievements */
