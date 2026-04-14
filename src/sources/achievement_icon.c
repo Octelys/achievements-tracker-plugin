@@ -142,7 +142,7 @@ static void update_achievement_icon(const achievement_t *achievement) {
         return;
     }
 
-    /* Same icon URL but lock state changed: update visual state immediately
+    /* Same icon URL but unlock state changed: update visual state immediately
      * without triggering a redundant image download. */
     if (!has_url_changed && has_state_changed) {
         g_is_achievement_unlocked = is_new_unlocked_achievement;

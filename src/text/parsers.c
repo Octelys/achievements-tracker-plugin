@@ -41,7 +41,10 @@ static char *append_icon_size_query(const char *url) {
         return NULL;
     }
 
-    if (strstr(url, "w=") && strstr(url, "h=")) {
+    const bool has_width_param  = strstr(url, "?w=") || strstr(url, "&w=");
+    const bool has_height_param = strstr(url, "?h=") || strstr(url, "&h=");
+
+    if (has_width_param && has_height_param) {
         return bstrdup(url);
     }
 
