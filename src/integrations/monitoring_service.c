@@ -336,12 +336,8 @@ static void on_xbox_game_played(const game_t *game) {
 
     g_last_game_source = IDENTITY_SOURCE_XBOX;
 
-    /* Do NOT clear g_current_achievements here. xbox_session_change_game() has
-     * already cleared the session's internal achievement list before firing this
-     * callback. on_xbox_session_ready() — which may have already been called on
-     * the prefetch thread before this callback runs — is the sole owner of
-     * g_current_achievements for Xbox. Clearing here would wipe achievements
-     * that on_xbox_session_ready() already set (race when all icons are cached). */
+    /* Do NOT clear g_current_achievements here. on_xbox_session_ready() is the
+     * sole owner of g_current_achievements updates for Xbox data. */
 
     /* Notify with the current active identity. g_xbox_identity may be NULL
      * here if the game-played event arrives before the connection-changed

@@ -18,6 +18,9 @@
 //  Private functions
 //  --------------------------------------------------------------------------------------------------------------------
 
+#define XBOX_ACHIEVEMENT_ICON_WIDTH  200
+#define XBOX_ACHIEVEMENT_ICON_HEIGHT 200
+
 static char *get_node_string(cJSON *json_root, int achievement_index, const char *property_name) {
 
     char property_key[512] = "";
@@ -30,6 +33,31 @@ static char *get_node_string(cJSON *json_root, int achievement_index, const char
     }
 
     return bstrdup(property_node->valuestring);
+}
+
+static char *append_icon_size_query(const char *url) {
+
+    if (!url || url[0] == '\0') {
+        return NULL;
+    }
+
+    const bool has_width_param  = strstr(url, "?w=") || strstr(url, "&w=");
+    const bool has_height_param = strstr(url, "?h=") || strstr(url, "&h=");
+
+    if (has_width_param && has_height_param) {
+        return bstrdup(url);
+    }
+
+    const char separator = strchr(url, '?') ? '&' : '?';
+    char       sized_url[4096];
+    snprintf(sized_url,
+             sizeof(sized_url),
+             "%s%cw=%d&h=%d",
+             url,
+             separator,
+             XBOX_ACHIEVEMENT_ICON_WIDTH,
+             XBOX_ACHIEVEMENT_ICON_HEIGHT);
+    return bstrdup(sized_url);
 }
 
 static bool get_node_bool(cJSON *json_root, int achievement_index, const char *property_name) {
@@ -315,7 +343,9 @@ xbox_achievement_t *parse_achievements(const char *json_string) {
         achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
         achievement->unlocked_timestamp =
             get_node_unix_timestamp(json_root, achievement_index, "progression/timeUnlocked");
-        achievement->icon_url = get_node_string(json_root, achievement_index, "mediaAssets/0/url");
+        char *icon_url        = get_node_string(json_root, achievement_index, "mediaAssets/0/url");
+        achievement->icon_url = append_icon_size_query(icon_url);
+        free_memory((void **)&icon_url);
 
         /* Reads the media assets */
         xbox_media_asset_t *media_assets = NULL;
@@ -337,7 +367,7 @@ xbox_achievement_t *parse_achievements(const char *json_string) {
             }
 
             xbox_media_asset_t *media_asset = bzalloc(sizeof(xbox_media_asset_t));
-            media_asset->url                = bstrdup(media_asset_url_node->valuestring);
+            media_asset->url                = append_icon_size_query(media_asset_url_node->valuestring);
             media_asset->next               = NULL;
 
             if (!media_assets) {
