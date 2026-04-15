@@ -343,6 +343,11 @@ xbox_achievement_t *parse_achievements(const char *json_string) {
         achievement->is_secret          = get_node_bool(json_root, achievement_index, "isSecret");
         achievement->unlocked_timestamp =
             get_node_unix_timestamp(json_root, achievement_index, "progression/timeUnlocked");
+        achievement->progression_current =
+            get_node_string(json_root, achievement_index, "progression/requirements/0/current");
+        achievement->progression_target =
+            get_node_string(json_root, achievement_index, "progression/requirements/0/target");
+
         char *icon_url        = get_node_string(json_root, achievement_index, "mediaAssets/0/url");
         achievement->icon_url = append_icon_size_query(icon_url);
         free_memory((void **)&icon_url);

@@ -142,8 +142,21 @@ static void update_achievement_name(const achievement_t *achievement) {
         g_must_reload = true;
     }
 
-    if (achievement->value > 0) {
+    if (achievement->value > 0 && achievement->measured_progress) {
+        snprintf(g_achievement_name,
+                 sizeof(g_achievement_name),
+                 "%d - %s (%s)",
+                 achievement->value,
+                 achievement->name,
+                 achievement->measured_progress);
+    } else if (achievement->value > 0) {
         snprintf(g_achievement_name, sizeof(g_achievement_name), "%d - %s", achievement->value, achievement->name);
+    } else if (achievement->measured_progress) {
+        snprintf(g_achievement_name,
+                 sizeof(g_achievement_name),
+                 "%s (%s)",
+                 achievement->name,
+                 achievement->measured_progress);
     } else {
         snprintf(g_achievement_name, sizeof(g_achievement_name), "%s", achievement->name);
     }
