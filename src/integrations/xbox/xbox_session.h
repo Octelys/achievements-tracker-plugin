@@ -73,6 +73,8 @@ void xbox_session_change_game(xbox_session_t *session, game_t *game, xbox_sessio
  */
 void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achievement_progress_t *progress);
 
+void xbox_session_progress_achievement(xbox_session_t *session, const xbox_achievement_progress_t *progress);
+
 /**
  * @brief Clears all session state.
  *

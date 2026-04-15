@@ -27,6 +27,16 @@ typedef struct xbox_achievement_progress {
     const char                       *progress_state;
     /** Unix timestamp (seconds since epoch) when the achievement was unlocked, or 0 if locked. */
     int64_t                           unlocked_timestamp;
+    /**
+     * Current progression value for the first requirement, as a service-provided string (e.g. "42").
+     * NULL if not available.
+     */
+    const char                       *current;
+    /**
+     * Target progression value for the first requirement, as a service-provided string (e.g. "100").
+     * NULL if not available.
+     */
+    const char                       *target;
     /** Next progress entry in the list, or NULL. */
     struct xbox_achievement_progress *next;
 } xbox_achievement_progress_t;

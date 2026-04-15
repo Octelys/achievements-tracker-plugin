@@ -21,6 +21,8 @@ xbox_achievement_progress_t *xbox_copy_achievement_progress(const xbox_achieveme
         copy->progress_state              = bstrdup(current->progress_state);
         copy->service_config_id           = bstrdup(current->service_config_id);
         copy->unlocked_timestamp          = current->unlocked_timestamp;
+        copy->current                     = bstrdup(current->current);
+        copy->target                      = bstrdup(current->target);
 
         if (previous_copy) {
             previous_copy->next = copy;
@@ -51,6 +53,8 @@ void xbox_free_achievement_progress(xbox_achievement_progress_t **achievement_pr
         free_memory((void **)&current->id);
         free_memory((void **)&current->progress_state);
         free_memory((void **)&current->service_config_id);
+        free_memory((void **)&current->current);
+        free_memory((void **)&current->target);
         free_memory((void **)&current);
 
         current = next;

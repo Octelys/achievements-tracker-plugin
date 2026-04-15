@@ -337,7 +337,7 @@ achievement_t *xbox_to_achievements(const xbox_achievement_t *xbox) {
         a->unlocked_timestamp = x->unlocked_timestamp;
         a->source             = ACHIEVEMENT_SOURCE_XBOX;
 
-        if (x->progression_current && x->progression_target) {
+        if (x->progression_current && x->progression_target && strcmp(x->progression_current, "0") != 0) {
             char measured[128];
             snprintf(measured, sizeof(measured), "%s/%s", x->progression_current, x->progression_target);
             a->measured_progress = bstrdup(measured);

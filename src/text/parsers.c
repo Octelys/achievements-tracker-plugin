@@ -276,20 +276,29 @@ xbox_achievement_progress_t *parse_achievement_progress(const char *json_string)
             continue;
         }
 
-        int32_t fraction           = 0;
-        int64_t unlocked_timestamp = 0;
-
-        if (!convert_iso8601_utc_to_unix(time_unlocked_node->valuestring, &unlocked_timestamp, &fraction)) {
-            obs_log(LOG_ERROR, "No time unlocked at %d (received %s)", detail_index, time_unlocked_node->valuestring);
-            continue;
-        }
-
         xbox_achievement_progress_t *progress = bzalloc(sizeof(xbox_achievement_progress_t));
         progress->service_config_id           = bstrdup(current_service_config_id);
         progress->id                          = bstrdup(id_node->valuestring);
         progress->progress_state              = bstrdup(progress_state_node->valuestring);
-        progress->unlocked_timestamp          = unlocked_timestamp;
-        progress->next                        = NULL;
+
+        int32_t fraction           = 0;
+        int64_t unlocked_timestamp = 0;
+
+        if (convert_iso8601_utc_to_unix(time_unlocked_node->valuestring, &unlocked_timestamp, &fraction)) {
+            progress->unlocked_timestamp = unlocked_timestamp;
+        }
+
+        char current_key[512] = "";
+        snprintf(current_key, sizeof(current_key), "/progression/%d/requirements/0/current", detail_index);
+        cJSON *current_node = cJSONUtils_GetPointer(json_root, current_key);
+        progress->current   = (current_node && current_node->valuestring) ? bstrdup(current_node->valuestring) : NULL;
+
+        char target_key[512] = "";
+        snprintf(target_key, sizeof(target_key), "/progression/%d/requirements/0/target", detail_index);
+        cJSON *target_node = cJSONUtils_GetPointer(json_root, target_key);
+        progress->target   = (target_node && target_node->valuestring) ? bstrdup(target_node->valuestring) : NULL;
+
+        progress->next = NULL;
 
         if (!achievement_progress) {
             achievement_progress = progress;

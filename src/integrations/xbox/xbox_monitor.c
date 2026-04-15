@@ -225,7 +225,7 @@ static void notify_game_played(const game_t *game) {
 }
 
 /**
- * @brief Invoke all registered achievement progressed subscribers.
+ * @brief Invoke all registered achievement-progressed subscribers.
  */
 static void notify_achievements_progressed(const xbox_achievement_progress_t *achievements_progress) {
 
@@ -519,9 +519,16 @@ static void on_achievement_progress_received(const xbox_achievement_progress_t *
         return;
     }
 
-    /* TODO Progress is not necessarily achieved */
+    obs_log(LOG_INFO,
+            "[XboxMonitor] Progress received for achievement ID %s (%s)",
+            progress->id,
+            progress->progress_state);
 
-    xbox_session_unlock_achievement(&g_current_session, progress);
+    if (strcasecmp(progress->progress_state, "Achieved") == 0) {
+        xbox_session_unlock_achievement(&g_current_session, progress);
+    } else if (strcasecmp(progress->progress_state, "InProgress") == 0) {
+        xbox_session_progress_achievement(&g_current_session, progress);
+    }
 
     notify_achievements_progressed(progress);
 }
