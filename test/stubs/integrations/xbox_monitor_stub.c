@@ -31,7 +31,7 @@ static on_xbox_achievements_progressed_t s_cb_achievements_progressed = NULL;
 static on_xbox_session_ready_t           s_cb_session_ready           = NULL;
 
 /* Identity returned by state_get_xbox_identity() */
-static xbox_identity_t  *s_xbox_identity     = NULL;
+static xbox_identity_t    *s_xbox_identity     = NULL;
 /* Achievements returned by get_current_game_achievements() */
 static xbox_achievement_t *s_xbox_achievements = NULL;
 
@@ -153,7 +153,7 @@ void mock_xbox_monitor_fire_session_ready(void) {
 }
 
 void mock_xbox_monitor_fire_achievements_progressed(const gamerscore_t                *gamerscore,
-                                                     const xbox_achievement_progress_t *progress) {
+                                                    const xbox_achievement_progress_t *progress) {
     if (s_cb_achievements_progressed)
         s_cb_achievements_progressed(gamerscore, progress);
 }

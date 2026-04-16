@@ -64,7 +64,7 @@ void mock_xbox_monitor_fire_session_ready(void);
  * Invokes the callback registered via xbox_subscribe_achievements_progressed().
  */
 void mock_xbox_monitor_fire_achievements_progressed(const gamerscore_t                *gamerscore,
-                                                     const xbox_achievement_progress_t *progress);
+                                                    const xbox_achievement_progress_t *progress);
 
 /**
  * @brief Reset all stub state (callbacks, stored identity, etc.).

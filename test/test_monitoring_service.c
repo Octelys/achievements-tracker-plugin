@@ -108,18 +108,16 @@ static void fill_retro_achievement(retro_achievement_t *a, uint32_t id, const ch
     strncpy(a->status, status, sizeof(a->status) - 1);
 }
 
-static xbox_achievement_progress_t *make_xbox_achievement_progress(const char *id,
-                                                                    const char *progress_state,
-                                                                    const char *current,
-                                                                    const char *target) {
+static xbox_achievement_progress_t *make_xbox_achievement_progress(const char *id, const char *progress_state,
+                                                                   const char *current, const char *target) {
     xbox_achievement_progress_t *progress = bzalloc(sizeof(xbox_achievement_progress_t));
-    progress->service_config_id            = bstrdup("00000000-0000-0000-0000-0000700a1e17");
-    progress->id                           = bstrdup(id);
-    progress->progress_state               = progress_state ? bstrdup(progress_state) : NULL;
-    progress->current                      = current ? bstrdup(current) : NULL;
-    progress->target                       = target ? bstrdup(target) : NULL;
-    progress->unlocked_timestamp           = 0;
-    progress->next                         = NULL;
+    progress->service_config_id           = bstrdup("00000000-0000-0000-0000-0000700a1e17");
+    progress->id                          = bstrdup(id);
+    progress->progress_state              = progress_state ? bstrdup(progress_state) : NULL;
+    progress->current                     = current ? bstrdup(current) : NULL;
+    progress->target                      = target ? bstrdup(target) : NULL;
+    progress->unlocked_timestamp          = 0;
+    progress->next                        = NULL;
     return progress;
 }
 
@@ -136,12 +134,12 @@ static void free_xbox_achievement_progress(xbox_achievement_progress_t **progres
 }
 
 static xbox_achievement_t *make_xbox_achievement(const char *id, const char *name, const char *progress_state) {
-    xbox_achievement_t *a   = bzalloc(sizeof(xbox_achievement_t));
-    a->id                   = bstrdup(id);
-    a->name                 = bstrdup(name);
-    a->progress_state       = bstrdup(progress_state);
-    a->service_config_id    = bstrdup("00000000-0000-0000-0000-0000700a1e17");
-    a->unlocked_timestamp   = 0;
+    xbox_achievement_t *a = bzalloc(sizeof(xbox_achievement_t));
+    a->id                 = bstrdup(id);
+    a->name               = bstrdup(name);
+    a->progress_state     = bstrdup(progress_state);
+    a->service_config_id  = bstrdup("00000000-0000-0000-0000-0000700a1e17");
+    a->unlocked_timestamp = 0;
     return a;
 }
 
@@ -778,11 +776,11 @@ static void monitoring_achievements__xbox_progress_update_non_zero__measured_pro
     s_session_ready_cb_count = 0;
 
     /* Fire progress update with non-zero current value */
-    xbox_achievement_progress_t *progress = make_xbox_achievement_progress(
-        "achievement-1", /* id — matches the seeded achievement */
-        "InProgress",    /* progress_state */
-        "42",            /* current */
-        "100"            /* target */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id — matches the seeded
+                                                                                               achievement */
+                                                                           "InProgress",    /* progress_state */
+                                                                           "42",            /* current */
+                                                                           "100"            /* target */
     );
     mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
     free_xbox_achievement_progress(&progress);
@@ -813,11 +811,11 @@ static void monitoring_achievements__xbox_progress_update_zero_current__measured
     s_session_ready_cb_count = 0;
 
     /* Fire progress update with current="0" */
-    xbox_achievement_progress_t *progress = make_xbox_achievement_progress(
-        "achievement-1", /* id */
-        "InProgress",    /* progress_state */
-        "0",             /* current — zero should not produce a progress string */
-        "100"            /* target */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id */
+                                                                           "InProgress",    /* progress_state */
+                                                                           "0", /* current — zero should not produce a
+                                                                                   progress string */
+                                                                           "100" /* target */
     );
     mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
     free_xbox_achievement_progress(&progress);
@@ -848,11 +846,12 @@ static void monitoring_achievements__xbox_progress_update_achieved__achievements
     s_session_ready_cb_count        = 0;
     s_achievements_changed_cb_count = 0;
 
-    xbox_achievement_progress_t *progress = make_xbox_achievement_progress(
-        "achievement-1", /* id — matches the seeded achievement */
-        "Achieved",      /* progress_state — triggers a full rebuild */
-        "100",           /* current */
-        "100"            /* target */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id — matches the seeded
+                                                                                               achievement */
+                                                                           "Achieved", /* progress_state — triggers a
+                                                                                          full rebuild */
+                                                                           "100",      /* current */
+                                                                           "100"       /* target */
     );
     mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
     free_xbox_achievement_progress(&progress);
@@ -902,11 +901,10 @@ static void monitoring_achievements__xbox_progress_update_no_identity__early_ret
     s_achievements_changed_cb_count = 0;
 
     /* Fire progress update */
-    xbox_achievement_progress_t *progress = make_xbox_achievement_progress(
-        "achievement-1", /* id */
-        "InProgress",    /* progress_state */
-        "42",            /* current */
-        "100"            /* target */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id */
+                                                                           "InProgress",    /* progress_state */
+                                                                           "42",            /* current */
+                                                                           "100"            /* target */
     );
     mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
     free_xbox_achievement_progress(&progress);
