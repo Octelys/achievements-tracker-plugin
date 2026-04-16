@@ -10,6 +10,17 @@
 
 #include "common/game.h"
 #include "integrations/xbox/xbox_monitor.h"
+#include "integrations/xbox/contracts/xbox_achievement.h"
+
+// ...existing code...
+
+/**
+ * @brief Set the xbox_achievements that get_current_game_achievements() will return.
+ *
+ * The stub takes ownership of the provided list; pass NULL to make the
+ * stub return NULL (simulates no loaded achievements).
+ */
+void mock_xbox_monitor_set_achievements(xbox_achievement_t *achievements);
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +57,14 @@ void mock_xbox_monitor_fire_game_played(const game_t *game);
  * thread finishes before the game-played notification returns.
  */
 void mock_xbox_monitor_fire_session_ready(void);
+
+/**
+ * @brief Simulate an Xbox achievement progress event.
+ *
+ * Invokes the callback registered via xbox_subscribe_achievements_progressed().
+ */
+void mock_xbox_monitor_fire_achievements_progressed(const gamerscore_t                *gamerscore,
+                                                     const xbox_achievement_progress_t *progress);
 
 /**
  * @brief Reset all stub state (callbacks, stored identity, etc.).

@@ -320,6 +320,11 @@ bool text_source_update_text(text_source_t *text_source, bool *force_reload, con
     } else if (text_source->current_text && strcmp(text_source->current_text, text) != 0) {
         initiate_fade_out_transition(text_source, text, use_active_color);
         goto completed;
+    } else {
+        /* Text is unchanged — still propagate the active-color flag so that a
+         * state change (e.g. a progressed achievement being unlocked) is
+         * reflected even when the display text itself stays the same. */
+        text_source->use_active_color = use_active_color;
     }
 
     //  Update the private OBS source settings.

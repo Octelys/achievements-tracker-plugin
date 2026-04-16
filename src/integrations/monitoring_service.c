@@ -12,6 +12,8 @@
 #include "common/gamerscore.h"
 #include "common/memory.h"
 #include "io/state.h"
+#include "sources/common/achievement_cycle.h"
+#include "time/time.h"
 
 /* --------------------------------------------------------------------------
  * Active-identity subscription list
@@ -291,7 +293,6 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
 static void on_xbox_achievements_progressed(const gamerscore_t                *gamerscore,
                                             const xbox_achievement_progress_t *progress) {
     UNUSED_PARAMETER(gamerscore);
-    UNUSED_PARAMETER(progress);
 
     if (!g_xbox_identity)
         return;
@@ -299,8 +300,39 @@ static void on_xbox_achievements_progressed(const gamerscore_t                *g
     refresh_xbox_score(g_xbox_identity);
     obs_log(LOG_INFO, "[MonitoringService] Xbox score updated: %u", g_xbox_identity->score);
 
-    /* Refresh the cached generic achievements. */
-    replace_current_achievements(xbox_to_achievements(get_current_game_achievements()));
+    /* Update the measured_progress field in-place on the cached generic
+     * achievement so the display reflects the new value without resetting
+     * the cycle (which would jump back to the first achievement). */
+    if (progress && progress->id && g_current_achievements) {
+        for (achievement_t *a = g_current_achievements; a != NULL; a = a->next) {
+            if (a->id && strcasecmp(a->id, progress->id) == 0) {
+
+                if (progress->progress_state && strcasecmp(progress->progress_state, "Achieved") == 0) {
+                    /* Achievement was just unlocked — patch in-place using the
+                     * timestamp already present in the progress event, clear the
+                     * progress string, then re-sort so it moves to the unlocked
+                     * section of the cycle.  No rebuild needed: we have all the
+                     * information we need right here. */
+                    a->unlocked_timestamp = progress->unlocked_timestamp > 0 ? progress->unlocked_timestamp
+                                                                             : (int64_t)now();
+                    free_memory((void **)&a->measured_progress);
+                    sort_achievements(&g_current_achievements);
+                    notify_achievements_changed();
+                } else {
+                    /* Still in progress — patch measured_progress in-place so
+                     * the display updates without resetting the cycle. */
+                    free_memory((void **)&a->measured_progress);
+                    if (progress->current && progress->target && strcmp(progress->current, "0") != 0) {
+                        char measured[128];
+                        snprintf(measured, sizeof(measured), "%s/%s", progress->current, progress->target);
+                        a->measured_progress = bstrdup(measured);
+                    }
+                    achievement_cycle_refresh_current();
+                }
+                break;
+            }
+        }
+    }
 
     /* Re-notify so subscribers receive the updated score. */
     if (g_xbox_game)
@@ -471,11 +503,19 @@ static void on_retro_no_game(void) {
  * event (initial state dump on connection). Treating that as session-ready
  * would set g_session_ready = true with no game context, which could then
  * block the next real game's session from starting correctly.
+ *
+ * Similarly, RetroArch may send an empty achievements list immediately after
+ * game_playing (count=0) as a loading placeholder before the real list
+ * arrives. Treating that as session-ready would start the cycle with no
+ * achievements and leave it blank until on_achievements_changed fires again —
+ * which only resets the display when g_session_ready is already true, so the
+ * initial blank state persists. Only fire session_ready when the list is
+ * non-empty so the cycle always starts with at least one achievement to show.
  */
 static void on_retro_achievements(const retro_achievement_t *achievements, size_t count) {
     replace_current_achievements(retro_to_achievements(achievements, count));
 
-    if (g_retro_game) {
+    if (g_retro_game && count > 0) {
         notify_session_ready();
     }
 }

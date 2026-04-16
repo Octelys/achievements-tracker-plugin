@@ -11,6 +11,7 @@
 #include "integrations/xbox/contracts/xbox_unlocked_achievement.h"
 
 #include <errno.h>
+#include <time.h>
 #include <util/thread_compat.h>
 #include <stdlib.h>
 #include <string.h>
@@ -194,8 +195,15 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
 
     /* Updates the achievement status */
     free_memory((void **)&achievement->progress_state);
-    achievement->progress_state     = bstrdup(progress->progress_state);
-    achievement->unlocked_timestamp = progress->unlocked_timestamp;
+    achievement->progress_state = bstrdup(progress->progress_state);
+
+    /* Xbox sends "0001-01-01T00:00:00" (parsed as 0) as the null unlock date.
+     * Fall back to the current time so the achievement is never treated as locked. */
+    achievement->unlocked_timestamp = (progress->unlocked_timestamp > 0) ? progress->unlocked_timestamp
+                                                                         : (int64_t)time(NULL);
+
+    /* Clear in-progress tracking — the achievement is now complete. */
+    free_memory((void **)&achievement->progression_current);
 
     xbox_sort_achievements(&session->achievements);
 

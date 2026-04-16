@@ -13,6 +13,7 @@
 #include "integrations/xbox/xbox_monitor.h"
 #include "integrations/xbox/xbox_client.h"
 #include "integrations/xbox/entities/xbox_identity.h"
+#include "integrations/xbox/contracts/xbox_achievement.h"
 #include "io/state.h"
 #include "common/game.h"
 #include "common/gamerscore.h"
@@ -30,7 +31,9 @@ static on_xbox_achievements_progressed_t s_cb_achievements_progressed = NULL;
 static on_xbox_session_ready_t           s_cb_session_ready           = NULL;
 
 /* Identity returned by state_get_xbox_identity() */
-static xbox_identity_t *s_xbox_identity = NULL;
+static xbox_identity_t  *s_xbox_identity     = NULL;
+/* Achievements returned by get_current_game_achievements() */
+static xbox_achievement_t *s_xbox_achievements = NULL;
 
 /* -------------------------------------------------------------------------
  * xbox_subscribe_* — called by monitoring_service during monitoring_start()
@@ -75,7 +78,7 @@ const game_t *get_current_game(void) {
     return NULL;
 }
 const xbox_achievement_t *get_current_game_achievements(void) {
-    return NULL;
+    return s_xbox_achievements;
 }
 
 /* -------------------------------------------------------------------------
@@ -129,6 +132,11 @@ void mock_xbox_monitor_set_identity(xbox_identity_t *identity) {
     s_xbox_identity = identity; /* Takes ownership. */
 }
 
+void mock_xbox_monitor_set_achievements(xbox_achievement_t *achievements) {
+    xbox_free_achievement(&s_xbox_achievements);
+    s_xbox_achievements = achievements; /* Takes ownership. */
+}
+
 void mock_xbox_monitor_fire_connection_changed(bool connected, const char *error_message) {
     if (s_cb_connection_changed)
         s_cb_connection_changed(connected, error_message);
@@ -144,8 +152,15 @@ void mock_xbox_monitor_fire_session_ready(void) {
         s_cb_session_ready();
 }
 
+void mock_xbox_monitor_fire_achievements_progressed(const gamerscore_t                *gamerscore,
+                                                     const xbox_achievement_progress_t *progress) {
+    if (s_cb_achievements_progressed)
+        s_cb_achievements_progressed(gamerscore, progress);
+}
+
 void mock_xbox_monitor_reset(void) {
     free_identity(&s_xbox_identity);
+    xbox_free_achievement(&s_xbox_achievements);
     s_cb_connection_changed      = NULL;
     s_cb_game_played             = NULL;
     s_cb_achievements_progressed = NULL;

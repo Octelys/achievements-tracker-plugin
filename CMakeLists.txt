@@ -744,6 +744,7 @@ if(BUILD_TESTING)
     src/integrations/xbox/contracts/xbox_achievement_progress.c
     src/integrations/xbox/contracts/xbox_unlocked_achievement.c
     src/integrations/xbox/entities/xbox_identity.c
+    src/sources/common/achievement_cycle.c
     test/stubs/bmem_stub.c
     test/stubs/integrations/xbox_monitor_stub.c
     test/stubs/integrations/retro_achievements_monitor_stub.c
