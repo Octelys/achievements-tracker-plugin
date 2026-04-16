@@ -813,8 +813,8 @@ static void monitoring_achievements__xbox_progress_update_zero_current__measured
     /* Fire progress update with current="0" */
     xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id */
                                                                            "InProgress",    /* progress_state */
-                                                                           "0", /* current — zero should not produce a
-                                                                                   progress string */
+                                                                           "0",  /* current — zero should not produce a
+                                                                                    progress string */
                                                                            "100" /* target */
     );
     mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
