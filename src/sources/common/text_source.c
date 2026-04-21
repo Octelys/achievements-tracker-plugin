@@ -177,6 +177,16 @@ static obs_data_t *create_private_obs_source_settings(text_source_t *text_source
     obs_data_set_bool(settings, "outline", false);
     obs_data_set_bool(settings, "drop_shadow", false);
 
+    // Disable word wrap and custom width so the source auto-sizes to the
+    // rendered text. Without these, some OBS builds default to filling the
+    // full canvas width, making alignment via OBS transforms impossible.
+    obs_data_set_bool(settings, "word_wrap", false);
+    obs_data_set_int(settings, "custom_width", 0);
+
+    // Guard against GDI+ installations that default use_custom_bgcolor to
+    // true, which would paint an opaque background behind the text.
+    obs_data_set_bool(settings, "use_custom_bgcolor", false);
+
     return settings;
 }
 
