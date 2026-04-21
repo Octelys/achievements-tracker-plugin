@@ -572,6 +572,23 @@ bool achievement_cycle_is_auto_cycle_enabled(void) {
     return g_auto_cycle_enabled;
 }
 
+void achievement_cycle_refresh_current(void) {
+
+    if (!g_session_ready || !g_current_achievement) {
+        return;
+    }
+
+    /* Find the matching entry in the live list and re-notify subscribers so
+     * they pick up any in-place field changes (e.g. measured_progress). */
+    const achievement_t *live = monitoring_get_current_game_achievements();
+    for (const achievement_t *a = live; a != NULL; a = a->next) {
+        if (a->id && g_current_achievement->id && strcmp(a->id, g_current_achievement->id) == 0) {
+            notify_subscribers(a);
+            return;
+        }
+    }
+}
+
 void achievement_cycle_set_timings(float last_unlocked_secs, float locked_each_secs, float locked_total_secs) {
 
     g_last_unlocked_duration = last_unlocked_secs >= ACHIEVEMENT_CYCLE_MIN_DURATION ? last_unlocked_secs

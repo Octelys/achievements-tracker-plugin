@@ -56,6 +56,7 @@
 #include "integrations/xbox/entities/xbox_identity.h"
 #include "common/game.h"
 #include "common/token.h"
+#include "common/memory.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -105,6 +106,41 @@ static void fill_retro_achievement(retro_achievement_t *a, uint32_t id, const ch
     a->points = 10;
     strncpy(a->name, name, sizeof(a->name) - 1);
     strncpy(a->status, status, sizeof(a->status) - 1);
+}
+
+static xbox_achievement_progress_t *make_xbox_achievement_progress(const char *id, const char *progress_state,
+                                                                   const char *current, const char *target) {
+    xbox_achievement_progress_t *progress = bzalloc(sizeof(xbox_achievement_progress_t));
+    progress->service_config_id           = bstrdup("00000000-0000-0000-0000-0000700a1e17");
+    progress->id                          = bstrdup(id);
+    progress->progress_state              = progress_state ? bstrdup(progress_state) : NULL;
+    progress->current                     = current ? bstrdup(current) : NULL;
+    progress->target                      = target ? bstrdup(target) : NULL;
+    progress->unlocked_timestamp          = 0;
+    progress->next                        = NULL;
+    return progress;
+}
+
+static void free_xbox_achievement_progress(xbox_achievement_progress_t **progress) {
+    if (!progress || !*progress)
+        return;
+    xbox_achievement_progress_t *p = *progress;
+    free_memory((void **)&p->service_config_id);
+    free_memory((void **)&p->id);
+    free_memory((void **)&p->progress_state);
+    free_memory((void **)&p->current);
+    free_memory((void **)&p->target);
+    free_memory((void **)progress);
+}
+
+static xbox_achievement_t *make_xbox_achievement(const char *id, const char *name, const char *progress_state) {
+    xbox_achievement_t *a = bzalloc(sizeof(xbox_achievement_t));
+    a->id                 = bstrdup(id);
+    a->name               = bstrdup(name);
+    a->progress_state     = bstrdup(progress_state);
+    a->service_config_id  = bstrdup("00000000-0000-0000-0000-0000700a1e17");
+    a->unlocked_timestamp = 0;
+    return a;
 }
 
 /* -------------------------------------------------------------------------
@@ -718,6 +754,165 @@ static void monitoring_session_ready__xbox_session_ready_with_game__fired(void) 
     TEST_ASSERT_EQUAL_INT(1, s_session_ready_cb_count);
 }
 
+/* =========================================================================
+ * Achievement progress updates — Xbox
+ * ====================================================================== */
+
+/* 26. Xbox achievement progress update with non-zero current value → measured_progress
+ *     is patched in-place on the cached achievement (cycle is NOT reset). */
+static void monitoring_achievements__xbox_progress_update_non_zero__measured_progress_set(void) {
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    /* Seed one achievement so g_current_achievements is non-NULL after session_ready. */
+    mock_xbox_monitor_set_achievements(make_xbox_achievement("achievement-1", "Stop Hitting Yourself", "NotStarted"));
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    mock_xbox_monitor_fire_session_ready();
+
+    s_session_ready_cb_count = 0;
+
+    /* Fire progress update with non-zero current value */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id — matches the seeded
+                                                                                               achievement */
+                                                                           "InProgress",    /* progress_state */
+                                                                           "42",            /* current */
+                                                                           "100"            /* target */
+    );
+    mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
+    free_xbox_achievement_progress(&progress);
+
+    /* The cycle must NOT have been reset. */
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+
+    /* measured_progress must have been patched in-place to "42/100". */
+    const achievement_t *a = monitoring_get_current_game_achievements();
+    TEST_ASSERT_NOT_NULL(a);
+    TEST_ASSERT_EQUAL_STRING("42/100", a->measured_progress);
+}
+
+/* 27. Xbox achievement progress update with current="0" → measured_progress stays NULL
+ *     (a zero value is not displayed). */
+static void monitoring_achievements__xbox_progress_update_zero_current__measured_progress_not_set(void) {
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    mock_xbox_monitor_set_achievements(make_xbox_achievement("achievement-1", "Stop Hitting Yourself", "NotStarted"));
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    mock_xbox_monitor_fire_session_ready();
+
+    s_session_ready_cb_count = 0;
+
+    /* Fire progress update with current="0" */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id */
+                                                                           "InProgress",    /* progress_state */
+                                                                           "0",  /* current — zero should not produce a
+                                                                                    progress string */
+                                                                           "100" /* target */
+    );
+    mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
+    free_xbox_achievement_progress(&progress);
+
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+
+    /* measured_progress must remain NULL when current is "0". */
+    const achievement_t *a = monitoring_get_current_game_achievements();
+    TEST_ASSERT_NOT_NULL(a);
+    TEST_ASSERT_NULL(a->measured_progress);
+}
+
+/* 28. Xbox achievement progressed to "Achieved" → achievements list is rebuilt
+ *     and achievements_changed fires to reset the display cycle.
+ *     session_ready must NOT fire (it would wrongly imply icons were re-prefetched). */
+static void monitoring_achievements__xbox_progress_update_achieved__achievements_changed_fired(void) {
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    mock_xbox_monitor_set_achievements(make_xbox_achievement("achievement-1", "Stop Hitting Yourself", "InProgress"));
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    mock_xbox_monitor_fire_session_ready();
+
+    s_session_ready_cb_count        = 0;
+    s_achievements_changed_cb_count = 0;
+
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id — matches the seeded
+                                                                                               achievement */
+                                                                           "Achieved", /* progress_state — triggers a
+                                                                                          full rebuild */
+                                                                           "100",      /* current */
+                                                                           "100"       /* target */
+    );
+    mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
+    free_xbox_achievement_progress(&progress);
+
+    /* achievements_changed must fire to reset the display cycle. */
+    TEST_ASSERT_EQUAL_INT(1, s_achievements_changed_cb_count);
+    /* session_ready must NOT fire — images were already downloaded. */
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+}
+
+/* 29. Xbox achievement progress update with NULL progress → nothing happens. */
+static void monitoring_achievements__xbox_progress_update_null__no_effect(void) {
+    /* Set up Xbox game */
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    mock_xbox_monitor_fire_session_ready();
+
+    s_identity_cb_count             = 0;
+    s_session_ready_cb_count        = 0;
+    s_achievements_changed_cb_count = 0;
+
+    /* Fire progress update with NULL progress */
+    mock_xbox_monitor_fire_achievements_progressed(NULL, NULL);
+
+    /* Nothing should happen */
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+}
+
+/* 30. Xbox achievement progress update without identity → callback returns early. */
+static void monitoring_achievements__xbox_progress_update_no_identity__early_return(void) {
+    /* Connect but do NOT set identity */
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    mock_xbox_monitor_fire_session_ready();
+
+    s_identity_cb_count             = 0;
+    s_session_ready_cb_count        = 0;
+    s_achievements_changed_cb_count = 0;
+
+    /* Fire progress update */
+    xbox_achievement_progress_t *progress = make_xbox_achievement_progress("achievement-1", /* id */
+                                                                           "InProgress",    /* progress_state */
+                                                                           "42",            /* current */
+                                                                           "100"            /* target */
+    );
+    mock_xbox_monitor_fire_achievements_progressed(NULL, progress);
+    free_xbox_achievement_progress(&progress);
+
+    /* Nothing should happen because there's no identity */
+    TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
+}
+
 /* -------------------------------------------------------------------------
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -761,6 +956,13 @@ int main(void) {
     RUN_TEST(monitoring_achievements__xbox_session_ready_without_game__achievements_not_overwritten);
     RUN_TEST(monitoring_session_ready__xbox_session_ready_without_game__not_fired);
     RUN_TEST(monitoring_session_ready__xbox_session_ready_with_game__fired);
+
+    /* Achievement progress updates — Xbox */
+    RUN_TEST(monitoring_achievements__xbox_progress_update_non_zero__measured_progress_set);
+    RUN_TEST(monitoring_achievements__xbox_progress_update_zero_current__measured_progress_not_set);
+    RUN_TEST(monitoring_achievements__xbox_progress_update_achieved__achievements_changed_fired);
+    RUN_TEST(monitoring_achievements__xbox_progress_update_null__no_effect);
+    RUN_TEST(monitoring_achievements__xbox_progress_update_no_identity__early_return);
 
     return UNITY_END();
 }

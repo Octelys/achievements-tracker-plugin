@@ -176,6 +176,17 @@ void achievement_cycle_set_auto_cycle(bool enabled);
  */
 bool achievement_cycle_is_auto_cycle_enabled(void);
 
+/**
+ * @brief Re-notify subscribers with the currently displayed achievement.
+ *
+ * Use this after an in-place field update (e.g. measured_progress) on the
+ * cached achievements list, when the cycle should not be reset but the
+ * display needs to reflect the new value.
+ *
+ * No-op if the session is not ready or no achievement is currently displayed.
+ */
+void achievement_cycle_refresh_current(void);
+
 #ifdef __cplusplus
 }
 #endif

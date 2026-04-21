@@ -11,6 +11,7 @@
 #include "integrations/xbox/contracts/xbox_unlocked_achievement.h"
 
 #include <errno.h>
+#include <time.h>
 #include <util/thread_compat.h>
 #include <stdlib.h>
 #include <string.h>
@@ -194,8 +195,15 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
 
     /* Updates the achievement status */
     free_memory((void **)&achievement->progress_state);
-    achievement->progress_state     = bstrdup(progress->progress_state);
-    achievement->unlocked_timestamp = progress->unlocked_timestamp;
+    achievement->progress_state = bstrdup(progress->progress_state);
+
+    /* Xbox sends "0001-01-01T00:00:00" (parsed as 0) as the null unlock date.
+     * Fall back to the current time so the achievement is never treated as locked. */
+    achievement->unlocked_timestamp = (progress->unlocked_timestamp > 0) ? progress->unlocked_timestamp
+                                                                         : (int64_t)time(NULL);
+
+    /* Clear in-progress tracking — the achievement is now complete. */
+    free_memory((void **)&achievement->progression_current);
 
     xbox_sort_achievements(&session->achievements);
 
@@ -250,6 +258,34 @@ void xbox_session_unlock_achievement(xbox_session_t *session, const xbox_achieve
             achievement->name,
             unlocked_achievement->value,
             xbox_session_compute_gamerscore(session));
+}
+
+void xbox_session_progress_achievement(xbox_session_t *session, const xbox_achievement_progress_t *progress) {
+
+    if (!session || !progress) {
+        return;
+    }
+
+    xbox_achievement_t *achievement = find_achievement_by_id(progress, session->achievements);
+
+    if (!achievement) {
+        obs_log(LOG_ERROR,
+                "[XboxSession] Failed to progress achievement %s: not found in the game's achievements",
+                progress->id ? progress->id : "(null)");
+        return;
+    }
+
+    /* Updates the achievement status */
+    free_memory((void **)&achievement->progress_state);
+    achievement->progress_state = bstrdup(progress->progress_state);
+
+    free_memory((void **)&achievement->progression_current);
+    achievement->progression_current = bstrdup(progress->current);
+
+    obs_log(LOG_INFO,
+            "[XboxSession] Achievement '%s' progressed to %s",
+            achievement->name,
+            achievement->progression_current);
 }
 
 void xbox_session_clear(xbox_session_t *session) {

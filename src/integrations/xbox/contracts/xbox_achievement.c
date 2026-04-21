@@ -4,6 +4,7 @@
 
 #include <inttypes.h>
 #include <obs-module.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 xbox_media_asset_t *xbox_copy_media_asset(const xbox_media_asset_t *media_asset) {
@@ -125,17 +126,19 @@ xbox_achievement_t *xbox_copy_achievement(const xbox_achievement_t *achievement)
 
         xbox_achievement_t *copy = bzalloc(sizeof(xbox_achievement_t));
 
-        copy->id                 = bstrdup(current->id);
-        copy->description        = bstrdup(current->description);
-        copy->locked_description = bstrdup(current->locked_description);
-        copy->name               = bstrdup(current->name);
-        copy->progress_state     = bstrdup(current->progress_state);
-        copy->service_config_id  = bstrdup(current->service_config_id);
-        copy->icon_url           = bstrdup(current->icon_url);
-        copy->media_assets       = xbox_copy_media_asset(current->media_assets);
-        copy->rewards            = xbox_copy_reward(current->rewards);
-        copy->is_secret          = current->is_secret;
-        copy->unlocked_timestamp = current->unlocked_timestamp;
+        copy->id                  = bstrdup(current->id);
+        copy->description         = bstrdup(current->description);
+        copy->locked_description  = bstrdup(current->locked_description);
+        copy->name                = bstrdup(current->name);
+        copy->progress_state      = bstrdup(current->progress_state);
+        copy->service_config_id   = bstrdup(current->service_config_id);
+        copy->icon_url            = bstrdup(current->icon_url);
+        copy->media_assets        = xbox_copy_media_asset(current->media_assets);
+        copy->rewards             = xbox_copy_reward(current->rewards);
+        copy->is_secret           = current->is_secret;
+        copy->unlocked_timestamp  = current->unlocked_timestamp;
+        copy->progression_current = bstrdup(current->progression_current);
+        copy->progression_target  = bstrdup(current->progression_target);
 
         if (previous_copy) {
             previous_copy->next = copy;
@@ -170,6 +173,8 @@ void xbox_free_achievement(xbox_achievement_t **achievement) {
         free_memory((void **)&current->locked_description);
         free_memory((void **)&current->progress_state);
         free_memory((void **)&current->icon_url);
+        free_memory((void **)&current->progression_current);
+        free_memory((void **)&current->progression_target);
         xbox_free_media_asset(&current->media_assets);
         xbox_free_reward(&current->rewards);
         free_memory((void **)&current);
@@ -331,6 +336,12 @@ achievement_t *xbox_to_achievements(const xbox_achievement_t *xbox) {
         a->value              = (x->rewards && x->rewards->value) ? atoi(x->rewards->value) : 0;
         a->unlocked_timestamp = x->unlocked_timestamp;
         a->source             = ACHIEVEMENT_SOURCE_XBOX;
+
+        if (x->progression_current && x->progression_target && strcmp(x->progression_current, "0") != 0) {
+            char measured[128];
+            snprintf(measured, sizeof(measured), "%s/%s", x->progression_current, x->progression_target);
+            a->measured_progress = bstrdup(measured);
+        }
 
         if (previous) {
             previous->next = a;
