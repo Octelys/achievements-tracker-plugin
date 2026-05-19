@@ -25,10 +25,21 @@ set(CPACK_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${CMAKE_PROJECT_VERSION}-wind
 set(_nsi_template "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/installer.nsi.in")
 set(_nsi_configured "${CMAKE_CURRENT_BINARY_DIR}/installer-${INSTALLER_ARCH}.nsi")
 set(_configure_script "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/configure-installer.cmake")
+set(_installer_output "${CMAKE_CURRENT_BINARY_DIR}/${CPACK_PACKAGE_FILE_NAME}.exe")
 
 set(_nsis_icon_flag "")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/resources/installer.ico")
   set(_nsis_icon_flag "/DHAVE_INSTALLER_ICO")
+endif()
+
+if(WINDOWS_CODESIGN)
+  windows_get_sign_file_script(_windows_sign_file_script)
+  set(_windows_sign_installer_command
+    COMMAND
+      "${CMAKE_COMMAND}" -DSIGN_FILE_PATH=${_installer_output} -P "${_windows_sign_file_script}"
+  )
+else()
+  set(_windows_sign_installer_command "")
 endif()
 
 # Custom target: cmake --build --target package-installer
@@ -44,6 +55,7 @@ add_custom_target(
     "-DINSTALL_STAGE_DIR=${CMAKE_CURRENT_BINARY_DIR}/../release/$<CONFIG>" -DNSI_TEMPLATE=${_nsi_template}
     -DNSI_OUTPUT=${_nsi_configured} -P ${_configure_script}
   COMMAND "${NSIS_MAKENSIS}" /V2 ${_nsis_icon_flag} "${_nsi_configured}"
+  ${_windows_sign_installer_command}
   WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   COMMENT "Building NSIS installer for ${INSTALLER_ARCH}..."
   VERBATIM

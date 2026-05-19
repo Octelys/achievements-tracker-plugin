@@ -4,7 +4,8 @@ param(
     [string] $Target = 'x64',
     [ValidateSet('Debug', 'RelWithDebInfo', 'Release', 'MinSizeRel')]
     [string] $Configuration = 'RelWithDebInfo',
-    [string] $VersionOverride = ''
+    [string] $VersionOverride = '',
+    [switch] $Codesign
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,6 +53,9 @@ function Build {
 
     if ( $VersionOverride -ne '' ) {
         $CmakeArgs += "-DPLUGIN_VERSION_OVERRIDE=${VersionOverride}"
+    }
+    if ( $Codesign ) {
+        $CmakeArgs += '-DWINDOWS_CODESIGN=ON'
     }
     $CmakeBuildArgs = @('--build')
     $CmakeInstallArgs = @()
