@@ -74,6 +74,15 @@ typedef struct text_source {
     char *current_text;
     bool  use_active_color;
 
+    /**
+     * Fixed canvas width in pixels (mirrors text_source_config_t::source_width).
+     *
+     * Kept here so get_width() can return it without requiring the caller to
+     * pass config through every time. Updated by text_source_update_text().
+     * 0 means auto-size to text width.
+     */
+    uint32_t source_width;
+
 } text_source_t;
 
 /**

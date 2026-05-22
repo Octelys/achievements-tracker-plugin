@@ -105,6 +105,21 @@ typedef struct auto_visibility_config {
 } auto_visibility_config_t;
 
 /**
+ * @brief Horizontal alignment for text within its source canvas.
+ *
+ * Controls where text is drawn horizontally when the source canvas
+ * (source_width) is wider than the rendered text.
+ */
+typedef enum text_align {
+    /** Text starts at the left edge; the source grows to the right. */
+    TEXT_ALIGN_LEFT = 0,
+    /** Text is centred within the canvas. */
+    TEXT_ALIGN_CENTER,
+    /** Text ends at the right edge; the source grows to the left. */
+    TEXT_ALIGN_RIGHT,
+} text_align_t;
+
+/**
  * @brief Common configuration for text-based sources.
  *
  * Contains all the shared configuration fields used across text sources.
@@ -121,6 +136,22 @@ typedef struct text_source_config {
     uint32_t                 inactive_top_color;
     uint32_t                 inactive_bottom_color;
     auto_visibility_config_t auto_visibility;
+    /**
+     * Horizontal alignment of text within the canvas.
+     *
+     * Only meaningful when source_width > 0. When source_width == 0 the text
+     * auto-sizes to the content and alignment has no effect.
+     */
+    text_align_t             alignment;
+    /**
+     * Fixed canvas width in pixels reported by get_width().
+     *
+     * Set to 0 (default) to auto-size the canvas to the rendered text width.
+     * Set to a positive value to create a fixed-width canvas. The text is then
+     * drawn at its natural pixel size and shifted horizontally according to
+     * the alignment field.
+     */
+    uint32_t                 source_width;
 } text_source_config_t;
 
 /**

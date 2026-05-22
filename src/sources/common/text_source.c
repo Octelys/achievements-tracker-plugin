@@ -325,6 +325,10 @@ bool text_source_update_text(text_source_t *text_source, bool *force_reload, con
         return false;
     }
 
+    /* Keep the cached canvas width in sync with the config so get_width()
+     * can return it without needing the config pointer. */
+    text_source->source_width = config->source_width;
+
     if (!text_source->current_text) {
         initiate_fade_in_transition(text_source, text, use_active_color);
     } else if (text_source->current_text && strcmp(text_source->current_text, text) != 0) {
@@ -353,7 +357,6 @@ completed:
 
 void text_source_render(text_source_t *text_source, const text_source_config_t *config, gs_effect_t *effect) {
 
-    UNUSED_PARAMETER(config);
     UNUSED_PARAMETER(effect);
 
     if (!text_source || !text_source->private_obs_source) {
@@ -370,8 +373,54 @@ void text_source_render(text_source_t *text_source, const text_source_config_t *
         obs_data_release(settings);
     }
 
+    /* Compute x-offset for alignment.
+     *
+     * The text renders at its natural pixel width inside the canvas reported
+     * by get_width(). When source_width == 0 the canvas equals the text width
+     * so the offset is always 0 (left). When source_width > 0 the offset is
+     * derived from the alignment setting:
+     *
+     *   LEFT   – text starts at x = 0                            (grows right)
+     *   CENTER – text is centred in the canvas
+     *   RIGHT  – text ends at x = canvas_width                   (grows left)
+     *
+     * Note: OBS scene-item scale is applied on top of all of this by the OBS
+     * compositor. Keep the scene-item scale at 1:1 if you want the text to
+     * appear at exactly its configured pixel size.
+     */
+    const uint32_t text_w   = obs_source_get_width(text_source->private_obs_source);
+    const uint32_t canvas_w = config->source_width > 0 ? config->source_width : text_w;
+    float          x_off    = 0.0f;
+
+    if (canvas_w > text_w) {
+        switch (config->alignment) {
+        case TEXT_ALIGN_CENTER:
+            x_off = (float)(canvas_w - text_w) * 0.5f;
+            break;
+        case TEXT_ALIGN_RIGHT:
+            x_off = (float)(canvas_w - text_w);
+            break;
+        case TEXT_ALIGN_LEFT:
+        default:
+            x_off = 0.0f;
+            break;
+        }
+    }
+
+    /* Push a translation matrix so the inner source is drawn at the correct
+     * horizontal position within the canvas. The matrix is popped immediately
+     * after to avoid affecting subsequent draw calls by the OBS compositor. */
+    if (x_off != 0.0f) {
+        gs_matrix_push();
+        gs_matrix_translate3f(x_off, 0.0f, 0.0f);
+    }
+
     // Opacity is handled by updating the text color's alpha channel in tick()
     obs_source_video_render(text_source->private_obs_source);
+
+    if (x_off != 0.0f) {
+        gs_matrix_pop();
+    }
 
     text_source->transition.last_opacity = final_opacity;
 }
@@ -427,6 +476,16 @@ void text_source_add_properties(obs_properties_t *props, bool supports_inactive_
         obs_properties_add_color(props, "text_inactive_top_color", "Inactive text color (Top)");
         obs_properties_add_color(props, "text_inactive_bottom_color", "Inactive text color (Bottom)");
     }
+
+    // Canvas width (0 = auto-size to text)
+    obs_properties_add_int(props, "text_source_width", "Canvas width (0 = auto)", 0, 8192, 1);
+
+    // Horizontal alignment within the canvas
+    obs_property_t *align_list =
+        obs_properties_add_list(props, "text_alignment", "Text alignment", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_list_add_int(align_list, "Left", TEXT_ALIGN_LEFT);
+    obs_property_list_add_int(align_list, "Center", TEXT_ALIGN_CENTER);
+    obs_property_list_add_int(align_list, "Right", TEXT_ALIGN_RIGHT);
 
     auto_visibility_add_toggle_property(props);
 }
@@ -485,11 +544,27 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
     if (auto_visibility_update_toggle(settings, &config->auto_visibility)) {
         *must_reload = true;
     }
+
+    if (obs_data_has_user_value(settings, "text_source_width")) {
+        config->source_width = (uint32_t)obs_data_get_int(settings, "text_source_width");
+        *must_reload         = true;
+    }
+
+    if (obs_data_has_user_value(settings, "text_alignment")) {
+        config->alignment = (text_align_t)obs_data_get_int(settings, "text_alignment");
+        *must_reload      = true;
+    }
 }
 
 uint32_t text_source_get_width(text_source_t *base) {
     if (!base || !base->private_obs_source) {
         return 0;
+    }
+    /* When the caller has configured a fixed canvas width, report it so that
+     * OBS allocates the correct bounding box for the source in the scene.
+     * Otherwise fall back to the text's natural pixel width. */
+    if (base->source_width > 0) {
+        return base->source_width;
     }
     return obs_source_get_width(base->private_obs_source);
 }
