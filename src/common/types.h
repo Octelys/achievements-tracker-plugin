@@ -162,6 +162,25 @@ typedef struct gamertag_configuration {
 } gamertag_configuration_t;
 
 /**
+ * @brief Configuration used by the active game name overlay/renderer.
+ *
+ * Ownership:
+ * - Strings are treated as borrowed pointers unless otherwise documented by the
+ *   caller.
+ */
+typedef struct game_name_configuration {
+    const char              *font_face;
+    const char              *font_style;
+    /** Font size in pixels (height passed to FreeType). */
+    uint32_t                 font_size;
+    /** Top gradient color in 0xRRGGBBAA format. */
+    uint32_t                 top_color;
+    /** Bottom gradient color in 0xRRGGBBAA format. */
+    uint32_t                 bottom_color;
+    auto_visibility_config_t auto_visibility;
+} game_name_configuration_t;
+
+/**
  * @brief Configuration used by the achievement name overlay/renderer.
  *
  * Ownership:

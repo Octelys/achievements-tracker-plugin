@@ -8,6 +8,7 @@
 #include "sources/game_cover.h"
 #include "sources/gamerscore.h"
 #include "sources/gamertag.h"
+#include "sources/game_name.h"
 
 #include "io/state.h"
 #include "sources/achievement_name.h"
@@ -32,6 +33,7 @@ bool obs_module_load(void) {
     game_cover_source_register();
     xbox_gamerscore_source_register();
     xbox_gamertag_source_register();
+    xbox_game_name_source_register();
 
     /* Initialize the shared achievement display cycle before registering achievement sources */
     achievement_cycle_init();
@@ -76,6 +78,7 @@ void obs_module_unload(void) {
     xbox_gamerpic_source_cleanup();
     xbox_gamerscore_source_cleanup();
     xbox_gamertag_source_cleanup();
+    xbox_game_name_source_cleanup();
 
     monitoring_stop();
     io_cleanup();

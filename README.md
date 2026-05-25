@@ -141,6 +141,7 @@ Each text and image source exposes an **Auto show/hide** toggle in its propertie
 #### Game
 
 - **Game Cover**: image source for the currently active game's cover art
+- **Game Name**: text source for the currently active game's title
 
 #### Achievements
 

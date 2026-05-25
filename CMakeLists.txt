@@ -479,6 +479,7 @@ target_sources(
     src/main.c
     src/sources/gamerpic.c
     src/sources/game_cover.c
+    src/sources/game_name.c
     src/sources/gamerscore.c
     src/sources/gamertag.c
     src/sources/achievement_name.c
