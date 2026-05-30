@@ -94,6 +94,22 @@ static game_t *g_retro_game = NULL;
  */
 static identity_source_t g_last_game_source = IDENTITY_SOURCE_XBOX;
 
+static const game_t *get_current_active_game(void) {
+    if (g_last_game_source == IDENTITY_SOURCE_XBOX) {
+        if (g_xbox_game)
+            return g_xbox_game;
+        if (g_retro_game)
+            return g_retro_game;
+    } else {
+        if (g_retro_game)
+            return g_retro_game;
+        if (g_xbox_game)
+            return g_xbox_game;
+    }
+
+    return NULL;
+}
+
 static const identity_t *get_current_active_identity(void) {
     /* When both sources have an active game, the one that reported a game
      * most recently takes priority. */
@@ -645,6 +661,10 @@ void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback) 
 
 const identity_t *monitoring_get_current_active_identity(void) {
     return get_current_active_identity();
+}
+
+const game_t *monitoring_get_current_active_game(void) {
+    return get_current_active_game();
 }
 
 const achievement_t *monitoring_get_current_game_achievements(void) {

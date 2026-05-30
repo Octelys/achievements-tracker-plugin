@@ -159,6 +159,28 @@ void state_set_gamertag_configuration(const gamertag_configuration_t *configurat
 gamertag_configuration_t *state_get_gamertag_configuration();
 
 /**
+ * @brief Set the active game name source configuration.
+ *
+ * Stores the configuration for the active game name display source, including
+ * font path, text size, color, and alignment. The configuration is persisted to disk.
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_game_name_configuration(const game_name_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored active game name source configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - Default color: 0xFFFFFF (white)
+ * - Default size: 12 pixels
+ *
+ * @return Newly allocated configuration structure. Caller must free it with
+ *         state_free_game_name_configuration().
+ */
+game_name_configuration_t *state_get_game_name_configuration();
+
+/**
  * @brief Set the achievement name source configuration.
  *
  * Stores the configuration for the achievement name display source, including
@@ -343,6 +365,16 @@ void state_free_gamerscore_configuration(gamerscore_configuration_t **config);
  * @param config Configuration structure to free. Set to NULL after freeing.
  */
 void state_free_gamertag_configuration(gamertag_configuration_t **config);
+
+/**
+ * @brief Free a game name configuration structure and its contents.
+ *
+ * Frees the font strings and the configuration structure itself.
+ * Safe to call with NULL.
+ *
+ * @param config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_game_name_configuration(game_name_configuration_t **config);
 
 /**
  * @brief Free an achievement name configuration structure and its contents.

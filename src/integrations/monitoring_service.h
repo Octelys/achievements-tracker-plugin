@@ -159,6 +159,19 @@ void monitoring_subscribe_session_ready(on_monitoring_session_ready_t callback);
 const identity_t *monitoring_get_current_active_identity(void);
 
 /**
+ * @brief Get the currently active game, if any.
+ *
+ * Returns the same game that would be delivered to game-played subscribers
+ * right now.
+ *
+ * Ownership/lifetime: the returned pointer is owned by the monitoring service
+ * and may be replaced on the next game update. Do not free it.
+ *
+ * @return The active game, or NULL if no session is established.
+ */
+const game_t *monitoring_get_current_active_game(void);
+
+/**
  * @brief Get the cached generic achievements list for the current game.
  *
  * Returns the achievements converted to generic @ref achievement_t form,
