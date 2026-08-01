@@ -33,6 +33,7 @@
 #define GAMERSCORE_CONFIGURATION_SIZE "source_gamerscore_size"
 #define GAMERSCORE_CONFIGURATION_FONT_FACE "source_gamerscore_font_face"
 #define GAMERSCORE_CONFIGURATION_FONT_STYLE "source_gamerscore_font_style"
+#define GAMERSCORE_CONFIGURATION_TEXT_ALIGN "source_gamerscore_text_align"
 #define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_gamerscore_auto_visibility_enabled"
 #define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_gamerscore_auto_visibility_show_duration"
 #define GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_gamerscore_auto_visibility_hide_duration"
@@ -43,6 +44,7 @@
 #define GAMERTAG_CONFIGURATION_SIZE "source_gamertag_size"
 #define GAMERTAG_CONFIGURATION_FONT_FACE "source_gamertag_font_face"
 #define GAMERTAG_CONFIGURATION_FONT_STYLE "source_gamertag_font_style"
+#define GAMERTAG_CONFIGURATION_TEXT_ALIGN "source_gamertag_text_align"
 #define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_gamertag_auto_visibility_enabled"
 #define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_gamertag_auto_visibility_show_duration"
 #define GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_gamertag_auto_visibility_hide_duration"
@@ -53,6 +55,7 @@
 #define GAME_NAME_CONFIGURATION_SIZE "source_game_name_size"
 #define GAME_NAME_CONFIGURATION_FONT_FACE "source_game_name_font_face"
 #define GAME_NAME_CONFIGURATION_FONT_STYLE "source_game_name_font_style"
+#define GAME_NAME_CONFIGURATION_TEXT_ALIGN "source_game_name_text_align"
 #define GAME_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_game_name_auto_visibility_enabled"
 #define GAME_NAME_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_game_name_auto_visibility_show_duration"
 #define GAME_NAME_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_game_name_auto_visibility_hide_duration"
@@ -65,6 +68,7 @@
 #define ACHIEVEMENT_NAME_CONFIGURATION_SIZE "source_achievement_name_size"
 #define ACHIEVEMENT_NAME_CONFIGURATION_FONT_FACE "source_achievement_name_font_face"
 #define ACHIEVEMENT_NAME_CONFIGURATION_FONT_STYLE "source_achievement_name_font_style"
+#define ACHIEVEMENT_NAME_CONFIGURATION_TEXT_ALIGN "source_achievement_name_text_align"
 #define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_achievement_name_auto_visibility_enabled"
 #define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_achievement_name_auto_visibility_show_duration"
 #define ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievement_name_auto_visibility_hide_duration"
@@ -77,6 +81,7 @@
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE "source_achievement_description_size"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_FACE "source_achievement_description_font_face"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_STYLE "source_achievement_description_font_style"
+#define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_TEXT_ALIGN "source_achievement_description_text_align"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_achievement_description_auto_visibility_enabled"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_achievement_description_auto_visibility_show_duration"
 #define ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievement_description_auto_visibility_hide_duration"
@@ -87,6 +92,7 @@
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE "source_achievements_count_size"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE "source_achievements_count_font_face"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE "source_achievements_count_font_style"
+#define ACHIEVEMENTS_COUNT_CONFIGURATION_TEXT_ALIGN "source_achievements_count_text_align"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_ENABLED "source_achievements_count_auto_visibility_enabled"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION "source_achievements_count_auto_visibility_show_duration"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievements_count_auto_visibility_hide_duration"
@@ -411,6 +417,7 @@ void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamers
     obs_data_set_int(g_state, GAMERSCORE_CONFIGURATION_SIZE, gamerscore_configuration->font_size);
     obs_data_set_string(g_state, GAMERSCORE_CONFIGURATION_FONT_FACE, gamerscore_configuration->font_face);
     obs_data_set_string(g_state, GAMERSCORE_CONFIGURATION_FONT_STYLE, gamerscore_configuration->font_style);
+    obs_data_set_int(g_state, GAMERSCORE_CONFIGURATION_TEXT_ALIGN, gamerscore_configuration->text_align);
     obs_data_set_bool(g_state,
                       GAMERSCORE_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
                       gamerscore_configuration->auto_visibility.enabled);
@@ -449,6 +456,8 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
     gamerscore_configuration->font_size                     = size == 0 ? 48 : size;
     gamerscore_configuration->font_face                     = bstrdup(font_face);
     gamerscore_configuration->font_style                    = bstrdup(font_style);
+    gamerscore_configuration->text_align =
+        (text_align_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_TEXT_ALIGN);
     gamerscore_configuration->auto_visibility.enabled       = auto_visibility_enabled;
     gamerscore_configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
                                                                   ? auto_visibility_show_duration
@@ -474,6 +483,7 @@ void state_set_gamertag_configuration(const gamertag_configuration_t *configurat
     obs_data_set_int(g_state, GAMERTAG_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, GAMERTAG_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, GAMERTAG_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_int(g_state, GAMERTAG_CONFIGURATION_TEXT_ALIGN, configuration->text_align);
     obs_data_set_bool(g_state, GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_ENABLED, configuration->auto_visibility.enabled);
     obs_data_set_double(g_state,
                         GAMERTAG_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
@@ -510,6 +520,7 @@ gamertag_configuration_t *state_get_gamertag_configuration() {
     configuration->font_size                     = size == 0 ? 48 : size;
     configuration->font_face                     = bstrdup(font_face);
     configuration->font_style                    = bstrdup(font_style);
+    configuration->text_align = (text_align_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_TEXT_ALIGN);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
                                                        ? auto_visibility_show_duration
@@ -535,6 +546,7 @@ void state_set_game_name_configuration(const game_name_configuration_t *configur
     obs_data_set_int(g_state, GAME_NAME_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, GAME_NAME_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, GAME_NAME_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_int(g_state, GAME_NAME_CONFIGURATION_TEXT_ALIGN, configuration->text_align);
     obs_data_set_bool(g_state, GAME_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED, configuration->auto_visibility.enabled);
     obs_data_set_double(g_state,
                         GAME_NAME_CONFIGURATION_AUTO_VISIBILITY_SHOW_DURATION,
@@ -566,6 +578,7 @@ game_name_configuration_t *state_get_game_name_configuration() {
 
     game_name_configuration_t *configuration = bzalloc(sizeof(game_name_configuration_t));
 
+    configuration->text_align = (text_align_t)obs_data_get_int(g_state, GAME_NAME_CONFIGURATION_TEXT_ALIGN);
     configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
     configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
     configuration->font_size                     = size == 0 ? 48 : size;
@@ -600,6 +613,7 @@ void state_set_achievement_name_configuration(const achievement_name_configurati
     obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, ACHIEVEMENT_NAME_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_TEXT_ALIGN, configuration->text_align);
     obs_data_set_bool(g_state,
                       ACHIEVEMENT_NAME_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
                       configuration->auto_visibility.enabled);
@@ -638,6 +652,7 @@ achievement_name_configuration_t *state_get_achievement_name_configuration() {
 
     achievement_name_configuration_t *configuration = bzalloc(sizeof(achievement_name_configuration_t));
 
+    configuration->text_align = (text_align_t)obs_data_get_int(g_state, ACHIEVEMENT_NAME_CONFIGURATION_TEXT_ALIGN);
     configuration->active_top_color              = active_top_color == 0 ? 0xFFFFFFFF : active_top_color;
     configuration->active_bottom_color           = active_bottom_color == 0 ? 0xFFFFFFFF : active_bottom_color;
     configuration->inactive_top_color            = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
@@ -678,6 +693,7 @@ void state_set_achievement_description_configuration(const achievement_descripti
     obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_TEXT_ALIGN, configuration->text_align);
     obs_data_set_bool(g_state,
                       ACHIEVEMENT_DESCRIPTION_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
                       configuration->auto_visibility.enabled);
@@ -718,6 +734,8 @@ achievement_description_configuration_t *state_get_achievement_description_confi
 
     achievement_description_configuration_t *configuration = bzalloc(sizeof(achievement_description_configuration_t));
 
+    configuration->text_align =
+        (text_align_t)obs_data_get_int(g_state, ACHIEVEMENT_DESCRIPTION_CONFIGURATION_TEXT_ALIGN);
     configuration->active_top_color              = active_top_color == 0 ? 0xFFFFFFFF : active_top_color;
     configuration->active_bottom_color           = active_bottom_color == 0 ? 0xFFFFFFFF : active_bottom_color;
     configuration->inactive_top_color            = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
@@ -750,6 +768,7 @@ void state_set_achievements_count_configuration(const achievements_count_configu
     obs_data_set_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_SIZE, configuration->font_size);
     obs_data_set_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_FACE, configuration->font_face);
     obs_data_set_string(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_FONT_STYLE, configuration->font_style);
+    obs_data_set_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TEXT_ALIGN, configuration->text_align);
     obs_data_set_bool(g_state,
                       ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_ENABLED,
                       configuration->auto_visibility.enabled);
@@ -783,6 +802,7 @@ achievements_count_configuration_t *state_get_achievements_count_configuration()
 
     achievements_count_configuration_t *configuration = bzalloc(sizeof(achievements_count_configuration_t));
 
+    configuration->text_align = (text_align_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TEXT_ALIGN);
     configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
     configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
     configuration->font_size                     = size == 0 ? 48 : size;

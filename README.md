@@ -368,11 +368,79 @@ xcodebuild -configuration Debug -scheme achievements-tracker -parallelizeTargets
 build_macos_dev/Debug/achievements-tracker.plugin
 ```
 
-5. Copy it into OBS's plugin folder:
+5. Install it. The easiest way is the helper script, which rebuilds and copies the
+   bundle into every install location in one step (removing any stale copy first):
+
+```bash
+./install.sh
+```
+
+   `install.sh` installs into **two** locations so both OBS builds stay in sync:
+
+   - `~/Library/Application Support/obs-studio/plugins/` — used by a Homebrew /
+     App Store OBS.
+   - The `Contents/PlugIns` directory of a source-built `OBS.app`. This defaults to
+     `.../obs-studio/build_macos/frontend/Debug/OBS.app/Contents/PlugIns` and is only
+     written when that directory already exists. Override the path if your OBS.app
+     lives elsewhere:
+
+     ```bash
+     OBS_APP_PLUGIN_DIR="/path/to/OBS.app/Contents/PlugIns" ./install.sh
+     ```
+
+   To install manually into just the Homebrew/App Store location instead:
 
 ```bash
 cp -r build_macos_dev/Debug/achievements-tracker.plugin \
   ~/Library/Application\ Support/obs-studio/plugins/
+```
+
+##### Troubleshooting: stale SDK path after an Xcode update
+
+After updating Xcode or the macOS SDK, `cmake --preset macos-dev` may fail with errors like:
+
+```text
+Imported target "ZLIB::ZLIB" includes non-existent path
+  ".../SDKs/MacOSX26.2.sdk/usr/include"
+Imported target "OpenGL::GL" includes non-existent path
+  ".../SDKs/MacOSX26.2.sdk/System/Library/Frameworks/OpenGL.framework"
+```
+
+This happens because the cached OBS-studio build directory was configured against the previous SDK version, which no longer exists on disk. Clear the stale caches and reconfigure:
+
+```bash
+rm -rf .deps/obs-studio-31.1.1/build_universal build_macos_dev
+cmake --preset macos-dev
+```
+
+(Adjust the OBS version in the path if `.deps/obs-studio-*` differs.) The reinstalled Homebrew packages are unrelated to this failure.
+
+##### Troubleshooting: plugin fails to load after a Homebrew upgrade
+
+OBS may refuse to load the plugin with an error like:
+
+```text
+Library not loaded: /opt/homebrew/opt/libwebsockets/lib/libwebsockets.21.dylib
+  Reason: tried: '.../libwebsockets.21.dylib' (no such file), ...
+```
+
+This happens when `brew upgrade` bumps a dependency to a new major version with a
+different dylib soname (e.g. `libwebsockets` 4.x → 5.0.0 replaces
+`libwebsockets.21.dylib` with `libwebsockets.22.dylib`). The **already-installed**
+plugin binary still has the old version baked into its load commands, so `dlopen`
+fails and the entire plugin is skipped.
+
+The fix is to rebuild against the new library and reinstall:
+
+```bash
+cmake --build build_macos_dev --config Debug
+./install.sh
+```
+
+You can confirm which version a binary references with:
+
+```bash
+otool -L build_macos_dev/Debug/achievements-tracker.plugin/Contents/MacOS/achievements-tracker | grep websockets
 ```
 
 ##### Universal macOS build notes
