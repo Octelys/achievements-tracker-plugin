@@ -413,6 +413,12 @@ jobs:
           # Pulling the latest vcpkg tree ensures we get corrected hashes.
           git -C "$env:VCPKG_INSTALLATION_ROOT" pull --ff-only
 
+          # Re-bootstrap the vcpkg tool so the binary matches the updated tree.
+          # The vcpkg.exe baked into the runner image is older than the freshly
+          # pulled scripts; without this it rejects the newer vcpkg-tools.json:
+          #   "document schema version 2 is not supported by this version of vcpkg"
+          & "$env:VCPKG_INSTALLATION_ROOT\bootstrap-vcpkg.bat"
+
           # Install OpenSSL and libwebsockets for x64 via vcpkg.
           # The obs-deps prebuilt package does not ship either on Windows.
           # The system OpenSSL must be replaced with the vcpkg one: the system
@@ -467,6 +473,10 @@ jobs:
           # Update vcpkg to the latest port definitions before installing.
           # See the x64 step for the full explanation.
           git -C "$env:VCPKG_INSTALLATION_ROOT" pull --ff-only
+
+          # Re-bootstrap the vcpkg tool so the binary matches the updated tree.
+          # See the x64 step for the full explanation.
+          & "$env:VCPKG_INSTALLATION_ROOT\bootstrap-vcpkg.bat"
 
           # Install OpenSSL and libwebsockets for ARM64 via vcpkg.
           # The windows-2022 runner ships vcpkg at $env:VCPKG_INSTALLATION_ROOT.
