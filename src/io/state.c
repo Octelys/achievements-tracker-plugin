@@ -451,13 +451,12 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
 
     gamerscore_configuration_t *gamerscore_configuration = bzalloc(sizeof(gamerscore_configuration_t));
 
-    gamerscore_configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
-    gamerscore_configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    gamerscore_configuration->font_size                     = size == 0 ? 48 : size;
-    gamerscore_configuration->font_face                     = bstrdup(font_face);
-    gamerscore_configuration->font_style                    = bstrdup(font_style);
-    gamerscore_configuration->text_align =
-        (text_align_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_TEXT_ALIGN);
+    gamerscore_configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
+    gamerscore_configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    gamerscore_configuration->font_size    = size == 0 ? 48 : size;
+    gamerscore_configuration->font_face    = bstrdup(font_face);
+    gamerscore_configuration->font_style   = bstrdup(font_style);
+    gamerscore_configuration->text_align = (text_align_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_TEXT_ALIGN);
     gamerscore_configuration->auto_visibility.enabled       = auto_visibility_enabled;
     gamerscore_configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
                                                                   ? auto_visibility_show_duration
@@ -515,13 +514,13 @@ gamertag_configuration_t *state_get_gamertag_configuration() {
 
     gamertag_configuration_t *configuration = bzalloc(sizeof(gamertag_configuration_t));
 
-    configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
-    configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    configuration->font_size                     = size == 0 ? 48 : size;
-    configuration->font_face                     = bstrdup(font_face);
-    configuration->font_style                    = bstrdup(font_style);
-    configuration->text_align = (text_align_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_TEXT_ALIGN);
-    configuration->auto_visibility.enabled       = auto_visibility_enabled;
+    configuration->top_color               = top_color == 0 ? 0xFFFFFFFF : top_color;
+    configuration->bottom_color            = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    configuration->font_size               = size == 0 ? 48 : size;
+    configuration->font_face               = bstrdup(font_face);
+    configuration->font_style              = bstrdup(font_style);
+    configuration->text_align              = (text_align_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_TEXT_ALIGN);
+    configuration->auto_visibility.enabled = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
                                                        ? auto_visibility_show_duration
                                                        : AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION;
@@ -578,12 +577,12 @@ game_name_configuration_t *state_get_game_name_configuration() {
 
     game_name_configuration_t *configuration = bzalloc(sizeof(game_name_configuration_t));
 
-    configuration->text_align = (text_align_t)obs_data_get_int(g_state, GAME_NAME_CONFIGURATION_TEXT_ALIGN);
-    configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
-    configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    configuration->font_size                     = size == 0 ? 48 : size;
-    configuration->font_face                     = bstrdup(font_face);
-    configuration->font_style                    = bstrdup(font_style);
+    configuration->text_align   = (text_align_t)obs_data_get_int(g_state, GAME_NAME_CONFIGURATION_TEXT_ALIGN);
+    configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
+    configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    configuration->font_size    = size == 0 ? 48 : size;
+    configuration->font_face    = bstrdup(font_face);
+    configuration->font_style   = bstrdup(font_style);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
                                                        ? auto_visibility_show_duration
@@ -802,12 +801,12 @@ achievements_count_configuration_t *state_get_achievements_count_configuration()
 
     achievements_count_configuration_t *configuration = bzalloc(sizeof(achievements_count_configuration_t));
 
-    configuration->text_align = (text_align_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TEXT_ALIGN);
-    configuration->top_color                     = top_color == 0 ? 0xFFFFFFFF : top_color;
-    configuration->bottom_color                  = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
-    configuration->font_size                     = size == 0 ? 48 : size;
-    configuration->font_face                     = bstrdup(font_face);
-    configuration->font_style                    = bstrdup(font_style);
+    configuration->text_align   = (text_align_t)obs_data_get_int(g_state, ACHIEVEMENTS_COUNT_CONFIGURATION_TEXT_ALIGN);
+    configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
+    configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
+    configuration->font_size    = size == 0 ? 48 : size;
+    configuration->font_face    = bstrdup(font_face);
+    configuration->font_style   = bstrdup(font_style);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
                                                        ? auto_visibility_show_duration
