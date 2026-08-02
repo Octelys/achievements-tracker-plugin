@@ -38,6 +38,7 @@ static void update_render_config(void) {
     g_render_config.active_bottom_color   = g_configuration->bottom_color;
     g_render_config.inactive_top_color    = g_configuration->top_color;
     g_render_config.inactive_bottom_color = g_configuration->bottom_color;
+    g_render_config.text_align            = g_configuration->text_align;
     g_render_config.auto_visibility       = g_configuration->auto_visibility;
 }
 
@@ -140,6 +141,7 @@ static void on_source_update(void *data, obs_data_t *settings) {
     g_configuration->font_size       = g_render_config.font_size;
     g_configuration->top_color       = g_render_config.active_top_color;
     g_configuration->bottom_color    = g_render_config.active_bottom_color;
+    g_configuration->text_align      = g_render_config.text_align;
     g_configuration->auto_visibility = g_render_config.auto_visibility;
 
     state_set_achievements_count_configuration(g_configuration);

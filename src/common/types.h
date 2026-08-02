@@ -105,6 +105,19 @@ typedef struct auto_visibility_config {
 } auto_visibility_config_t;
 
 /**
+ * @brief Horizontal alignment of text within its (auto-sized) box.
+ *
+ * The box width grows to fit the widest text seen; shorter text is then
+ * positioned within that box according to this value. LEFT reproduces the
+ * historical behaviour (text anchored to the source's left edge).
+ */
+typedef enum text_align {
+    TEXT_ALIGN_LEFT   = 0,
+    TEXT_ALIGN_CENTER = 1,
+    TEXT_ALIGN_RIGHT  = 2,
+} text_align_t;
+
+/**
  * @brief Common configuration for text-based sources.
  *
  * Contains all the shared configuration fields used across text sources.
@@ -120,6 +133,8 @@ typedef struct text_source_config {
     /** Alternate color for locked achievements (0xRRGGBBAA format). */
     uint32_t                 inactive_top_color;
     uint32_t                 inactive_bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } text_source_config_t;
 
@@ -139,6 +154,8 @@ typedef struct gamerscore_configuration {
     uint32_t                 top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
     uint32_t                 bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } gamerscore_configuration_t;
 
@@ -158,6 +175,8 @@ typedef struct gamertag_configuration {
     uint32_t                 top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
     uint32_t                 bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } gamertag_configuration_t;
 
@@ -177,6 +196,8 @@ typedef struct game_name_configuration {
     uint32_t                 top_color;
     /** Bottom gradient color in 0xRRGGBBAA format. */
     uint32_t                 bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } game_name_configuration_t;
 
@@ -200,6 +221,8 @@ typedef struct achievement_name_configuration {
     uint32_t                 inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
     uint32_t                 inactive_bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } achievement_name_configuration_t;
 
@@ -223,6 +246,8 @@ typedef struct achievement_description_configuration {
     uint32_t                 inactive_top_color;
     /** Bottom gradient color for locked achievements in 0xRRGGBBAA format. */
     uint32_t                 inactive_bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } achievement_description_configuration_t;
 
@@ -241,6 +266,8 @@ typedef struct achievements_count_configuration {
     /** Packed RGBA color in 0xRRGGBBAA format. */
     uint32_t                 top_color;
     uint32_t                 bottom_color;
+    /** Horizontal alignment of the text within its auto-sized box. */
+    text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
 } achievements_count_configuration_t;
 

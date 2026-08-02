@@ -7,6 +7,7 @@
 
 #include "drawing/color.h"
 #include "diagnostics/log.h"
+#include "io/state.h"
 #include "sources/common/visibility_cycle.h"
 
 /**
@@ -245,6 +246,11 @@ text_source_t *text_source_create(obs_source_t *source, const char *name) {
     text_source->current_text       = NULL;
     text_source->pending_text       = bstrdup("");
 
+    /* Restore the auto-sized alignment box measured in a previous session so the
+     * source keeps a stable width (and honours its alignment) even before any
+     * text has been displayed this session. */
+    state_get_source_box(text_source->name, &text_source->box_width, &text_source->box_font_size);
+
     /* Sets transition state */
     text_source->transition.phase    = TEXT_TRANSITION_NONE;
     text_source->transition.opacity  = 1.0f;
@@ -287,6 +293,9 @@ void text_source_destroy(text_source_t *text_source) {
     }
 
     if (text_source->name) {
+        /* Persist the widest text seen so the alignment box is restored (rather
+         * than collapsing to zero) on the next OBS start. */
+        state_set_source_box(text_source->name, text_source->box_width, text_source->box_font_size);
         bfree(text_source->name);
         text_source->name = NULL;
     }
@@ -360,8 +369,34 @@ void text_source_render(text_source_t *text_source, const text_source_config_t *
         obs_data_release(settings);
     }
 
+    // Grow the auto-sized box to fit the widest text seen (reset when the font
+    // size changes so the box recalibrates instead of staying stale-wide).
+    const uint32_t text_width = obs_source_get_width(text_source->private_obs_source);
+    if (config->font_size != text_source->box_font_size) {
+        text_source->box_font_size = config->font_size;
+        text_source->box_width     = 0;
+    }
+    if (text_width > text_source->box_width) {
+        text_source->box_width = text_width;
+    }
+
+    // Offset the (internally left-aligned) text within the box to honour the
+    // configured horizontal alignment.
+    float offset_x = 0.0f;
+    if (text_source->box_width > text_width) {
+        const float slack = (float)(text_source->box_width - text_width);
+        if (config->text_align == TEXT_ALIGN_CENTER) {
+            offset_x = slack * 0.5f;
+        } else if (config->text_align == TEXT_ALIGN_RIGHT) {
+            offset_x = slack;
+        }
+    }
+
     // Opacity is handled by updating the text color's alpha channel in tick()
+    gs_matrix_push();
+    gs_matrix_translate3f(offset_x, 0.0f, 0.0f);
     obs_source_video_render(text_source->private_obs_source);
+    gs_matrix_pop();
 
     text_source->transition.last_opacity = final_opacity;
 }
@@ -407,6 +442,13 @@ void text_source_add_properties(obs_properties_t *props, bool supports_inactive_
     }
 
     obs_properties_add_font(props, "text_font", "Font");
+
+    // Horizontal alignment within the source's auto-sized box.
+    obs_property_t *align =
+        obs_properties_add_list(props, "text_align", "Text alignment", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_list_add_int(align, "Left", TEXT_ALIGN_LEFT);
+    obs_property_list_add_int(align, "Center", TEXT_ALIGN_CENTER);
+    obs_property_list_add_int(align, "Right", TEXT_ALIGN_RIGHT);
 
     // (Active) Color picker
     obs_properties_add_color(props, "text_active_top_color", "Active text color (Top)");
@@ -456,6 +498,11 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
         *must_reload      = true;
     }
 
+    if (obs_data_has_user_value(settings, "text_align")) {
+        // Alignment only affects the render-time offset, so no reload is needed.
+        config->text_align = (text_align_t)obs_data_get_int(settings, "text_align");
+    }
+
     if (obs_data_has_user_value(settings, "text_font")) {
         obs_data_t *font_obj = obs_data_get_obj(settings, "text_font");
         if (font_obj) {
@@ -481,7 +528,14 @@ uint32_t text_source_get_width(text_source_t *base) {
     if (!base || !base->private_obs_source) {
         return 0;
     }
-    return obs_source_get_width(base->private_obs_source);
+    // Report the auto-sized box width (widest text seen) so the source keeps a
+    // stable footprint the user can position, rather than shrinking/growing with
+    // each title. Keep it in sync with the current text width as a floor.
+    const uint32_t text_width = obs_source_get_width(base->private_obs_source);
+    if (text_width > base->box_width) {
+        base->box_width = text_width;
+    }
+    return base->box_width;
 }
 
 uint32_t text_source_get_height(text_source_t *base) {

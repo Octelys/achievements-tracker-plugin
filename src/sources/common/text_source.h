@@ -74,6 +74,11 @@ typedef struct text_source {
     char *current_text;
     bool  use_active_color;
 
+    /** Widest text width (px) seen so far — the auto-sized box width used for alignment. */
+    uint32_t box_width;
+    /** Font size the box_width was measured against; a change invalidates box_width. */
+    uint32_t box_font_size;
+
 } text_source_t;
 
 /**

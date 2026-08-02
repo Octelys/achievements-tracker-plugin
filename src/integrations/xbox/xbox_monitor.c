@@ -945,11 +945,16 @@ bool xbox_monitoring_start() {
     goto done;
 
 error:
+    /* g_monitoring_context->identity aliases `identity`, so free it exactly once
+     * via the local. Guard the context: it may still be NULL if we failed before
+     * allocating it (e.g. no Xbox identity available). */
     free_identity(&identity);
-    free_identity(&g_monitoring_context->identity);
-    free_memory((void **)&g_monitoring_context->rx_buffer);
-    free_memory((void **)&g_monitoring_context->auth_token);
-    free_memory((void **)&g_monitoring_context);
+
+    if (g_monitoring_context) {
+        free_memory((void **)&g_monitoring_context->rx_buffer);
+        free_memory((void **)&g_monitoring_context->auth_token);
+        free_memory((void **)&g_monitoring_context);
+    }
 
 done:
     return succeeded;
