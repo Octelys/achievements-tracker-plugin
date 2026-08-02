@@ -2,6 +2,30 @@
 
 A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements profile data, current game information, and achievement progress for the signed-in user.
 
+## Table of Contents
+
+- [Features](#features)
+- [User Guide](#user-guide)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+  - [Available OBS Sources](#available-obs-sources)
+- [Developer Documentation](#developer-documentation)
+  - [Repository Structure](#repository-structure)
+  - [Authentication Sequence](#authentication-sequence)
+- [Building from Source](#building-from-source)
+  - [Prerequisites](#prerequisites)
+  - [Dependency / linking notes](#dependency--linking-notes)
+  - [Platform-specific setup](#platform-specific-setup)
+- [Running Tests](#running-tests)
+  - [macOS](#macos-2)
+  - [Linux](#linux-2)
+  - [Windows](#windows-2)
+  - [Running individual tests](#running-individual-tests)
+- [Profiling](#profiling)
+- [References](#references)
+- [Contributing](#contributing)
+- [Support](#support)
+
 ## Features
 
 - **Global Xbox account configuration dialog** using Microsoft's device-code flow
@@ -10,6 +34,7 @@ A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements
 - **Unified monitoring service** that handles both Xbox and RetroAchievements sessions with last-game-received priority
 - **Profile sources** for gamertag, gamerpic, and gamerscore
 - **Achievement sources** for name, description, icon, and progress count
+- **Game cover art** drawn at its true aspect ratio with optional per-orientation (Square / Portrait / Landscape) decorative borders
 - **Automatic achievement cycle** that rotates through the last unlocked achievement and random locked achievements on a configurable timer
 - **Manual navigation hotkeys** (default: Shift+← / Shift+→) to step through achievements on demand
 - **Auto show/hide** per-source toggle with globally shared visible / hidden / fade durations configurable from one place
@@ -142,6 +167,48 @@ Each text and image source exposes an **Auto show/hide** toggle in its propertie
 
 - **Game Cover**: image source for the currently active game's cover art
 - **Game Name**: text source for the currently active game's title
+
+##### Game Cover borders
+
+The **Game Cover** source draws the downloaded cover art at its **true aspect ratio**
+(fitted and centred, never stretched) and can frame it with an optional decorative
+border. Because covers come in different shapes, the source properties expose three
+independent border image pickers:
+
+| Property | Applied to covers whose aspect ratio is… |
+| --- | --- |
+| **Square border** | roughly square (between ~0.87 and ~1.15) |
+| **Portrait border** | taller than wide (< ~0.87) |
+| **Landscape border** | wider than tall (> ~1.15) |
+
+Each border is a local image file — typically a frame with a transparent centre. At
+render time the plugin measures the loaded cover, classifies it into one of the three
+buckets, draws the cover inset by the configured **Border width**, and overlays the
+matching border on top. Borders are **opt-in**: an unset picker renders the fitted
+cover with no frame.
+
+A **Border width (px)** slider (default 15 px, range 0–200) controls the padding left
+between the cover art and the frame on every side, applied uniformly across all three
+orientations. It only affects the artwork's inset — the frame image itself is drawn at
+its own dimensions.
+
+To keep the scene item from jumping in size as games come and go, the source reports a
+**fixed footprint** equal to the **Square border** image's dimensions and composites
+every orientation inside it — the square border fills the box exactly, while portrait
+and landscape borders sit centred with transparent padding on the short axis. Until a
+Square border is configured, the footprint falls back to the selected border (or the
+bare cover).
+
+Because the footprint is pinned to the square border, each orientation also has its own
+**frame margin** slider — **Square / Portrait / Landscape frame margin (px)** (default
+0, range 0–1000). The margin shrinks the box that the frame is fitted into on every
+side, so a frame (the space-filling square one in particular) can be made to occupy
+less than the full footprint while the source's reported size stays put. A margin of 0
+fills the box as before.
+
+Border image paths persist across OBS restarts via the source's settings, and the
+border honours the source's **Auto show/hide** toggle, fading in and out together with
+the cover.
 
 #### Achievements
 
