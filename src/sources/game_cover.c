@@ -34,6 +34,14 @@
 #define BORDER_PORTRAIT_PROPERTY  "border_portrait_path"
 #define BORDER_LANDSCAPE_PROPERTY "border_landscape_path"
 
+/** Property key for the configurable cover-to-frame padding. */
+#define BORDER_WIDTH_PROPERTY "border_width"
+
+/** Property keys for the per-orientation frame margins inside the source box. */
+#define BORDER_MARGIN_SQUARE_PROPERTY    "border_margin_square"
+#define BORDER_MARGIN_PORTRAIT_PROPERTY  "border_margin_portrait"
+#define BORDER_MARGIN_LANDSCAPE_PROPERTY "border_margin_landscape"
+
 /** File dialog filter for border image pickers. */
 #define BORDER_FILE_FILTER "Image files (*.png *.jpg *.jpeg *.bmp *.gif);;All files (*.*)"
 
@@ -48,17 +56,31 @@
 #define COVER_PORTRAIT_THRESHOLD  0.87f
 
 /**
- * @brief Padding, in source-space pixels, left between the cover art and the
- *        border frame on every side.
+ * @brief Default and bounds, in source-space pixels, for the cover-to-frame
+ *        padding left between the cover art and the border frame on every side.
  *
  * Only applied when a border is drawn: the cover is fitted inside the frame
  * shrunk by this amount on each edge, so the artwork never runs up against the
- * frame. Square frames use a wider margin than landscape/portrait ones. Without
+ * frame. The amount is user-configurable via @ref BORDER_WIDTH_PROPERTY; without
  * a border the cover fills the reported size as before.
  */
-#define COVER_BORDER_PADDING_SQUARE    30.0f
-#define COVER_BORDER_PADDING_PORTRAIT  10.0f
-#define COVER_BORDER_PADDING_LANDSCAPE 15.0f
+#define COVER_BORDER_PADDING_DEFAULT 15
+#define COVER_BORDER_PADDING_MIN     0
+#define COVER_BORDER_PADDING_MAX     200
+
+/**
+ * @brief Default and bounds, in source-space pixels, for the per-orientation
+ *        frame margin left between the border frame and the edge of the fixed
+ *        source box.
+ *
+ * The source footprint stays pinned to the square border's dimensions, but each
+ * orientation's frame is fitted inside that box shrunk by its margin on every
+ * side — so a frame can be made to occupy less than the full box. A margin of 0
+ * (the default) fills the box as before.
+ */
+#define COVER_BORDER_MARGIN_DEFAULT 0
+#define COVER_BORDER_MARGIN_MIN     0
+#define COVER_BORDER_MARGIN_MAX     1000
 
 /**
  * @brief Global singleton cover cache.
@@ -85,6 +107,20 @@ static auto_visibility_config_t g_auto_visibility = {
 static image_t g_border_square;
 static image_t g_border_portrait;
 static image_t g_border_landscape;
+
+/**
+ * @brief User-configured padding between the cover art and the border frame, in
+ *        source-space pixels, applied uniformly on every side and orientation.
+ */
+static float g_border_padding = (float)COVER_BORDER_PADDING_DEFAULT;
+
+/**
+ * @brief User-configured per-orientation margins between the border frame and the
+ *        edge of the fixed source box, in source-space pixels (every side).
+ */
+static float g_border_margin_square    = (float)COVER_BORDER_MARGIN_DEFAULT;
+static float g_border_margin_portrait  = (float)COVER_BORDER_MARGIN_DEFAULT;
+static float g_border_margin_landscape = (float)COVER_BORDER_MARGIN_DEFAULT;
 
 /** @brief Axis-aligned rectangle in source space (pixels). */
 typedef struct {
@@ -185,22 +221,46 @@ static image_t *select_border(uint32_t tex_w, uint32_t tex_h) {
 }
 
 /**
- * @brief Padding between the cover and the frame for a given border.
+ * @brief Margin between the frame and the source-box edge for a given border.
  *
  * @param border The border selected for the current cover (may be NULL).
- * @return The per-orientation padding in source-space pixels.
+ * @return The per-orientation margin in source-space pixels.
  */
-static float select_border_padding(const image_t *border) {
-
-    if (border == &g_border_square) {
-        return COVER_BORDER_PADDING_SQUARE;
-    }
+static float select_border_margin(const image_t *border) {
 
     if (border == &g_border_portrait) {
-        return COVER_BORDER_PADDING_PORTRAIT;
+        return g_border_margin_portrait;
     }
 
-    return COVER_BORDER_PADDING_LANDSCAPE;
+    if (border == &g_border_landscape) {
+        return g_border_margin_landscape;
+    }
+
+    return g_border_margin_square;
+}
+
+/**
+ * @brief Shrink a rectangle by @p margin on every side, centred.
+ *
+ * The rectangle is left unchanged when the margin would collapse (or invert) it,
+ * so a large margin never produces a negative extent.
+ *
+ * @param rect   Rectangle to inset, in source space.
+ * @param margin Inset applied on each side, in source-space pixels.
+ * @return The inset rectangle.
+ */
+static cover_rect_t inset_rect(cover_rect_t rect, float margin) {
+
+    if (margin <= 0.0f || rect.width <= 2.0f * margin || rect.height <= 2.0f * margin) {
+        return rect;
+    }
+
+    rect.x += margin;
+    rect.y += margin;
+    rect.width -= 2.0f * margin;
+    rect.height -= 2.0f * margin;
+
+    return rect;
 }
 
 /**
@@ -255,6 +315,12 @@ static void apply_source_settings(obs_data_t *settings) {
     update_border(&g_border_square, obs_data_get_string(settings, BORDER_SQUARE_PROPERTY));
     update_border(&g_border_portrait, obs_data_get_string(settings, BORDER_PORTRAIT_PROPERTY));
     update_border(&g_border_landscape, obs_data_get_string(settings, BORDER_LANDSCAPE_PROPERTY));
+
+    g_border_padding = (float)obs_data_get_int(settings, BORDER_WIDTH_PROPERTY);
+
+    g_border_margin_square    = (float)obs_data_get_int(settings, BORDER_MARGIN_SQUARE_PROPERTY);
+    g_border_margin_portrait  = (float)obs_data_get_int(settings, BORDER_MARGIN_PORTRAIT_PROPERTY);
+    g_border_margin_landscape = (float)obs_data_get_int(settings, BORDER_MARGIN_LANDSCAPE_PROPERTY);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -366,6 +432,10 @@ static void on_source_update(void *data, obs_data_t *settings) {
 
 static void source_get_defaults(obs_data_t *settings) {
     auto_visibility_set_defaults(settings);
+    obs_data_set_default_int(settings, BORDER_WIDTH_PROPERTY, COVER_BORDER_PADDING_DEFAULT);
+    obs_data_set_default_int(settings, BORDER_MARGIN_SQUARE_PROPERTY, COVER_BORDER_MARGIN_DEFAULT);
+    obs_data_set_default_int(settings, BORDER_MARGIN_PORTRAIT_PROPERTY, COVER_BORDER_MARGIN_DEFAULT);
+    obs_data_set_default_int(settings, BORDER_MARGIN_LANDSCAPE_PROPERTY, COVER_BORDER_MARGIN_DEFAULT);
 }
 
 /**
@@ -373,13 +443,14 @@ static void source_get_defaults(obs_data_t *settings) {
  *
  * The source advertises a *fixed* box — the square border's dimensions — so its
  * footprint never changes as covers come and go and the scene item stops
- * resizing. Every orientation is composited inside that same box: the square
- * border fills it exactly, while landscape/portrait borders are fitted
- * (centred, aspect preserved) so they sit inside the box with transparent
- * padding on the short axis. The cover is then fitted inside whichever border,
- * inset by the per-orientation padding. Until a square border is configured the
- * box falls back to the selected border (or the bare cover). Everything respects
- * the auto-visibility opacity so it fades together.
+ * resizing. Every orientation is composited inside that same box, each shrunk by
+ * its own per-orientation frame margin: the square border fills the box when its
+ * margin is zero, while landscape/portrait borders are fitted (centred, aspect
+ * preserved) inside the inset box with transparent padding on the short axis. The
+ * cover is then fitted inside whichever border, inset by the configurable border
+ * width. Until a square border is configured the box falls back to the selected
+ * border (or the bare cover). Everything respects the auto-visibility opacity so
+ * it fades together.
  */
 static void on_source_video_render(void *data, gs_effect_t *effect) {
 
@@ -440,34 +511,30 @@ static void on_source_video_render(void *data, gs_effect_t *effect) {
 
     /*
      * Place the border inside the box, preserving its aspect ratio (centred).
-     * A landscape/portrait border sits inside the square box with transparent
-     * padding; a square border fills it exactly.
+     * The box is first shrunk by the per-orientation margin so a frame can be
+     * made to occupy less than the full source footprint; the frame is then
+     * fitted inside that inset area. A landscape/portrait border also picks up
+     * transparent padding on its short axis; a zero-margin square border fills
+     * the box exactly.
      */
     cover_rect_t border_rect = {0.0f, 0.0f, (float)box_w, (float)box_h};
 
     if (has_border) {
-        border_rect = fit_rect(box_w,
-                               box_h,
-                               gs_texture_get_width(border->texture),
-                               gs_texture_get_height(border->texture));
+        const cover_rect_t box_rect = inset_rect(border_rect, select_border_margin(border));
+
+        border_rect =
+            fit_within(box_rect, gs_texture_get_width(border->texture), gs_texture_get_height(border->texture));
     }
 
     /*
      * Fit the cover inside the border, preserving its aspect ratio. When a
-     * border is drawn, shrink the fit area by the per-orientation padding on
+     * border is drawn, shrink the fit area by the configured border width on
      * every side so the artwork keeps a margin from the frame.
      */
     cover_rect_t cover_area = border_rect;
 
     if (has_border) {
-        const float padding = select_border_padding(border);
-
-        if (cover_area.width > 2.0f * padding && cover_area.height > 2.0f * padding) {
-            cover_area.x += padding;
-            cover_area.y += padding;
-            cover_area.width -= 2.0f * padding;
-            cover_area.height -= 2.0f * padding;
-        }
+        cover_area = inset_rect(cover_area, g_border_padding);
     }
 
     const cover_rect_t cover_rect = fit_within(cover_area, cover_w, cover_h);
@@ -488,6 +555,30 @@ static obs_properties_t *source_get_properties(void *data) {
     obs_properties_add_path(p, BORDER_SQUARE_PROPERTY, "Square border", OBS_PATH_FILE, BORDER_FILE_FILTER, NULL);
     obs_properties_add_path(p, BORDER_PORTRAIT_PROPERTY, "Portrait border", OBS_PATH_FILE, BORDER_FILE_FILTER, NULL);
     obs_properties_add_path(p, BORDER_LANDSCAPE_PROPERTY, "Landscape border", OBS_PATH_FILE, BORDER_FILE_FILTER, NULL);
+    obs_properties_add_int_slider(p,
+                                  BORDER_WIDTH_PROPERTY,
+                                  "Border width (px)",
+                                  COVER_BORDER_PADDING_MIN,
+                                  COVER_BORDER_PADDING_MAX,
+                                  1);
+    obs_properties_add_int_slider(p,
+                                  BORDER_MARGIN_SQUARE_PROPERTY,
+                                  "Square frame margin (px)",
+                                  COVER_BORDER_MARGIN_MIN,
+                                  COVER_BORDER_MARGIN_MAX,
+                                  1);
+    obs_properties_add_int_slider(p,
+                                  BORDER_MARGIN_PORTRAIT_PROPERTY,
+                                  "Portrait frame margin (px)",
+                                  COVER_BORDER_MARGIN_MIN,
+                                  COVER_BORDER_MARGIN_MAX,
+                                  1);
+    obs_properties_add_int_slider(p,
+                                  BORDER_MARGIN_LANDSCAPE_PROPERTY,
+                                  "Landscape frame margin (px)",
+                                  COVER_BORDER_MARGIN_MIN,
+                                  COVER_BORDER_MARGIN_MAX,
+                                  1);
     return p;
 }
 
