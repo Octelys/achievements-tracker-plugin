@@ -35,13 +35,73 @@ mkdir -p "${BUILD_DIR}"
 mkdir -p "${FREETYPE_UNIVERSAL_DIR}"
 
 # Download FreeType source
-FREETYPE_URL="https://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.xz"
 FREETYPE_ARCHIVE="${BUILD_DIR}/freetype-${FREETYPE_VERSION}.tar.xz"
 FREETYPE_SRC="${BUILD_DIR}/freetype-${FREETYPE_VERSION}"
 
-if [[ ! -f "${FREETYPE_ARCHIVE}" ]]; then
+# Known-good SHA-256 checksums for the release tarballs, keyed by version. The
+# download is validated against this so a corrupt or truncated mirror response
+# (e.g. an HTML "502 Bad Gateway" page saved as .tar.xz) is rejected instead of
+# being handed to tar.
+typeset -A FREETYPE_SHA256
+FREETYPE_SHA256=(
+  2.13.2 12991c4e55c506dd7f9b765933e62fd2be2e06d421505d7950a132e4f1bb484d
+)
+
+# Release tarball mirrors, tried in order. Savannah is upstream's home but is
+# regularly flaky (intermittent 502s from its mirror redirects); SourceForge
+# carries the identical release files as a reliable fallback.
+FREETYPE_MIRRORS=(
+  "https://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.xz"
+  "https://downloads.sourceforge.net/project/freetype/freetype2/${FREETYPE_VERSION}/freetype-${FREETYPE_VERSION}.tar.xz"
+)
+
+# Validate an archive: checksum (when a known-good one exists for this version)
+# plus a structural test that xz/tar can actually read it.
+verify_archive() {
+  local archive="$1"
+
+  [[ -f "${archive}" ]] || return 1
+
+  local expected="${FREETYPE_SHA256[${FREETYPE_VERSION}]:-}"
+  if [[ -n "${expected}" ]]; then
+    local actual
+    actual="$(shasum -a 256 "${archive}" | awk '{ print $1 }')"
+    if [[ "${actual}" != "${expected}" ]]; then
+      print "  checksum mismatch (expected ${expected}, got ${actual})"
+      return 1
+    fi
+  fi
+
+  tar -tf "${archive}" > /dev/null 2>&1 || return 1
+  return 0
+}
+
+# (Re)download whenever there is no cached archive or the cached one fails
+# validation, so a previously-saved error page can never be reused.
+if [[ ! -f "${FREETYPE_ARCHIVE}" ]] || ! verify_archive "${FREETYPE_ARCHIVE}"; then
+  rm -f "${FREETYPE_ARCHIVE}"
   print "Downloading FreeType ${FREETYPE_VERSION}..."
-  curl -L -o "${FREETYPE_ARCHIVE}" "${FREETYPE_URL}"
+
+  downloaded=false
+  for url in "${FREETYPE_MIRRORS[@]}"; do
+    print "  trying ${url}"
+    # --fail turns HTTP 4xx/5xx into a non-zero exit (no error page written);
+    # --retry/--retry-all-errors ride out transient mirror failures; the
+    # timeouts stop a dead mirror from hanging the job.
+    if curl --fail --location --retry 3 --retry-all-errors \
+         --connect-timeout 30 --max-time 600 \
+         -o "${FREETYPE_ARCHIVE}" "${url}" && verify_archive "${FREETYPE_ARCHIVE}"; then
+      downloaded=true
+      break
+    fi
+    print "  mirror failed, trying next..."
+    rm -f "${FREETYPE_ARCHIVE}"
+  done
+
+  if [[ "${downloaded}" != true ]]; then
+    print -u2 "ERROR: could not download a valid FreeType ${FREETYPE_VERSION} archive from any mirror"
+    exit 1
+  fi
 fi
 
 # Extract source
