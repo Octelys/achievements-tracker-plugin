@@ -7,6 +7,7 @@
 
 #include "drawing/color.h"
 #include "diagnostics/log.h"
+#include "io/state.h"
 #include "sources/common/visibility_cycle.h"
 
 /**
@@ -245,6 +246,11 @@ text_source_t *text_source_create(obs_source_t *source, const char *name) {
     text_source->current_text       = NULL;
     text_source->pending_text       = bstrdup("");
 
+    /* Restore the auto-sized alignment box measured in a previous session so the
+     * source keeps a stable width (and honours its alignment) even before any
+     * text has been displayed this session. */
+    state_get_source_box(text_source->name, &text_source->box_width, &text_source->box_font_size);
+
     /* Sets transition state */
     text_source->transition.phase    = TEXT_TRANSITION_NONE;
     text_source->transition.opacity  = 1.0f;
@@ -287,6 +293,9 @@ void text_source_destroy(text_source_t *text_source) {
     }
 
     if (text_source->name) {
+        /* Persist the widest text seen so the alignment box is restored (rather
+         * than collapsing to zero) on the next OBS start. */
+        state_set_source_box(text_source->name, text_source->box_width, text_source->box_font_size);
         bfree(text_source->name);
         text_source->name = NULL;
     }

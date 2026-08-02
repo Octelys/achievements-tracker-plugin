@@ -109,6 +109,11 @@
 #define AUTO_VISIBILITY_SHARED_HIDE_DURATION "auto_visibility_shared_hide_duration"
 #define AUTO_VISIBILITY_SHARED_FADE_DURATION "auto_visibility_shared_fade_duration"
 
+/* Fallback font family used when a source has no font configured yet. FreeType
+ * cannot load an empty face (logs "Failed to load font" and renders nothing), so
+ * text sources would stay invisible on a fresh/unconfigured state without this. */
+#define DEFAULT_FONT_FACE "Helvetica"
+
 /**
  * @brief Global in-memory persisted state.
  *
@@ -406,6 +411,61 @@ char *state_get_device_code(void) {
     return bstrdup(device_code);
 }
 
+/**
+ * @brief Duplicate a persisted font face, substituting a default when it is empty.
+ *
+ * @param font_face Stored face (may be NULL or "" when never configured).
+ * @return Newly allocated face string (caller frees). Never empty.
+ */
+static char *dup_font_face(const char *font_face) {
+    return (font_face && *font_face) ? bstrdup(font_face) : bstrdup(DEFAULT_FONT_FACE);
+}
+
+void state_set_source_box(const char *source_name, uint32_t box_width, uint32_t box_font_size) {
+
+    if (!g_state || !source_name) {
+        return;
+    }
+
+    char width_key[256];
+    char font_size_key[256];
+    snprintf(width_key, sizeof(width_key), "source_box_width_%s", source_name);
+    snprintf(font_size_key, sizeof(font_size_key), "source_box_font_size_%s", source_name);
+
+    obs_data_set_int(g_state, width_key, box_width);
+    obs_data_set_int(g_state, font_size_key, box_font_size);
+
+    save_state(g_state);
+}
+
+void state_get_source_box(const char *source_name, uint32_t *box_width, uint32_t *box_font_size) {
+
+    if (box_width) {
+        *box_width = 0;
+    }
+
+    if (box_font_size) {
+        *box_font_size = 0;
+    }
+
+    if (!g_state || !source_name) {
+        return;
+    }
+
+    char width_key[256];
+    char font_size_key[256];
+    snprintf(width_key, sizeof(width_key), "source_box_width_%s", source_name);
+    snprintf(font_size_key, sizeof(font_size_key), "source_box_font_size_%s", source_name);
+
+    if (box_width) {
+        *box_width = (uint32_t)obs_data_get_int(g_state, width_key);
+    }
+
+    if (box_font_size) {
+        *box_font_size = (uint32_t)obs_data_get_int(g_state, font_size_key);
+    }
+}
+
 void state_set_gamerscore_configuration(const gamerscore_configuration_t *gamerscore_configuration) {
 
     if (!gamerscore_configuration) {
@@ -454,7 +514,7 @@ gamerscore_configuration_t *state_get_gamerscore_configuration() {
     gamerscore_configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
     gamerscore_configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
     gamerscore_configuration->font_size    = size == 0 ? 48 : size;
-    gamerscore_configuration->font_face    = bstrdup(font_face);
+    gamerscore_configuration->font_face    = dup_font_face(font_face);
     gamerscore_configuration->font_style   = bstrdup(font_style);
     gamerscore_configuration->text_align = (text_align_t)obs_data_get_int(g_state, GAMERSCORE_CONFIGURATION_TEXT_ALIGN);
     gamerscore_configuration->auto_visibility.enabled       = auto_visibility_enabled;
@@ -517,7 +577,7 @@ gamertag_configuration_t *state_get_gamertag_configuration() {
     configuration->top_color               = top_color == 0 ? 0xFFFFFFFF : top_color;
     configuration->bottom_color            = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
     configuration->font_size               = size == 0 ? 48 : size;
-    configuration->font_face               = bstrdup(font_face);
+    configuration->font_face               = dup_font_face(font_face);
     configuration->font_style              = bstrdup(font_style);
     configuration->text_align              = (text_align_t)obs_data_get_int(g_state, GAMERTAG_CONFIGURATION_TEXT_ALIGN);
     configuration->auto_visibility.enabled = auto_visibility_enabled;
@@ -581,7 +641,7 @@ game_name_configuration_t *state_get_game_name_configuration() {
     configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
     configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
     configuration->font_size    = size == 0 ? 48 : size;
-    configuration->font_face    = bstrdup(font_face);
+    configuration->font_face    = dup_font_face(font_face);
     configuration->font_style   = bstrdup(font_style);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
@@ -657,7 +717,7 @@ achievement_name_configuration_t *state_get_achievement_name_configuration() {
     configuration->inactive_top_color            = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
     configuration->inactive_bottom_color         = inactive_bottom_color == 0 ? 0x7F7F7FFF : inactive_bottom_color;
     configuration->font_size                     = size == 0 ? 12 : size;
-    configuration->font_face                     = bstrdup(font_face);
+    configuration->font_face                     = dup_font_face(font_face);
     configuration->font_style                    = bstrdup(font_style);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
@@ -740,7 +800,7 @@ achievement_description_configuration_t *state_get_achievement_description_confi
     configuration->inactive_top_color            = inactive_top_color == 0 ? 0x7F7F7FFF : inactive_top_color;
     configuration->inactive_bottom_color         = inactive_bottom_color == 0 ? 0x7F7F7FFF : inactive_bottom_color;
     configuration->font_size                     = size == 0 ? 12 : size;
-    configuration->font_face                     = bstrdup(font_face);
+    configuration->font_face                     = dup_font_face(font_face);
     configuration->font_style                    = bstrdup(font_style);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f
@@ -805,7 +865,7 @@ achievements_count_configuration_t *state_get_achievements_count_configuration()
     configuration->top_color    = top_color == 0 ? 0xFFFFFFFF : top_color;
     configuration->bottom_color = bottom_color == 0 ? 0xFFFFFFFF : bottom_color;
     configuration->font_size    = size == 0 ? 48 : size;
-    configuration->font_face    = bstrdup(font_face);
+    configuration->font_face    = dup_font_face(font_face);
     configuration->font_style   = bstrdup(font_style);
     configuration->auto_visibility.enabled       = auto_visibility_enabled;
     configuration->auto_visibility.show_duration = auto_visibility_show_duration > 0.0f

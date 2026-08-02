@@ -115,6 +115,33 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity);
 xbox_identity_t *state_get_xbox_identity(void);
 
 /**
+ * @brief Persist the auto-sized alignment box metrics for a text source.
+ *
+ * Text sources report the widest text they have seen (@p box_width) as their
+ * width so shorter text can be aligned within a stable footprint. Because this
+ * value is measured at runtime, it is saved here (keyed by @p source_name) so
+ * the box survives an OBS restart and does not collapse to zero before any text
+ * has been displayed.
+ *
+ * @param source_name   Unique source display name used as the storage key.
+ * @param box_width      Widest text width (px) seen so far.
+ * @param box_font_size  Font size the width was measured against.
+ */
+void state_set_source_box(const char *source_name, uint32_t box_width, uint32_t box_font_size);
+
+/**
+ * @brief Read the persisted alignment box metrics for a text source.
+ *
+ * Both out-params are set to 0 when nothing has been stored yet (the correct
+ * "no reference measured" default).
+ *
+ * @param source_name    Unique source display name used as the storage key.
+ * @param box_width       Out: widest text width (px) previously seen, or 0.
+ * @param box_font_size   Out: font size the width was measured against, or 0.
+ */
+void state_get_source_box(const char *source_name, uint32_t *box_width, uint32_t *box_font_size);
+
+/**
  * @brief Set the gamerscore source configuration.
  *
  * Stores the configuration for the gamerscore display source, including font path,

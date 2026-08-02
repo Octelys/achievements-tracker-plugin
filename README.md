@@ -152,6 +152,19 @@ Each text and image source exposes an **Auto show/hide** toggle in its propertie
 
 Each achievement source also exposes an **Auto show/hide** toggle in its properties panel (see [Auto Show/Hide Durations](#auto-showhide-durations) above).
 
+#### Text alignment
+
+Every text source exposes a **Text alignment** property (Left / Center / Right). Because
+each title can differ in length, the source keeps an auto-sized box as wide as the widest
+text it has seen (persisted across restarts so it does not collapse before the first title
+appears) and positions shorter text within that box according to this setting. Left
+reproduces the historical behaviour (text anchored to the source's left edge).
+
+> **Important:** this in-source alignment only works when the scene item is drawn at its
+> native size. Set the item's **Edit Transform → Bounding Box Type** to **No bounds**. With
+> any bounding box, OBS scales the source's reported width into that box and stretches the
+> text — use OBS's own **Positional Alignment** instead if you rely on a bounding box.
+
 #### Achievement display cycle
 
 The four achievement sources above all stay in sync via a shared display cycle. Once the game session is fully ready (all achievement icons cached locally), the cycle runs automatically:
@@ -369,26 +382,28 @@ build_macos_dev/Debug/achievements-tracker.plugin
 ```
 
 5. Install it. The easiest way is the helper script, which rebuilds and copies the
-   bundle into every install location in one step (removing any stale copy first):
+   bundle into the install location in one step (removing any stale copy first):
 
 ```bash
 ./install.sh
 ```
 
-   `install.sh` installs into **two** locations so both OBS builds stay in sync:
+   `install.sh` installs into a **single** location:
 
-   - `~/Library/Application Support/obs-studio/plugins/` — used by a Homebrew /
-     App Store OBS.
-   - The `Contents/PlugIns` directory of a source-built `OBS.app`. This defaults to
-     `.../obs-studio/build_macos/frontend/Debug/OBS.app/Contents/PlugIns` and is only
-     written when that directory already exists. Override the path if your OBS.app
-     lives elsewhere:
+   - `~/Library/Application Support/obs-studio/plugins/` — scanned by every OBS on
+     the machine, whether Homebrew / App Store **or** a source-built `OBS.app`.
 
-     ```bash
-     OBS_APP_PLUGIN_DIR="/path/to/OBS.app/Contents/PlugIns" ./install.sh
-     ```
+   > **Do not** also copy the plugin into a source-built `OBS.app`'s
+   > `Contents/PlugIns`. That OBS already scans `~/Library/.../plugins`, so a bundle
+   > copy would be loaded a **second time** by the same process
+   > (`obs_register_source: Source '...' already exists! Duplicate library?`). The two
+   > instances each start their own monitor thread and fight over the connection,
+   > which churns connected↔disconnected and blanks out every text source. To clean up
+   > a duplicate left by an older `install.sh`, run it again — it now removes the stale
+   > bundle copy at `OBS_APP_PLUGIN_DIR` (override that path if your `OBS.app` lives
+   > elsewhere).
 
-   To install manually into just the Homebrew/App Store location instead:
+   To install manually instead:
 
 ```bash
 cp -r build_macos_dev/Debug/achievements-tracker.plugin \
