@@ -181,6 +181,8 @@ independent border image pickers:
 | **Portrait border** | taller than wide (< ~0.87) |
 | **Landscape border** | wider than tall (> ~1.15) |
 
+![plugin-image-source-borders.png](images/plugin-image-source-borders.png)
+
 Each border is a local image file — typically a frame with a transparent centre. At
 render time the plugin measures the loaded cover, classifies it into one of the three
 buckets, draws the cover inset by the configured **Border width**, and overlays the
@@ -231,6 +233,9 @@ reproduces the historical behaviour (text anchored to the source's left edge).
 > native size. Set the item's **Edit Transform → Bounding Box Type** to **No bounds**. With
 > any bounding box, OBS scales the source's reported width into that box and stretches the
 > text — use OBS's own **Positional Alignment** instead if you rely on a bounding box.
+
+![plugin-text-source-alignment.png](images/plugin-text-source-alignment.png)
+
 
 #### Achievement display cycle
 
