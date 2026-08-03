@@ -136,6 +136,8 @@ typedef struct text_source_config {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } text_source_config_t;
 
 /**
@@ -157,6 +159,8 @@ typedef struct gamerscore_configuration {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } gamerscore_configuration_t;
 
 /**
@@ -178,6 +182,8 @@ typedef struct gamertag_configuration {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } gamertag_configuration_t;
 
 /**
@@ -199,6 +205,8 @@ typedef struct game_name_configuration {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } game_name_configuration_t;
 
 /**
@@ -224,6 +232,8 @@ typedef struct achievement_name_configuration {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } achievement_name_configuration_t;
 
 /**
@@ -249,6 +259,8 @@ typedef struct achievement_description_configuration {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } achievement_description_configuration_t;
 
 /**
@@ -269,6 +281,8 @@ typedef struct achievements_count_configuration {
     /** Horizontal alignment of the text within its auto-sized box. */
     text_align_t             text_align;
     auto_visibility_config_t auto_visibility;
+    /** Whether the drop shadow is rendered behind the text (independent of the outline). */
+    bool                     shadow_enabled;
 } achievements_count_configuration_t;
 
 /** Default seconds for the auto-visibility show phase (shared across all sources). */
