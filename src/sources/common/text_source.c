@@ -61,7 +61,7 @@ static void set_color_with_opacity(text_source_t *text_source, obs_data_t *setti
 
     // Enable outline, disable drop shadow
     obs_data_set_bool(settings, "outline", use_outline);
-    obs_data_set_bool(settings, "drop_shadow", use_outline);
+    obs_data_set_bool(settings, "drop_shadow", use_outline && config->shadow_enabled);
 }
 
 /**
@@ -460,6 +460,8 @@ void text_source_add_properties(obs_properties_t *props, bool supports_inactive_
         obs_properties_add_color(props, "text_inactive_bottom_color", "Inactive text color (Bottom)");
     }
 
+    obs_properties_add_bool(props, "text_shadow_enabled", "Text shadow");
+
     auto_visibility_add_toggle_property(props);
 }
 
@@ -517,6 +519,11 @@ void text_source_update_properties(obs_data_t *settings, text_source_config_t *c
             obs_data_release(font_obj);
             *must_reload = true;
         }
+    }
+
+    if (obs_data_has_user_value(settings, "text_shadow_enabled")) {
+        config->shadow_enabled = obs_data_get_bool(settings, "text_shadow_enabled");
+        *must_reload           = true;
     }
 
     if (auto_visibility_update_toggle(settings, &config->auto_visibility)) {
