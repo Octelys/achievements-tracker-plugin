@@ -26,7 +26,10 @@ bool twitch_is_stream_live(const char *user_id) {
     }
 
     char headers[1024];
-    snprintf(headers, sizeof(headers), "Authorization: Bearer %s\nClient-Id: %s\n", identity->token->value,
+    snprintf(headers,
+             sizeof(headers),
+             "Authorization: Bearer %s\nClient-Id: %s\n",
+             identity->token->value,
              TWITCH_CLIENT_ID);
 
     char url[512];
@@ -57,7 +60,7 @@ bool twitch_is_stream_live(const char *user_id) {
     }
 
     cJSON *data_node = cJSONUtils_GetPointer(json, "/data");
-    bool live = data_node && (data_node->type & 0xFF) == cJSON_Array && cJSON_GetArraySize(data_node) > 0;
+    bool   live      = data_node && (data_node->type & 0xFF) == cJSON_Array && cJSON_GetArraySize(data_node) > 0;
 
     free_json_memory((void **)&json);
 

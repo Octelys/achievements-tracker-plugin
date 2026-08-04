@@ -75,7 +75,10 @@ static bool fetch_twitch_user_profile(const char *access_token_value, char **out
                                       char **out_display_name) {
 
     char headers[1024];
-    snprintf(headers, sizeof(headers), "Authorization: Bearer %s\nClient-Id: %s\n", access_token_value,
+    snprintf(headers,
+             sizeof(headers),
+             "Authorization: Bearer %s\nClient-Id: %s\n",
+             access_token_value,
              TWITCH_CLIENT_ID);
 
     long  http_code = 0;
@@ -131,8 +134,8 @@ static bool complete_sign_in(const char *access_token_value, int64_t expires, co
         return false;
     }
 
-    token_t            token    = {.value = (char *)access_token_value, .expires = expires};
-    twitch_identity_t   identity = {
+    token_t           token    = {.value = (char *)access_token_value, .expires = expires};
+    twitch_identity_t identity = {
         .login         = login,
         .display_name  = display_name,
         .user_id       = user_id,
@@ -154,8 +157,7 @@ static bool complete_sign_in(const char *access_token_value, int64_t expires, co
 /**
  * @brief Persist refreshed tokens, keeping the previously-resolved profile fields.
  */
-static void persist_refreshed_tokens(const char *access_token_value, int64_t expires,
-                                     const char *refresh_token_value) {
+static void persist_refreshed_tokens(const char *access_token_value, int64_t expires, const char *refresh_token_value) {
 
     twitch_identity_t *existing = state_get_twitch_identity();
 
@@ -164,7 +166,7 @@ static void persist_refreshed_tokens(const char *access_token_value, int64_t exp
         return;
     }
 
-    token_t           token = {.value = (char *)access_token_value, .expires = expires};
+    token_t           token   = {.value = (char *)access_token_value, .expires = expires};
     twitch_identity_t updated = *existing;
     updated.token             = &token;
     updated.refresh_token     = (char *)refresh_token_value;
@@ -194,8 +196,12 @@ static bool refresh_twitch_token(void) {
     free_twitch_identity(&identity);
 
     char form_url_encoded[8192];
-    snprintf(form_url_encoded, sizeof(form_url_encoded), "client_id=%s&refresh_token=%s&grant_type=%s",
-             TWITCH_CLIENT_ID, encoded_refresh_token, GRANT_TYPE_REFRESH_TOKEN);
+    snprintf(form_url_encoded,
+             sizeof(form_url_encoded),
+             "client_id=%s&refresh_token=%s&grant_type=%s",
+             TWITCH_CLIENT_ID,
+             encoded_refresh_token,
+             GRANT_TYPE_REFRESH_TOKEN);
     free_memory((void **)&encoded_refresh_token);
 
     long  http_code = 0;
@@ -246,8 +252,12 @@ static bool refresh_twitch_token(void) {
 static void poll_for_token(twitch_authentication_ctx_t *ctx) {
 
     char form_url_encoded[8192];
-    snprintf(form_url_encoded, sizeof(form_url_encoded), "client_id=%s&device_code=%s&grant_type=%s",
-             TWITCH_CLIENT_ID, ctx->device_code, GRANT_TYPE_DEVICE_CODE);
+    snprintf(form_url_encoded,
+             sizeof(form_url_encoded),
+             "client_id=%s&device_code=%s&grant_type=%s",
+             TWITCH_CLIENT_ID,
+             ctx->device_code,
+             GRANT_TYPE_DEVICE_CODE);
 
     obs_log(LOG_INFO, "[TwitchAuth] Waiting for the user to validate the code");
 
@@ -285,8 +295,7 @@ static void poll_for_token(twitch_authentication_ctx_t *ctx) {
 
         if (access_token_node && refresh_token_node && expires_in_node) {
             int64_t expires = time(NULL) + expires_in_node->valueint;
-            succeeded        = complete_sign_in(access_token_node->valuestring, expires,
-                                          refresh_token_node->valuestring);
+            succeeded = complete_sign_in(access_token_node->valuestring, expires, refresh_token_node->valuestring);
             free_json_memory((void **)&json);
             break;
         }
@@ -328,11 +337,11 @@ static void *start_twitch_authentication_flow(void *param) {
     }
 
     {
-        cJSON *device_code_node       = cJSONUtils_GetPointer(json, "/device_code");
-        cJSON *user_code_node         = cJSONUtils_GetPointer(json, "/user_code");
-        cJSON *verification_uri_node  = cJSONUtils_GetPointer(json, "/verification_uri");
-        cJSON *interval_node          = cJSONUtils_GetPointer(json, "/interval");
-        cJSON *expires_in_node        = cJSONUtils_GetPointer(json, "/expires_in");
+        cJSON *device_code_node      = cJSONUtils_GetPointer(json, "/device_code");
+        cJSON *user_code_node        = cJSONUtils_GetPointer(json, "/user_code");
+        cJSON *verification_uri_node = cJSONUtils_GetPointer(json, "/verification_uri");
+        cJSON *interval_node         = cJSONUtils_GetPointer(json, "/interval");
+        cJSON *expires_in_node       = cJSONUtils_GetPointer(json, "/expires_in");
 
         if (!device_code_node || !user_code_node || !verification_uri_node || !interval_node || !expires_in_node) {
             obs_log(LOG_ERROR, "[TwitchAuth] Device code response missing expected fields");
@@ -345,13 +354,13 @@ static void *start_twitch_authentication_flow(void *param) {
         ctx->expires_in_seconds  = expires_in_node->valueint;
 
         if (ctx->on_code_ready) {
-            ctx->on_code_ready(user_code_node->valuestring, verification_uri_node->valuestring,
-                               ctx->on_completed_data);
+            ctx->on_code_ready(user_code_node->valuestring, verification_uri_node->valuestring, ctx->on_completed_data);
         }
 
         if (!open_url(verification_uri_node->valuestring)) {
-            obs_log(LOG_WARNING, "[TwitchAuth] Could not open the browser automatically; the user_code above is "
-                                 "still valid to enter manually.");
+            obs_log(LOG_WARNING,
+                    "[TwitchAuth] Could not open the browser automatically; the user_code above is "
+                    "still valid to enter manually.");
         }
     }
 

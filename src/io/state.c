@@ -1103,11 +1103,11 @@ void state_set_twitch_configuration(const twitch_configuration_t *configuration)
     obs_data_set_bool(g_state, TWITCH_CONFIGURATION_ONLY_WHEN_LIVE, configuration->only_when_live);
     obs_data_set_string(g_state, TWITCH_CONFIGURATION_MESSAGE_TEMPLATE, configuration->message_template);
     obs_data_set_string(g_state,
-                       TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE,
-                       configuration->game_announcement_template);
+                        TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE,
+                        configuration->game_announcement_template);
     obs_data_set_string(g_state,
-                       TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE,
-                       configuration->mastery_announcement_template);
+                        TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE,
+                        configuration->mastery_announcement_template);
     save_state(g_state);
 }
 
@@ -1121,13 +1121,13 @@ twitch_configuration_t *state_get_twitch_configuration(void) {
 
     twitch_configuration_t *configuration = bzalloc(sizeof(twitch_configuration_t));
 
-    configuration->enabled               = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ENABLED);
-    configuration->announce_game_changes = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_GAME_CHANGES);
-    configuration->announce_mastery      = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_MASTERY);
-    configuration->only_when_live        = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ONLY_WHEN_LIVE);
-    configuration->message_template      = (message_template && strlen(message_template) > 0)
-                                          ? bstrdup(message_template)
-                                          : bstrdup(TWITCH_DEFAULT_MESSAGE_TEMPLATE);
+    configuration->enabled                    = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ENABLED);
+    configuration->announce_game_changes      = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_GAME_CHANGES);
+    configuration->announce_mastery           = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_MASTERY);
+    configuration->only_when_live             = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ONLY_WHEN_LIVE);
+    configuration->message_template           = (message_template && strlen(message_template) > 0)
+                                                    ? bstrdup(message_template)
+                                                    : bstrdup(TWITCH_DEFAULT_MESSAGE_TEMPLATE);
     configuration->game_announcement_template = (game_announcement_template && strlen(game_announcement_template) > 0)
                                                     ? bstrdup(game_announcement_template)
                                                     : bstrdup(TWITCH_DEFAULT_GAME_ANNOUNCEMENT_TEMPLATE);

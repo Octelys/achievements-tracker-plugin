@@ -223,16 +223,16 @@ class TwitchAccountDialog final : public QDialog {
 
     void onSave() {
         twitch_configuration_t config;
-        config.enabled              = m_enabledCheck->isChecked();
+        config.enabled               = m_enabledCheck->isChecked();
         config.announce_game_changes = m_announceGameChangesCheck->isChecked();
-        config.announce_mastery     = m_announceMasteryCheck->isChecked();
-        config.only_when_live       = m_onlyWhenLiveCheck->isChecked();
+        config.announce_mastery      = m_announceMasteryCheck->isChecked();
+        config.only_when_live        = m_onlyWhenLiveCheck->isChecked();
 
-        QByteArray templateUtf8        = m_templateEdit->text().toUtf8();
-        QByteArray gameTemplateUtf8    = m_gameTemplateEdit->text().toUtf8();
-        QByteArray masteryTemplateUtf8 = m_masteryTemplateEdit->text().toUtf8();
-        config.message_template            = templateUtf8.data();
-        config.game_announcement_template  = gameTemplateUtf8.data();
+        QByteArray templateUtf8              = m_templateEdit->text().toUtf8();
+        QByteArray gameTemplateUtf8          = m_gameTemplateEdit->text().toUtf8();
+        QByteArray masteryTemplateUtf8       = m_masteryTemplateEdit->text().toUtf8();
+        config.message_template              = templateUtf8.data();
+        config.game_announcement_template    = gameTemplateUtf8.data();
         config.mastery_announcement_template = masteryTemplateUtf8.data();
 
         state_set_twitch_configuration(&config);

@@ -16,7 +16,10 @@ static void on_twitch_code_ready(const char *user_code, const char *verification
     UNUSED_PARAMETER(data);
 
     pthread_mutex_lock(&g_pending_code_mutex);
-    snprintf(g_pending_code_text, sizeof(g_pending_code_text), "Go to %s and enter code: %s", verification_uri,
+    snprintf(g_pending_code_text,
+             sizeof(g_pending_code_text),
+             "Go to %s and enter code: %s",
+             verification_uri,
              user_code);
     pthread_mutex_unlock(&g_pending_code_mutex);
 }
@@ -42,7 +45,7 @@ void twitch_account_sign_out(void) {
 }
 
 bool twitch_account_is_signed_in(void) {
-    twitch_identity_t *identity   = twitch_get_identity();
+    twitch_identity_t *identity  = twitch_get_identity();
     const bool         signed_in = identity != NULL;
     free_twitch_identity(&identity);
     return signed_in;

@@ -12,8 +12,9 @@ extern "C" {
  * @file twitch-oauth.h
  * @brief Twitch authentication flow entry point.
  *
- * Drives Twitch's OAuth 2.0 device code flow (https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow)
- * and returns the result via asynchronous callbacks.
+ * Drives Twitch's OAuth 2.0 device code flow
+ * (https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow) and returns the result via
+ * asynchronous callbacks.
  *
  * Unlike Xbox's device code flow, Twitch's verification page does not accept
  * an embedded code in the URL — the user must type the short user_code shown

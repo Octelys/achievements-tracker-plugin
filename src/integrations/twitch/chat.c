@@ -28,7 +28,7 @@
 #define MIN_SEND_INTERVAL_MS 1500
 
 static pthread_mutex_t g_rate_limit_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int64_t         g_last_send_time  = 0;
+static int64_t         g_last_send_time   = 0;
 
 /**
  * @brief Sleep off any remaining gap since the last send, then record this send's time.
@@ -62,14 +62,19 @@ static long send_message_once(const twitch_identity_t *identity, const char *mes
     cJSON_Delete(body);
 
     char headers[1024];
-    snprintf(headers, sizeof(headers), "Authorization: Bearer %s\nClient-Id: %s\n", identity->token->value,
+    snprintf(headers,
+             sizeof(headers),
+             "Authorization: Bearer %s\nClient-Id: %s\n",
+             identity->token->value,
              TWITCH_CLIENT_ID);
 
     long  http_code = 0;
     char *response  = http_post_json(TWITCH_CHAT_MESSAGES_ENDPOINT, json_body, headers, &http_code);
 
     if (http_code < 200 || http_code >= 300) {
-        obs_log(LOG_ERROR, "[TwitchChat] POST failed: HTTP %ld. Response: %s", http_code,
+        obs_log(LOG_ERROR,
+                "[TwitchChat] POST failed: HTTP %ld. Response: %s",
+                http_code,
                 response ? response : "(none)");
     }
 

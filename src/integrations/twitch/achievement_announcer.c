@@ -57,11 +57,11 @@ static char *replace_all(const char *input, const char *needle, const char *repl
 
     size_t replacement_len = strlen(replacement);
     /* Upper bound: ignores the needle bytes removed, which only overestimates. */
-    size_t out_size = strlen(input) + count * replacement_len + 1;
-    char  *out      = bzalloc(out_size);
+    size_t out_size        = strlen(input) + count * replacement_len + 1;
+    char  *out             = bzalloc(out_size);
 
     const char *cursor = input;
-    char       *write   = out;
+    char       *write  = out;
     while ((scan = strstr(cursor, needle)) != NULL) {
         size_t prefix_len = (size_t)(scan - cursor);
         memcpy(write, cursor, prefix_len);
@@ -84,7 +84,7 @@ static char *build_announcement_message(const char *message_template, const achi
     snprintf(value_str, sizeof(value_str), "%d", achievement->value);
 
     const identity_t *identity = monitoring_get_current_active_identity();
-    const char        *gamertag = (identity && identity->name) ? identity->name : "";
+    const char       *gamertag = (identity && identity->name) ? identity->name : "";
 
     char *step1 = replace_all(message_template, "{name}", achievement->name ? achievement->name : "");
     char *step2 = replace_all(step1, "{value}", value_str);
@@ -112,7 +112,7 @@ static void *post_announcement_thread(void *param) {
 
     if (ctx->only_when_live) {
         twitch_identity_t *identity = twitch_get_identity();
-        bool                live     = identity && twitch_is_stream_live(identity->user_id);
+        bool               live     = identity && twitch_is_stream_live(identity->user_id);
         free_twitch_identity(&identity);
 
         if (!live) {
@@ -170,7 +170,7 @@ static char *g_last_announced_game_id = NULL;
 static char *build_game_announcement_message(const char *message_template, const char *game_title) {
 
     const identity_t *identity = monitoring_get_current_active_identity();
-    const char        *gamertag = (identity && identity->name) ? identity->name : "";
+    const char       *gamertag = (identity && identity->name) ? identity->name : "";
 
     char *step1 = replace_all(message_template, "{game}", game_title ? game_title : "");
     char *step2 = replace_all(step1, "{gamertag}", gamertag);
