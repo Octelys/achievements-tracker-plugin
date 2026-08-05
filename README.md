@@ -12,6 +12,7 @@ A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements
 - [Developer Documentation](#developer-documentation)
   - [Repository Structure](#repository-structure)
   - [Authentication Sequence](#authentication-sequence)
+  - [Twitch Chat Announcements](#twitch-chat-announcements)
 - [Building from Source](#building-from-source)
   - [Prerequisites](#prerequisites)
   - [Dependency / linking notes](#dependency--linking-notes)
@@ -31,6 +32,7 @@ A cross-platform OBS Studio plugin that displays Xbox Live and RetroAchievements
 - **Global Xbox account configuration dialog** using Microsoft's device-code flow
 - **Real-time game and achievement tracking** through Xbox Live RTA monitoring when available
 - **RetroAchievements integration** via a local RetroArch WebSocket server for retro game tracking — requires the [Octelys custom build of RetroArch](https://github.com/Octelys/retro-arch/releases/latest)
+- **Twitch chat announcements** for achievement unlocks, game changes, and mastery, posted to your channel's chat once you sign in with Twitch
 - **Unified monitoring service** that handles both Xbox and RetroAchievements sessions with last-game-received priority
 - **Profile sources** for gamertag, gamerpic, and gamerscore
 - **Achievement sources** for name, description, icon, and progress count
@@ -104,6 +106,26 @@ All Xbox sources in the plugin share the same authenticated account. RetroAchiev
 > Available for **Windows (x64)**, **macOS**, and **Linux (x86_64)**.
 
 ![Xbox Account dialog](images/plugin-xbox-account.png)
+
+#### Twitch account sign-in
+
+1. Open OBS Studio.
+2. Open **Tools** → **Twitch Account**.
+3. Click **Sign in with Twitch**.
+4. A popup shows a verification URL and a code. Open the URL in a browser and enter the code to authorize the plugin.
+5. Once authorization completes, the dialog shows **Signed in as `<display name>`**.
+
+![plugin-twitch-announcer.png](images/plugin-twitch-announcer.png)
+
+The same dialog configures chat announcements. Each announcement type has its own enable checkbox and an editable message template:
+
+| Announcement | Posted when | Default template | Placeholders |
+| --- | --- | --- | --- |
+| Achievement | An achievement is unlocked | `🏆 Achievement unlocked: {name} ({value}G)` | `{name}`, `{value}`, `{gamertag}` |
+| Game change | The current game changes | `🎮 Now playing: {game}` | `{game}`, `{gamertag}` |
+| Mastery | The current game reaches 100% unlocked achievements | `🎉 {gamertag} just mastered {game} — 100% achievements unlocked!` | `{game}`, `{gamertag}` |
+
+An **Only when the channel is live** option restricts achievement announcements to times when the Twitch channel is currently streaming. Click **Save** to persist the configuration. Sign-out is available from the same dialog once connected.
 
 #### Achievement Tracker dialog
 
@@ -302,6 +324,12 @@ achievements-tracker-plugin/
 │   ├── integrations/
 │   │   ├── monitoring_service.{c,h}    # Unified event fan-out for all integrations
 │   │   ├── retro-achievements/         # RetroAchievements WebSocket monitor
+│   │   ├── twitch/                     # Twitch OAuth sign-in and chat announcements
+│   │   │   ├── account_manager.{c,h}   # Twitch account lifecycle
+│   │   │   ├── achievement_announcer.{c,h} # Posts unlock/game/mastery announcements
+│   │   │   ├── chat.{c,h}              # Helix chat message client
+│   │   │   ├── oauth/                  # Twitch device-code OAuth flow
+│   │   │   └── stream_status.{c,h}     # Live/offline status check
 │   │   └── xbox/
 │   │       ├── account_manager.{c,h}   # Xbox account lifecycle
 │   │       ├── contracts/              # Xbox-specific wire types (achievements, progress)
@@ -391,6 +419,16 @@ Authorization: XBL3.0 x=<uhs>;<xsts_token>
 ```
 
 Examples used by the plugin include profile, title art, presence, and achievement endpoints under `*.xboxlive.com`.
+
+### Twitch Chat Announcements
+
+The Twitch integration is separate from Xbox/RetroAchievements monitoring: it authenticates once via OAuth, then posts one-shot chat messages through the Twitch Helix REST API — there is no persistent connection or incoming-chat listener.
+
+1. **OAuth device-code flow** (`src/integrations/twitch/oauth/twitch-oauth.c`) — requests a device code from `https://id.twitch.tv/oauth2/token` with scope `user:write:chat`, opens the verification URL for the user, and polls until authorization completes. The access token, refresh token, and identity fields are persisted to the state file alongside the Xbox fields.
+2. **Sending announcements** (`src/integrations/twitch/chat.c`) — `twitch_send_chat_message()` POSTs to `https://api.twitch.tv/helix/chat/messages`, throttled client-side.
+3. **Triggering announcements** (`src/integrations/twitch/achievement_announcer.c`) — listens for achievement unlocks, game changes, and mastery events from the monitoring service and dispatches the corresponding templated message on a background thread, honoring the **Only when the channel is live** setting via `stream_status.c`.
+
+Because this is a write-only integration, it cannot currently react to messages posted in Twitch chat. Reading chat would require an additional `user:read:chat` scope and a new persistent EventSub WebSocket subscription (the Xbox and RetroAchievements monitors already use `libwebsockets` for their own persistent connections and are a template for this).
 
 ---
 
