@@ -504,7 +504,14 @@ target_sources(
     src/integrations/xbox/xbox_monitor.c
     src/integrations/monitoring_service.c
     src/integrations/retro-achievements/retro_achievements_monitor.c
+    src/integrations/twitch/entities/twitch_identity.c
+    src/integrations/twitch/oauth/twitch-oauth.c
+    src/integrations/twitch/chat.c
+    src/integrations/twitch/stream_status.c
+    src/integrations/twitch/account_manager.c
+    src/integrations/twitch/achievement_announcer.c
     src/ui/xbox_account_config.cpp
+    src/ui/twitch_account_config.cpp
     src/ui/achievement_tracker_config.cpp
     src/io/state.c
     src/io/cache.c

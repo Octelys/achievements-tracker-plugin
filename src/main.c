@@ -3,7 +3,9 @@
 
 #include "sources/common/achievement_cycle.h"
 #include "ui/xbox_account_config.h"
+#include "ui/twitch_account_config.h"
 #include "ui/achievement_tracker_config.h"
+#include "integrations/twitch/achievement_announcer.h"
 #include "sources/gamerpic.h"
 #include "sources/game_cover.h"
 #include "sources/gamerscore.h"
@@ -26,8 +28,10 @@ bool obs_module_load(void) {
     io_load();
 
     xbox_account_config_register();
+    twitch_account_config_register();
     achievement_tracker_config_register();
     monitoring_start();
+    twitch_achievement_announcer_start();
 
     xbox_gamerpic_source_register();
     game_cover_source_register();
@@ -64,6 +68,7 @@ bool obs_module_load(void) {
 
 void obs_module_unload(void) {
     xbox_account_config_unregister();
+    twitch_account_config_unregister();
     achievement_tracker_config_unregister();
 
     achievement_cycle_destroy();

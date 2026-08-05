@@ -115,6 +115,59 @@ void state_set_xbox_identity(const xbox_identity_t *xbox_identity);
 xbox_identity_t *state_get_xbox_identity(void);
 
 /**
+ * @brief Set the Twitch identity and OAuth tokens for the currently authenticated user.
+ *
+ * @param twitch_identity Identity object to store (may be NULL to clear).
+ */
+void state_set_twitch_identity(const twitch_identity_t *twitch_identity);
+
+/**
+ * @brief Get the currently stored Twitch identity information.
+ *
+ * @return Newly allocated identity (caller must free with free_twitch_identity()),
+ *         or NULL if none is set.
+ */
+twitch_identity_t *state_get_twitch_identity(void);
+
+/**
+ * @brief Clear the persisted Twitch identity/tokens only.
+ *
+ * Does not affect Xbox state (see state_clear()) — signing out of one platform
+ * must never affect the other.
+ */
+void state_clear_twitch_identity(void);
+
+/**
+ * @brief Persist the Twitch announcement configuration (enabled, only-when-live, message templates).
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_twitch_configuration(const twitch_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored Twitch announcement configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - enabled / announce_game_changes / announce_mastery / only_when_live: false
+ * - message_template: TWITCH_DEFAULT_MESSAGE_TEMPLATE
+ * - game_announcement_template: TWITCH_DEFAULT_GAME_ANNOUNCEMENT_TEMPLATE
+ * - mastery_announcement_template: TWITCH_DEFAULT_MASTERY_ANNOUNCEMENT_TEMPLATE
+ *
+ * @return Newly allocated configuration structure. Caller must free with
+ *         state_free_twitch_configuration().
+ */
+twitch_configuration_t *state_get_twitch_configuration(void);
+
+/**
+ * @brief Free a Twitch configuration structure and its owned template strings.
+ *
+ * Safe to call with NULL or with @c *config == NULL.
+ *
+ * @param[in,out] config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_twitch_configuration(twitch_configuration_t **config);
+
+/**
  * @brief Persist the auto-sized alignment box metrics for a text source.
  *
  * Text sources report the widest text they have seen (@p box_width) as their

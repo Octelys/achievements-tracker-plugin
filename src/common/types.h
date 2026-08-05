@@ -24,6 +24,7 @@
 #include "common/token.h"
 #include "integrations/xbox/entities/xbox_identity.h"
 #include "integrations/xbox/entities/xbox_session.h"
+#include "integrations/twitch/entities/twitch_identity.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -284,6 +285,41 @@ typedef struct achievements_count_configuration {
     /** Whether the drop shadow is rendered behind the text (independent of the outline). */
     bool                     shadow_enabled;
 } achievements_count_configuration_t;
+
+/** Default message template used to announce an achievement unlock in Twitch chat. */
+#define TWITCH_DEFAULT_MESSAGE_TEMPLATE "\xF0\x9F\x8F\x86 Achievement unlocked: {name} ({value}G)"
+
+/** Default message template used to announce a new game being played in Twitch chat. */
+#define TWITCH_DEFAULT_GAME_ANNOUNCEMENT_TEMPLATE "\xF0\x9F\x8E\xAE Now playing: {game}"
+
+/** Default message template used to announce a game being mastered (100% unlocked) in Twitch chat. */
+#define TWITCH_DEFAULT_MASTERY_ANNOUNCEMENT_TEMPLATE \
+    "\xF0\x9F\x8E\x89 {gamertag} just mastered {game} \xE2\x80\x94 100% achievements unlocked!"
+
+/**
+ * @brief Configuration for posting achievement-unlock, game-change, and mastery announcements to Twitch chat.
+ *
+ * Ownership:
+ * - @c message_template, @c game_announcement_template, and
+ *   @c mastery_announcement_template are owned by this structure and must be
+ *   freed with bfree().
+ */
+typedef struct twitch_configuration {
+    /** Whether achievement-unlock announcements are posted to Twitch chat at all. */
+    bool  enabled;
+    /** Whether a new game being played is announced to Twitch chat. Independent of @c enabled. */
+    bool  announce_game_changes;
+    /** Whether mastering a game (100% unlocked) is announced to Twitch chat. Independent of @c enabled. */
+    bool  announce_mastery;
+    /** When true, announcements are only posted while the channel is live. */
+    bool  only_when_live;
+    /** Message template supporting {name}, {value}, and {gamertag} placeholders. */
+    char *message_template;
+    /** Message template supporting {game} and {gamertag} placeholders. */
+    char *game_announcement_template;
+    /** Message template supporting {game} and {gamertag} placeholders. */
+    char *mastery_announcement_template;
+} twitch_configuration_t;
 
 /** Default seconds for the auto-visibility show phase (shared across all sources). */
 #define AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION 30.0f

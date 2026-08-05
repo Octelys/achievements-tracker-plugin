@@ -110,6 +110,21 @@
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_HIDE_DURATION "source_achievements_count_auto_visibility_hide_duration"
 #define ACHIEVEMENTS_COUNT_CONFIGURATION_AUTO_VISIBILITY_FADE_DURATION "source_achievements_count_auto_visibility_fade_duration"
 
+#define TWITCH_LOGIN                "twitch_login"
+#define TWITCH_DISPLAY_NAME         "twitch_display_name"
+#define TWITCH_USER_ID              "twitch_user_id"
+#define TWITCH_ACCESS_TOKEN         "twitch_access_token"
+#define TWITCH_ACCESS_TOKEN_EXPIRY  "twitch_access_token_expiry"
+#define TWITCH_REFRESH_TOKEN        "twitch_refresh_token"
+
+#define TWITCH_CONFIGURATION_ENABLED         "twitch_configuration_enabled"
+#define TWITCH_CONFIGURATION_ANNOUNCE_GAME_CHANGES "twitch_configuration_announce_game_changes"
+#define TWITCH_CONFIGURATION_ANNOUNCE_MASTERY "twitch_configuration_announce_mastery"
+#define TWITCH_CONFIGURATION_ONLY_WHEN_LIVE  "twitch_configuration_only_when_live"
+#define TWITCH_CONFIGURATION_MESSAGE_TEMPLATE "twitch_configuration_message_template"
+#define TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE "twitch_configuration_game_announcement_template"
+#define TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE "twitch_configuration_mastery_announcement_template"
+
 #define CYCLE_LAST_UNLOCKED_DURATION   "cycle_last_unlocked_duration"
 #define CYCLE_LOCKED_EACH_DURATION     "cycle_locked_each_duration"
 #define CYCLE_LOCKED_TOTAL_DURATION    "cycle_locked_total_duration"
@@ -1000,6 +1015,144 @@ xbox_identity_t *state_get_xbox_identity(void) {
     identity->token           = token;
 
     return identity;
+}
+
+void state_set_twitch_identity(const twitch_identity_t *twitch_identity) {
+
+    if (!twitch_identity) {
+        return;
+    }
+
+    obs_data_set_string(g_state, TWITCH_LOGIN, twitch_identity->login);
+    obs_data_set_string(g_state, TWITCH_DISPLAY_NAME, twitch_identity->display_name);
+    obs_data_set_string(g_state, TWITCH_USER_ID, twitch_identity->user_id);
+    obs_data_set_string(g_state, TWITCH_ACCESS_TOKEN, twitch_identity->token->value);
+    obs_data_set_int(g_state, TWITCH_ACCESS_TOKEN_EXPIRY, twitch_identity->token->expires);
+    obs_data_set_string(g_state, TWITCH_REFRESH_TOKEN, twitch_identity->refresh_token);
+    save_state(g_state);
+}
+
+twitch_identity_t *state_get_twitch_identity(void) {
+
+    const char *login = obs_data_get_string(g_state, TWITCH_LOGIN);
+
+    if (!login || strlen(login) == 0) {
+        obs_log(LOG_INFO, "No Twitch login found in the cache");
+        return NULL;
+    }
+
+    const char *user_id = obs_data_get_string(g_state, TWITCH_USER_ID);
+
+    if (!user_id || strlen(user_id) == 0) {
+        obs_log(LOG_INFO, "No Twitch user id found in the cache");
+        return NULL;
+    }
+
+    const char *access_token = obs_data_get_string(g_state, TWITCH_ACCESS_TOKEN);
+
+    if (!access_token || strlen(access_token) == 0) {
+        obs_log(LOG_INFO, "No Twitch access token found in the cache");
+        return NULL;
+    }
+
+    int64_t access_token_expiry = (int64_t)obs_data_get_int(g_state, TWITCH_ACCESS_TOKEN_EXPIRY);
+
+    if (access_token_expiry == 0) {
+        obs_log(LOG_INFO, "No Twitch access token expiry found in the cache");
+        return NULL;
+    }
+
+    const char *refresh_token = obs_data_get_string(g_state, TWITCH_REFRESH_TOKEN);
+    const char *display_name  = obs_data_get_string(g_state, TWITCH_DISPLAY_NAME);
+
+    obs_log(LOG_DEBUG, "Twitch identity found in the cache: %s (%s)", login, user_id);
+
+    token_t *token = bzalloc(sizeof(token_t));
+    token->value   = bstrdup(access_token);
+    token->expires = access_token_expiry;
+
+    twitch_identity_t *identity = bzalloc(sizeof(twitch_identity_t));
+    identity->login             = bstrdup(login);
+    identity->display_name      = bstrdup(display_name);
+    identity->user_id           = bstrdup(user_id);
+    identity->token             = token;
+    identity->refresh_token     = bstrdup(refresh_token);
+
+    return identity;
+}
+
+void state_clear_twitch_identity(void) {
+    obs_data_set_string(g_state, TWITCH_LOGIN, "");
+    obs_data_set_string(g_state, TWITCH_DISPLAY_NAME, "");
+    obs_data_set_string(g_state, TWITCH_USER_ID, "");
+    obs_data_set_string(g_state, TWITCH_ACCESS_TOKEN, "");
+    obs_data_set_int(g_state, TWITCH_ACCESS_TOKEN_EXPIRY, 0);
+    obs_data_set_string(g_state, TWITCH_REFRESH_TOKEN, "");
+    save_state(g_state);
+}
+
+void state_set_twitch_configuration(const twitch_configuration_t *configuration) {
+
+    if (!configuration) {
+        return;
+    }
+
+    obs_data_set_bool(g_state, TWITCH_CONFIGURATION_ENABLED, configuration->enabled);
+    obs_data_set_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_GAME_CHANGES, configuration->announce_game_changes);
+    obs_data_set_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_MASTERY, configuration->announce_mastery);
+    obs_data_set_bool(g_state, TWITCH_CONFIGURATION_ONLY_WHEN_LIVE, configuration->only_when_live);
+    obs_data_set_string(g_state, TWITCH_CONFIGURATION_MESSAGE_TEMPLATE, configuration->message_template);
+    obs_data_set_string(g_state,
+                        TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE,
+                        configuration->game_announcement_template);
+    obs_data_set_string(g_state,
+                        TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE,
+                        configuration->mastery_announcement_template);
+    save_state(g_state);
+}
+
+twitch_configuration_t *state_get_twitch_configuration(void) {
+
+    const char *message_template = obs_data_get_string(g_state, TWITCH_CONFIGURATION_MESSAGE_TEMPLATE);
+    const char *game_announcement_template =
+        obs_data_get_string(g_state, TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE);
+    const char *mastery_announcement_template =
+        obs_data_get_string(g_state, TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE);
+
+    twitch_configuration_t *configuration = bzalloc(sizeof(twitch_configuration_t));
+
+    configuration->enabled                    = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ENABLED);
+    configuration->announce_game_changes      = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_GAME_CHANGES);
+    configuration->announce_mastery           = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_MASTERY);
+    configuration->only_when_live             = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ONLY_WHEN_LIVE);
+    configuration->message_template           = (message_template && strlen(message_template) > 0)
+                                                    ? bstrdup(message_template)
+                                                    : bstrdup(TWITCH_DEFAULT_MESSAGE_TEMPLATE);
+    configuration->game_announcement_template = (game_announcement_template && strlen(game_announcement_template) > 0)
+                                                    ? bstrdup(game_announcement_template)
+                                                    : bstrdup(TWITCH_DEFAULT_GAME_ANNOUNCEMENT_TEMPLATE);
+    configuration->mastery_announcement_template =
+        (mastery_announcement_template && strlen(mastery_announcement_template) > 0)
+            ? bstrdup(mastery_announcement_template)
+            : bstrdup(TWITCH_DEFAULT_MASTERY_ANNOUNCEMENT_TEMPLATE);
+
+    return configuration;
+}
+
+void state_free_twitch_configuration(twitch_configuration_t **config) {
+
+    if (!config || !*config) {
+        return;
+    }
+
+    twitch_configuration_t *current = *config;
+
+    free_memory((void **)&current->message_template);
+    free_memory((void **)&current->game_announcement_template);
+    free_memory((void **)&current->mastery_announcement_template);
+
+    bfree(current);
+    *config = NULL;
 }
 
 void state_free_gamerscore_configuration(gamerscore_configuration_t **config) {
