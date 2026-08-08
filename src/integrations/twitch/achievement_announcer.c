@@ -391,7 +391,7 @@ static void on_achievements_changed(void) {
 
         if (node->unlocked_timestamp == 0 && node->measured_progress && node->measured_progress[0] != '\0') {
             const char *previous_progress = previous_measured_progress(node->id);
-            if (previous_progress && strcmp(previous_progress, node->measured_progress) != 0) {
+            if (!previous_progress || strcmp(previous_progress, node->measured_progress) != 0) {
                 announce_progress(node);
             }
         }
