@@ -148,10 +148,11 @@ void state_set_twitch_configuration(const twitch_configuration_t *configuration)
  * @brief Get the currently stored Twitch announcement configuration.
  *
  * Retrieves the configuration with default values if none has been set:
- * - enabled / announce_game_changes / announce_mastery / only_when_live: false
+ * - enabled / announce_game_changes / announce_mastery / announce_progress / only_when_live: false
  * - message_template: TWITCH_DEFAULT_MESSAGE_TEMPLATE
  * - game_announcement_template: TWITCH_DEFAULT_GAME_ANNOUNCEMENT_TEMPLATE
  * - mastery_announcement_template: TWITCH_DEFAULT_MASTERY_ANNOUNCEMENT_TEMPLATE
+ * - progress_announcement_template: TWITCH_DEFAULT_PROGRESS_ANNOUNCEMENT_TEMPLATE
  *
  * @return Newly allocated configuration structure. Caller must free with
  *         state_free_twitch_configuration().

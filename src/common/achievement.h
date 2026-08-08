@@ -61,7 +61,10 @@ typedef struct achievement {
     /**
      * Progress string for measured achievements (e.g. "5/10").
      *
-     * NULL when not applicable (Xbox achievements or non-measured retro ones).
+     * Populated for RetroAchievements' measured achievements and for Xbox
+     * achievements that report a non-zero current/target progression. NULL
+     * when not applicable (non-measured retro achievements, or an Xbox
+     * achievement whose progression hasn't moved off zero yet).
      */
     char                *measured_progress;
     /** Which integration produced this achievement. */

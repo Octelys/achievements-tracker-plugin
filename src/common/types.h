@@ -296,6 +296,9 @@ typedef struct achievements_count_configuration {
 #define TWITCH_DEFAULT_MASTERY_ANNOUNCEMENT_TEMPLATE \
     "\xF0\x9F\x8E\x89 {gamertag} just mastered {game} \xE2\x80\x94 100% achievements unlocked!"
 
+/** Default message template used to announce achievement progress in Twitch chat. */
+#define TWITCH_DEFAULT_PROGRESS_ANNOUNCEMENT_TEMPLATE "\xE2\x8F\xB3 {name}: {progress}"
+
 /**
  * @brief Configuration for posting achievement-unlock, game-change, and mastery announcements to Twitch chat.
  *
@@ -319,6 +322,11 @@ typedef struct twitch_configuration {
     char *game_announcement_template;
     /** Message template supporting {game} and {gamertag} placeholders. */
     char *mastery_announcement_template;
+    /** Whether achievement progress updates (measured achievements) are announced to Twitch chat. Independent of @c
+     * enabled. */
+    bool  announce_progress;
+    /** Message template supporting {name}, {progress}, and {gamertag} placeholders. */
+    char *progress_announcement_template;
 } twitch_configuration_t;
 
 /** Default seconds for the auto-visibility show phase (shared across all sources). */
