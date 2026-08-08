@@ -344,6 +344,7 @@ static void on_xbox_achievements_progressed(const gamerscore_t                *g
                         a->measured_progress = bstrdup(measured);
                     }
                     achievement_cycle_refresh_current();
+                    notify_achievements_changed();
                 }
                 break;
             }
