@@ -286,6 +286,68 @@ static bool was_previously_unlocked(const char *id) {
 }
 
 /**
+ * @brief Find the previously-recorded measured_progress string for an achievement id.
+ *
+ * @return The previous progress string, or NULL if the achievement wasn't in the
+ *         baseline snapshot or had no measured progress at that point.
+ */
+static const char *previous_measured_progress(const char *id) {
+    for (const achievement_t *node = g_previous_snapshot; node; node = node->next) {
+        if (node->id && id && strcmp(node->id, id) == 0) {
+            return node->measured_progress;
+        }
+    }
+    return NULL;
+}
+
+/**
+ * @brief Build an announcement from a template supporting {name}, {progress}, and {gamertag}.
+ */
+static char *build_progress_announcement_message(const char *message_template, const achievement_t *achievement) {
+
+    const identity_t *identity = monitoring_get_current_active_identity();
+    const char       *gamertag = (identity && identity->name) ? identity->name : "";
+
+    char *step1 = replace_all(message_template, "{name}", achievement->name ? achievement->name : "");
+    char *step2 =
+        replace_all(step1, "{progress}", achievement->measured_progress ? achievement->measured_progress : "");
+    bfree(step1);
+    char *step3 = replace_all(step2, "{gamertag}", gamertag);
+    bfree(step2);
+
+    return step3;
+}
+
+/**
+ * @brief Build the message for an achievement's progress update and spawn the posting thread.
+ */
+static void announce_progress(const achievement_t *achievement) {
+
+    twitch_configuration_t *config = state_get_twitch_configuration();
+
+    if (!config->announce_progress) {
+        state_free_twitch_configuration(&config);
+        return;
+    }
+
+    announce_ctx_t *ctx = bzalloc(sizeof(announce_ctx_t));
+    ctx->message        = build_progress_announcement_message(config->progress_announcement_template, achievement);
+    ctx->only_when_live = config->only_when_live;
+
+    state_free_twitch_configuration(&config);
+
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, post_announcement_thread, ctx) != 0) {
+        obs_log(LOG_ERROR, "[TwitchAnnouncer] Unable to start the posting thread");
+        bfree(ctx->message);
+        bfree(ctx);
+        return;
+    }
+
+    pthread_detach(thread);
+}
+
+/**
  * @brief Capture the baseline once the *real* achievement list has fully loaded.
  *
  * Fires after the achievements-changed event that carried the final list (see
@@ -324,6 +386,14 @@ static void on_achievements_changed(void) {
     for (const achievement_t *node = current; node; node = node->next) {
         if (node->unlocked_timestamp != 0 && !was_previously_unlocked(node->id)) {
             announce_unlock(node);
+            continue;
+        }
+
+        if (node->unlocked_timestamp == 0 && node->measured_progress && node->measured_progress[0] != '\0') {
+            const char *previous_progress = previous_measured_progress(node->id);
+            if (previous_progress && strcmp(previous_progress, node->measured_progress) != 0) {
+                announce_progress(node);
+            }
         }
     }
 

@@ -6,13 +6,14 @@ extern "C" {
 
 /**
  * @file achievement_announcer.h
- * @brief Announces newly-unlocked achievements to Twitch chat.
+ * @brief Announces achievement unlocks and progress updates to Twitch chat.
  *
  * Subscribes to the monitoring service and diffs the achievement list to
- * detect specific unlocks (the monitoring service's own achievements-changed
- * signal carries no payload). A per-game baseline is established on first
- * sight of a game's achievement list so a game's *history* is never announced
- * — only unlocks that happen after that baseline.
+ * detect specific unlocks and measured-progress changes (the monitoring
+ * service's own achievements-changed signal carries no payload). A per-game
+ * baseline is established on first sight of a game's achievement list so a
+ * game's *history* is never announced — only unlocks/progress that happen
+ * after that baseline.
  */
 
 /**

@@ -41,10 +41,12 @@ class TwitchAccountDialog final : public QDialog {
           m_gameTemplateEdit(new QLineEdit(this)),
           m_announceMasteryCheck(new QCheckBox(this)),
           m_masteryTemplateEdit(new QLineEdit(this)),
+          m_announceProgressCheck(new QCheckBox(this)),
+          m_progressTemplateEdit(new QLineEdit(this)),
           m_refreshTimer(new QTimer(this)) {
         setWindowTitle("Twitch Account");
         setModal(false);
-        setMinimumWidth(460);
+        setMinimumWidth(620);
 
         auto *rootLayout = new QVBoxLayout(this);
         auto *formLayout = new QFormLayout();
@@ -97,7 +99,7 @@ class TwitchAccountDialog final : public QDialog {
         settingsForm->addRow(m_enabledCheck);
         settingsForm->addRow(m_onlyWhenLiveCheck);
         settingsForm->addRow("Message template", m_templateEdit);
-        settingsForm->addRow(QString(), templateHelp);
+        settingsForm->addRow(templateHelp);
 
         rootLayout->addSpacing(8);
         rootLayout->addWidget(settingsLabel);
@@ -121,7 +123,7 @@ class TwitchAccountDialog final : public QDialog {
 
         gameForm->addRow(m_announceGameChangesCheck);
         gameForm->addRow("Message template", m_gameTemplateEdit);
-        gameForm->addRow(QString(), gameTemplateHelp);
+        gameForm->addRow(gameTemplateHelp);
 
         rootLayout->addSpacing(8);
         rootLayout->addWidget(gameLabel);
@@ -145,12 +147,36 @@ class TwitchAccountDialog final : public QDialog {
 
         masteryForm->addRow(m_announceMasteryCheck);
         masteryForm->addRow("Message template", m_masteryTemplateEdit);
-        masteryForm->addRow(QString(), masteryTemplateHelp);
+        masteryForm->addRow(masteryTemplateHelp);
 
         rootLayout->addSpacing(8);
         rootLayout->addWidget(masteryLabel);
         rootLayout->addSpacing(4);
         rootLayout->addLayout(masteryForm);
+
+        // ---- Progress announcements ---------------------------------------------
+        auto *progressLabel = new QLabel("<b>Progress Announcements</b>", this);
+
+        auto *progressForm = new QFormLayout();
+        progressForm->setLabelAlignment(Qt::AlignLeft);
+        progressForm->setVerticalSpacing(6);
+        progressForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+
+        m_announceProgressCheck->setText("Announce achievement progress to Twitch chat");
+        m_progressTemplateEdit->setToolTip("Supports {name}, {progress}, and {gamertag} placeholders.");
+
+        auto *progressTemplateHelp = new QLabel(this);
+        progressTemplateHelp->setWordWrap(true);
+        progressTemplateHelp->setText("Placeholders: {name}, {progress}, {gamertag}");
+
+        progressForm->addRow(m_announceProgressCheck);
+        progressForm->addRow("Message template", m_progressTemplateEdit);
+        progressForm->addRow(progressTemplateHelp);
+
+        rootLayout->addSpacing(8);
+        rootLayout->addWidget(progressLabel);
+        rootLayout->addSpacing(4);
+        rootLayout->addLayout(progressForm);
 
         // ---- Buttons -----------------------------------------------------------
         auto *buttonBox = new QDialogButtonBox(this);
@@ -186,6 +212,8 @@ class TwitchAccountDialog final : public QDialog {
         m_gameTemplateEdit->setText(QString::fromUtf8(config->game_announcement_template));
         m_announceMasteryCheck->setChecked(config->announce_mastery);
         m_masteryTemplateEdit->setText(QString::fromUtf8(config->mastery_announcement_template));
+        m_announceProgressCheck->setChecked(config->announce_progress);
+        m_progressTemplateEdit->setText(QString::fromUtf8(config->progress_announcement_template));
 
         state_free_twitch_configuration(&config);
     }
@@ -226,23 +254,27 @@ class TwitchAccountDialog final : public QDialog {
         config.enabled               = m_enabledCheck->isChecked();
         config.announce_game_changes = m_announceGameChangesCheck->isChecked();
         config.announce_mastery      = m_announceMasteryCheck->isChecked();
+        config.announce_progress     = m_announceProgressCheck->isChecked();
         config.only_when_live        = m_onlyWhenLiveCheck->isChecked();
 
-        QByteArray templateUtf8              = m_templateEdit->text().toUtf8();
-        QByteArray gameTemplateUtf8          = m_gameTemplateEdit->text().toUtf8();
-        QByteArray masteryTemplateUtf8       = m_masteryTemplateEdit->text().toUtf8();
-        config.message_template              = templateUtf8.data();
-        config.game_announcement_template    = gameTemplateUtf8.data();
-        config.mastery_announcement_template = masteryTemplateUtf8.data();
+        QByteArray templateUtf8               = m_templateEdit->text().toUtf8();
+        QByteArray gameTemplateUtf8           = m_gameTemplateEdit->text().toUtf8();
+        QByteArray masteryTemplateUtf8        = m_masteryTemplateEdit->text().toUtf8();
+        QByteArray progressTemplateUtf8       = m_progressTemplateEdit->text().toUtf8();
+        config.message_template               = templateUtf8.data();
+        config.game_announcement_template     = gameTemplateUtf8.data();
+        config.mastery_announcement_template  = masteryTemplateUtf8.data();
+        config.progress_announcement_template = progressTemplateUtf8.data();
 
         state_set_twitch_configuration(&config);
 
         obs_log(LOG_INFO,
                 "Twitch Account: configuration saved (enabled=%s, announce_game_changes=%s, announce_mastery=%s, "
-                "only_when_live=%s)",
+                "announce_progress=%s, only_when_live=%s)",
                 config.enabled ? "true" : "false",
                 config.announce_game_changes ? "true" : "false",
                 config.announce_mastery ? "true" : "false",
+                config.announce_progress ? "true" : "false",
                 config.only_when_live ? "true" : "false");
     }
 
@@ -257,6 +289,8 @@ class TwitchAccountDialog final : public QDialog {
     QLineEdit   *m_gameTemplateEdit;
     QCheckBox   *m_announceMasteryCheck;
     QLineEdit   *m_masteryTemplateEdit;
+    QCheckBox   *m_announceProgressCheck;
+    QLineEdit   *m_progressTemplateEdit;
     QPushButton *m_saveButton;
     QTimer      *m_refreshTimer;
 };

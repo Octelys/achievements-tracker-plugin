@@ -124,6 +124,8 @@
 #define TWITCH_CONFIGURATION_MESSAGE_TEMPLATE "twitch_configuration_message_template"
 #define TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE "twitch_configuration_game_announcement_template"
 #define TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE "twitch_configuration_mastery_announcement_template"
+#define TWITCH_CONFIGURATION_ANNOUNCE_PROGRESS "twitch_configuration_announce_progress"
+#define TWITCH_CONFIGURATION_PROGRESS_ANNOUNCEMENT_TEMPLATE "twitch_configuration_progress_announcement_template"
 
 #define CYCLE_LAST_UNLOCKED_DURATION   "cycle_last_unlocked_duration"
 #define CYCLE_LOCKED_EACH_DURATION     "cycle_locked_each_duration"
@@ -1108,6 +1110,10 @@ void state_set_twitch_configuration(const twitch_configuration_t *configuration)
     obs_data_set_string(g_state,
                         TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE,
                         configuration->mastery_announcement_template);
+    obs_data_set_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_PROGRESS, configuration->announce_progress);
+    obs_data_set_string(g_state,
+                        TWITCH_CONFIGURATION_PROGRESS_ANNOUNCEMENT_TEMPLATE,
+                        configuration->progress_announcement_template);
     save_state(g_state);
 }
 
@@ -1118,6 +1124,8 @@ twitch_configuration_t *state_get_twitch_configuration(void) {
         obs_data_get_string(g_state, TWITCH_CONFIGURATION_GAME_ANNOUNCEMENT_TEMPLATE);
     const char *mastery_announcement_template =
         obs_data_get_string(g_state, TWITCH_CONFIGURATION_MASTERY_ANNOUNCEMENT_TEMPLATE);
+    const char *progress_announcement_template =
+        obs_data_get_string(g_state, TWITCH_CONFIGURATION_PROGRESS_ANNOUNCEMENT_TEMPLATE);
 
     twitch_configuration_t *configuration = bzalloc(sizeof(twitch_configuration_t));
 
@@ -1135,6 +1143,11 @@ twitch_configuration_t *state_get_twitch_configuration(void) {
         (mastery_announcement_template && strlen(mastery_announcement_template) > 0)
             ? bstrdup(mastery_announcement_template)
             : bstrdup(TWITCH_DEFAULT_MASTERY_ANNOUNCEMENT_TEMPLATE);
+    configuration->announce_progress = obs_data_get_bool(g_state, TWITCH_CONFIGURATION_ANNOUNCE_PROGRESS);
+    configuration->progress_announcement_template =
+        (progress_announcement_template && strlen(progress_announcement_template) > 0)
+            ? bstrdup(progress_announcement_template)
+            : bstrdup(TWITCH_DEFAULT_PROGRESS_ANNOUNCEMENT_TEMPLATE);
 
     return configuration;
 }
@@ -1150,6 +1163,7 @@ void state_free_twitch_configuration(twitch_configuration_t **config) {
     free_memory((void **)&current->message_template);
     free_memory((void **)&current->game_announcement_template);
     free_memory((void **)&current->mastery_announcement_template);
+    free_memory((void **)&current->progress_announcement_template);
 
     bfree(current);
     *config = NULL;
