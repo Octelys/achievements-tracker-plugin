@@ -127,6 +127,12 @@
 #define TWITCH_CONFIGURATION_ANNOUNCE_PROGRESS "twitch_configuration_announce_progress"
 #define TWITCH_CONFIGURATION_PROGRESS_ANNOUNCEMENT_TEMPLATE "twitch_configuration_progress_announcement_template"
 
+#define SPEECH_TO_TEXT_CONFIGURATION_ENABLED         "speech_to_text_configuration_enabled"
+#define SPEECH_TO_TEXT_CONFIGURATION_ONLY_WHEN_LIVE  "speech_to_text_configuration_only_when_live"
+#define SPEECH_TO_TEXT_CONFIGURATION_AUDIO_SOURCE_NAME "speech_to_text_configuration_audio_source_name"
+#define SPEECH_TO_TEXT_CONFIGURATION_SILENCE_DURATION_MS "speech_to_text_configuration_silence_duration_ms"
+#define SPEECH_TO_TEXT_CONFIGURATION_MESSAGE_TEMPLATE "speech_to_text_configuration_message_template"
+
 #define CYCLE_LAST_UNLOCKED_DURATION   "cycle_last_unlocked_duration"
 #define CYCLE_LOCKED_EACH_DURATION     "cycle_locked_each_duration"
 #define CYCLE_LOCKED_TOTAL_DURATION    "cycle_locked_total_duration"
@@ -1164,6 +1170,55 @@ void state_free_twitch_configuration(twitch_configuration_t **config) {
     free_memory((void **)&current->game_announcement_template);
     free_memory((void **)&current->mastery_announcement_template);
     free_memory((void **)&current->progress_announcement_template);
+
+    bfree(current);
+    *config = NULL;
+}
+
+void state_set_speech_to_text_configuration(const speech_to_text_configuration_t *configuration) {
+
+    if (!configuration) {
+        return;
+    }
+
+    obs_data_set_bool(g_state, SPEECH_TO_TEXT_CONFIGURATION_ENABLED, configuration->enabled);
+    obs_data_set_bool(g_state, SPEECH_TO_TEXT_CONFIGURATION_ONLY_WHEN_LIVE, configuration->only_when_live);
+    obs_data_set_string(g_state, SPEECH_TO_TEXT_CONFIGURATION_AUDIO_SOURCE_NAME, configuration->audio_source_name);
+    obs_data_set_int(g_state, SPEECH_TO_TEXT_CONFIGURATION_SILENCE_DURATION_MS, configuration->silence_duration_ms);
+    obs_data_set_string(g_state, SPEECH_TO_TEXT_CONFIGURATION_MESSAGE_TEMPLATE, configuration->message_template);
+    save_state(g_state);
+}
+
+speech_to_text_configuration_t *state_get_speech_to_text_configuration(void) {
+
+    const char *audio_source_name = obs_data_get_string(g_state, SPEECH_TO_TEXT_CONFIGURATION_AUDIO_SOURCE_NAME);
+    const char *message_template  = obs_data_get_string(g_state, SPEECH_TO_TEXT_CONFIGURATION_MESSAGE_TEMPLATE);
+    long long   silence_duration  = obs_data_get_int(g_state, SPEECH_TO_TEXT_CONFIGURATION_SILENCE_DURATION_MS);
+
+    speech_to_text_configuration_t *configuration = bzalloc(sizeof(speech_to_text_configuration_t));
+
+    configuration->enabled            = obs_data_get_bool(g_state, SPEECH_TO_TEXT_CONFIGURATION_ENABLED);
+    configuration->only_when_live     = obs_data_get_bool(g_state, SPEECH_TO_TEXT_CONFIGURATION_ONLY_WHEN_LIVE);
+    configuration->audio_source_name  = bstrdup(audio_source_name ? audio_source_name : "");
+    configuration->silence_duration_ms = (silence_duration > 0) ? (int)silence_duration
+                                                                 : SPEECH_TO_TEXT_DEFAULT_SILENCE_DURATION_MS;
+    configuration->message_template   = (message_template && strlen(message_template) > 0)
+                                             ? bstrdup(message_template)
+                                             : bstrdup(SPEECH_TO_TEXT_DEFAULT_MESSAGE_TEMPLATE);
+
+    return configuration;
+}
+
+void state_free_speech_to_text_configuration(speech_to_text_configuration_t **config) {
+
+    if (!config || !*config) {
+        return;
+    }
+
+    speech_to_text_configuration_t *current = *config;
+
+    free_memory((void **)&current->audio_source_name);
+    free_memory((void **)&current->message_template);
 
     bfree(current);
     *config = NULL;

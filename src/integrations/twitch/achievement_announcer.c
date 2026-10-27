@@ -24,9 +24,33 @@ static bool           g_mastery_announced    = false;
 
 /** Context handed to the detached posting thread; freed at the end of that thread. */
 typedef struct announce_ctx {
-    char *message;
-    bool  only_when_live;
+    char    *message;
+    bool     only_when_live;
+    /** Whether this is the game-change announcement, which hands off to the unlock-count follow-up. */
+    bool     is_game_announcement;
+    /** g_game_generation at the time the game announcement was built. */
+    uint32_t game_generation;
 } announce_ctx_t;
+
+/*
+ * Unlock-count follow-up to the game-change announcement.
+ *
+ * The counts are only known once the achievement list has loaded
+ * (session-ready), which can happen before the game announcement's posting
+ * thread has finished. To keep the two messages in order, whichever side
+ * finishes last posts the follow-up: either session-ready spawns it directly
+ * (game message already posted), or it parks the message for the game
+ * announcement thread to send right after its own.
+ */
+static pthread_mutex_t g_followup_mutex = PTHREAD_MUTEX_INITIALIZER;
+/** Bumped on every game change so a stale game thread never posts a newer game's follow-up. Guarded by g_followup_mutex. */
+static uint32_t        g_game_generation = 0;
+/** Whether the current game's announcement thread has finished. Guarded by g_followup_mutex. */
+static bool            g_game_post_done = false;
+/** Follow-up parked for the game announcement thread to post. Guarded by g_followup_mutex. */
+static char           *g_followup_message = NULL;
+/** Whether the current game was announced and still awaits its unlock-count follow-up. Monitor thread only. */
+static bool            g_counts_pending = false;
 
 /**
  * @brief Replace every occurrence of @p needle in @p input with @p replacement.
@@ -76,6 +100,28 @@ static char *replace_all(const char *input, const char *needle, const char *repl
 }
 
 /**
+ * @brief Replace {unlocked} and {total} with the current game's unlock counts.
+ *
+ * Shared by the unlock and progress announcements — both report standing
+ * against the current game's full achievement list.
+ */
+static char *replace_unlock_counts(const char *input) {
+
+    const achievement_t *achievements = monitoring_get_current_game_achievements();
+
+    char unlocked_str[16];
+    char total_str[16];
+    snprintf(unlocked_str, sizeof(unlocked_str), "%d", count_unlocked_achievements(achievements));
+    snprintf(total_str, sizeof(total_str), "%d", count_achievements(achievements));
+
+    char *step1 = replace_all(input, "{unlocked}", unlocked_str);
+    char *step2 = replace_all(step1, "{total}", total_str);
+    bfree(step1);
+
+    return step2;
+}
+
+/**
  * @brief Build the announcement text from the configured template and the unlocked achievement.
  */
 static char *build_announcement_message(const char *message_template, const achievement_t *achievement) {
@@ -91,8 +137,10 @@ static char *build_announcement_message(const char *message_template, const achi
     bfree(step1);
     char *step3 = replace_all(step2, "{gamertag}", gamertag);
     bfree(step2);
+    char *step4 = replace_unlock_counts(step3);
+    bfree(step3);
 
-    return step3;
+    return step4;
 }
 
 /**
@@ -103,7 +151,8 @@ static char *build_announcement_message(const char *message_template, const achi
  */
 static void *post_announcement_thread(void *param) {
 
-    announce_ctx_t *ctx = param;
+    announce_ctx_t *ctx    = param;
+    bool            posted = false;
 
     if (!twitch_account_is_signed_in()) {
         obs_log(LOG_DEBUG, "[TwitchAnnouncer] No Twitch account signed in, skipping post");
@@ -122,11 +171,45 @@ static void *post_announcement_thread(void *param) {
     }
 
     twitch_send_chat_message(ctx->message);
+    posted = true;
 
 cleanup:
+    if (ctx->is_game_announcement) {
+        pthread_mutex_lock(&g_followup_mutex);
+        char *followup = NULL;
+        if (ctx->game_generation == g_game_generation) {
+            g_game_post_done   = true;
+            followup           = g_followup_message;
+            g_followup_message = NULL;
+        }
+        pthread_mutex_unlock(&g_followup_mutex);
+
+        /* The follow-up shares the game message's sign-in/live gating. */
+        if (followup && posted) {
+            twitch_send_chat_message(followup);
+        }
+        bfree(followup);
+    }
+
     bfree(ctx->message);
     bfree(ctx);
     return NULL;
+}
+
+/**
+ * @brief Spawn the detached posting thread, taking ownership of @p ctx.
+ */
+static void start_posting_thread(announce_ctx_t *ctx) {
+
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, post_announcement_thread, ctx) != 0) {
+        obs_log(LOG_ERROR, "[TwitchAnnouncer] Unable to start the posting thread");
+        bfree(ctx->message);
+        bfree(ctx);
+        return;
+    }
+
+    pthread_detach(thread);
 }
 
 /**
@@ -162,21 +245,25 @@ static void announce_unlock(const achievement_t *achievement) {
 static char *g_last_announced_game_id = NULL;
 
 /**
- * @brief Build an announcement from a template supporting {game} and {gamertag}.
+ * @brief Build an announcement from a template supporting {game}, {console} and {gamertag}.
  *
  * Shared by the game-change and mastery announcements — both need exactly
  * this substitution.
  */
-static char *build_game_announcement_message(const char *message_template, const char *game_title) {
+static char *build_game_announcement_message(const char *message_template, const game_t *game) {
 
     const identity_t *identity = monitoring_get_current_active_identity();
     const char       *gamertag = (identity && identity->name) ? identity->name : "";
+    const char       *title    = (game && game->title) ? game->title : "";
+    const char       *console  = (game && game->console_name) ? game->console_name : "";
 
-    char *step1 = replace_all(message_template, "{game}", game_title ? game_title : "");
-    char *step2 = replace_all(step1, "{gamertag}", gamertag);
+    char *step1 = replace_all(message_template, "{game}", title);
+    char *step2 = replace_all(step1, "{console}", console);
     bfree(step1);
+    char *step3 = replace_all(step2, "{gamertag}", gamertag);
+    bfree(step2);
 
-    return step2;
+    return step3;
 }
 
 /**
@@ -209,21 +296,71 @@ static void announce_game_change(const game_t *game) {
         return;
     }
 
-    announce_ctx_t *ctx = bzalloc(sizeof(announce_ctx_t));
-    ctx->message        = build_game_announcement_message(config->game_announcement_template, game->title);
-    ctx->only_when_live = config->only_when_live;
+    announce_ctx_t *ctx       = bzalloc(sizeof(announce_ctx_t));
+    ctx->message              = build_game_announcement_message(config->game_announcement_template, game);
+    ctx->only_when_live       = config->only_when_live;
+    ctx->is_game_announcement = true;
 
     state_free_twitch_configuration(&config);
 
-    pthread_t thread;
-    if (pthread_create(&thread, NULL, post_announcement_thread, ctx) != 0) {
-        obs_log(LOG_ERROR, "[TwitchAnnouncer] Unable to start the posting thread");
-        bfree(ctx->message);
-        bfree(ctx);
+    pthread_mutex_lock(&g_followup_mutex);
+    ctx->game_generation = g_game_generation;
+    pthread_mutex_unlock(&g_followup_mutex);
+
+    g_counts_pending = true;
+
+    start_posting_thread(ctx);
+}
+
+/**
+ * @brief Post the current game's unlocked/total achievement counts right after its game announcement.
+ *
+ * Called once the achievement list has loaded. Skipped when the game was not
+ * announced (feature disabled, or same game re-notified on a reconnect) or
+ * has no achievements.
+ */
+static void announce_game_unlock_counts(void) {
+
+    if (!g_counts_pending) {
+        return;
+    }
+    g_counts_pending = false;
+
+    const achievement_t *achievements = monitoring_get_current_game_achievements();
+    const int            total        = count_achievements(achievements);
+
+    if (total == 0) {
         return;
     }
 
-    pthread_detach(thread);
+    const game_t *game = monitoring_get_current_active_game();
+
+    char message[512];
+    snprintf(message,
+             sizeof(message),
+             "Achievements unlocked in %s: %d/%d",
+             (game && game->title) ? game->title : "this game",
+             count_unlocked_achievements(achievements),
+             total);
+
+    twitch_configuration_t *config         = state_get_twitch_configuration();
+    const bool              only_when_live = config->only_when_live;
+    state_free_twitch_configuration(&config);
+
+    pthread_mutex_lock(&g_followup_mutex);
+    const bool game_post_done = g_game_post_done;
+    if (!game_post_done) {
+        bfree(g_followup_message);
+        g_followup_message = bstrdup(message);
+    }
+    pthread_mutex_unlock(&g_followup_mutex);
+
+    if (game_post_done) {
+        announce_ctx_t *ctx = bzalloc(sizeof(announce_ctx_t));
+        ctx->message        = bstrdup(message);
+        ctx->only_when_live = only_when_live;
+        start_posting_thread(ctx);
+    }
 }
 
 /**
@@ -241,7 +378,7 @@ static void announce_mastery(void) {
     const game_t *game = monitoring_get_current_active_game();
 
     announce_ctx_t *ctx = bzalloc(sizeof(announce_ctx_t));
-    ctx->message = build_game_announcement_message(config->mastery_announcement_template, game ? game->title : NULL);
+    ctx->message = build_game_announcement_message(config->mastery_announcement_template, game);
     ctx->only_when_live = config->only_when_live;
 
     state_free_twitch_configuration(&config);
@@ -273,6 +410,16 @@ static void reset_baseline(void) {
 
 static void on_game_played(const game_t *game) {
     reset_baseline();
+
+    pthread_mutex_lock(&g_followup_mutex);
+    g_game_generation++;
+    g_game_post_done = false;
+    bfree(g_followup_message);
+    g_followup_message = NULL;
+    pthread_mutex_unlock(&g_followup_mutex);
+
+    g_counts_pending = false;
+
     announce_game_change(game);
 }
 
@@ -314,8 +461,10 @@ static char *build_progress_announcement_message(const char *message_template, c
     bfree(step1);
     char *step3 = replace_all(step2, "{gamertag}", gamertag);
     bfree(step2);
+    char *step4 = replace_unlock_counts(step3);
+    bfree(step3);
 
-    return step3;
+    return step4;
 }
 
 /**
@@ -371,6 +520,8 @@ static void on_session_ready(void) {
      * earned in a previous session), that is history, not a fresh mastery —
      * suppress it the same way pre-existing unlocks are suppressed above. */
     g_mastery_announced = is_fully_mastered(current);
+
+    announce_game_unlock_counts();
 }
 
 static void on_achievements_changed(void) {

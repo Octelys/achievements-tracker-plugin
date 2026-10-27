@@ -49,6 +49,10 @@ add_library(cjson STATIC external/cjson/cJSON.c external/cjson/cJSON_Utils.c)
 
 target_include_directories(cjson PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/cjson)
 
+# whisper.cpp: local speech-to-text for the "voice to Twitch chat" feature.
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/FetchWhisper.cmake")
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE whisper)
+
 # Windows UUID (Rpc.h/UUuid*) lives in Rpcrt4
 if(WIN32)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Rpcrt4)
@@ -510,6 +514,11 @@ target_sources(
     src/integrations/twitch/stream_status.c
     src/integrations/twitch/account_manager.c
     src/integrations/twitch/achievement_announcer.c
+    src/integrations/twitch/speech_announcer.c
+    src/integrations/speech/vad.c
+    src/integrations/speech/speech_capture.c
+    src/integrations/speech/model_manager.c
+    src/integrations/speech/whisper_transcriber.cpp
     src/ui/xbox_account_config.cpp
     src/ui/twitch_account_config.cpp
     src/ui/achievement_tracker_config.cpp
@@ -862,9 +871,40 @@ if(BUILD_TESTING)
   target_link_test_deps(test_types)
 
   # ------------------------------
+  # test_vad
+  # ------------------------------
+  add_executable(
+    test_vad
+    test/test_vad.c
+    ${unity_SOURCE_DIR}/src/unity.c
+    src/integrations/speech/vad.c
+    test/stubs/bmem_stub.c
+  )
+
+  add_test(NAME test_vad COMMAND test_vad)
+
+  if(ENABLE_COVERAGE)
+    enable_coverage(test_vad)
+  endif()
+
+  target_include_directories(
+    test_vad
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+      ${CMAKE_CURRENT_SOURCE_DIR}/src
+      ${unity_SOURCE_DIR}/src
+      ${CMAKE_CURRENT_SOURCE_DIR}/test
+  )
+
+  target_compile_definitions(test_vad PRIVATE UNITY_INCLUDE_CONFIG_H)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(test_vad PRIVATE m)
+  endif()
+
+  # ------------------------------
   # Coverage target (must be after all test targets are defined)
   # ------------------------------
   if(ENABLE_COVERAGE)
-    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_monitoring_service test_xbox_session test_types)
+    add_coverage_target(test_encoder test_crypto test_convert test_parsers test_monitoring_service test_xbox_session test_types test_vad)
   endif()
 endif()

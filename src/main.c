@@ -1,4 +1,5 @@
 #include <obs-module.h>
+#include <obs-frontend-api.h>
 #include <diagnostics/log.h>
 
 #include "sources/common/achievement_cycle.h"
@@ -6,6 +7,7 @@
 #include "ui/twitch_account_config.h"
 #include "ui/achievement_tracker_config.h"
 #include "integrations/twitch/achievement_announcer.h"
+#include "integrations/twitch/speech_announcer.h"
 #include "sources/gamerpic.h"
 #include "sources/game_cover.h"
 #include "sources/gamerscore.h"
@@ -23,6 +25,22 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
+/**
+ * @brief Starts the speech-to-chat announcer once OBS has finished loading the scene collection.
+ *
+ * The configured audio source doesn't exist yet at obs_module_load() time —
+ * scenes/sources load after modules do — so speech capture must wait for this event.
+ */
+static void on_frontend_event(enum obs_frontend_event event, void *private_data) {
+    UNUSED_PARAMETER(private_data);
+
+    if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
+        twitch_speech_announcer_start();
+    } else if (event == OBS_FRONTEND_EVENT_EXIT) {
+        twitch_speech_announcer_stop();
+    }
+}
+
 bool obs_module_load(void) {
     obs_log(LOG_INFO, "Loading plugin (version %s)", PLUGIN_VERSION);
     io_load();
@@ -32,6 +50,7 @@ bool obs_module_load(void) {
     achievement_tracker_config_register();
     monitoring_start();
     twitch_achievement_announcer_start();
+    obs_frontend_add_event_callback(on_frontend_event, NULL);
 
     xbox_gamerpic_source_register();
     game_cover_source_register();
@@ -67,6 +86,9 @@ bool obs_module_load(void) {
 }
 
 void obs_module_unload(void) {
+    obs_frontend_remove_event_callback(on_frontend_event, NULL);
+    twitch_speech_announcer_stop();
+
     xbox_account_config_unregister();
     twitch_account_config_unregister();
     achievement_tracker_config_unregister();

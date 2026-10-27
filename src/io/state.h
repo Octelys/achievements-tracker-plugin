@@ -169,6 +169,36 @@ twitch_configuration_t *state_get_twitch_configuration(void);
 void state_free_twitch_configuration(twitch_configuration_t **config);
 
 /**
+ * @brief Persist the speech-to-text-to-chat configuration (enabled, source, silence gap, template).
+ *
+ * @param configuration Configuration to store (may be NULL to clear).
+ */
+void state_set_speech_to_text_configuration(const speech_to_text_configuration_t *configuration);
+
+/**
+ * @brief Get the currently stored speech-to-text-to-chat configuration.
+ *
+ * Retrieves the configuration with default values if none has been set:
+ * - enabled / only_when_live: false
+ * - audio_source_name: "" (empty)
+ * - silence_duration_ms: SPEECH_TO_TEXT_DEFAULT_SILENCE_DURATION_MS
+ * - message_template: SPEECH_TO_TEXT_DEFAULT_MESSAGE_TEMPLATE
+ *
+ * @return Newly allocated configuration structure. Caller must free with
+ *         state_free_speech_to_text_configuration().
+ */
+speech_to_text_configuration_t *state_get_speech_to_text_configuration(void);
+
+/**
+ * @brief Free a speech-to-text configuration structure and its owned strings.
+ *
+ * Safe to call with NULL or with @c *config == NULL.
+ *
+ * @param[in,out] config Configuration structure to free. Set to NULL after freeing.
+ */
+void state_free_speech_to_text_configuration(speech_to_text_configuration_t **config);
+
+/**
  * @brief Persist the auto-sized alignment box metrics for a text source.
  *
  * Text sources report the widest text they have seen (@p box_width) as their

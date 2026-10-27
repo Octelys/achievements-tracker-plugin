@@ -513,6 +513,31 @@ static void on_retro_no_game(void) {
 }
 
 /**
+ * @brief Sum the points of achievements locked in @p previous but unlocked in @p current.
+ *
+ * Achievements absent from @p previous are ignored so that the first list of
+ * a game session (where @p previous is NULL) never counts as new unlocks.
+ */
+static uint32_t compute_newly_unlocked_points(const achievement_t *previous, const achievement_t *current) {
+    uint32_t points = 0;
+
+    for (const achievement_t *a = current; a != NULL; a = a->next) {
+        if (a->unlocked_timestamp == 0 || !a->id)
+            continue;
+
+        for (const achievement_t *p = previous; p != NULL; p = p->next) {
+            if (p->source == ACHIEVEMENT_SOURCE_RETRO && p->id && strcmp(p->id, a->id) == 0) {
+                if (p->unlocked_timestamp == 0 && a->value > 0)
+                    points += (uint32_t)a->value;
+                break;
+            }
+        }
+    }
+
+    return points;
+}
+
+/**
  * @brief RetroAchievements callback invoked when the achievements' list is received.
  *
  * Only fires notify_session_ready() when a game is actually active.
@@ -530,7 +555,23 @@ static void on_retro_no_game(void) {
  * non-empty so the cycle always starts with at least one achievement to show.
  */
 static void on_retro_achievements(const retro_achievement_t *achievements, size_t count) {
-    replace_current_achievements(retro_to_achievements(achievements, count));
+    achievement_t *new_achievements = retro_to_achievements(achievements, count);
+
+    /* RetroArch does not resend the user message after an unlock, so the
+     * score would stay frozen until the next reconnection. Add the points of
+     * newly unlocked achievements to the cached score instead; the next user
+     * message, if any, overwrites it with the authoritative value. */
+    const uint32_t gained = compute_newly_unlocked_points(g_current_achievements, new_achievements);
+
+    replace_current_achievements(new_achievements);
+
+    if (gained > 0 && g_retro_identity) {
+        g_retro_identity->score += gained;
+        obs_log(LOG_INFO, "[MonitoringService] Retro score updated: %u (+%u)", g_retro_identity->score, gained);
+
+        if (g_retro_game && g_last_game_source == IDENTITY_SOURCE_RETRO)
+            notify_active_identity(get_current_active_identity());
+    }
 
     if (g_retro_game && count > 0) {
         notify_session_ready();

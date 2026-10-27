@@ -93,6 +93,42 @@ static bool str_replace(char *s, const char *needle, const char *replacement) {
     return changed;
 }
 
+/**
+ * @brief Map an Xbox presence device type to a human-readable console name.
+ *
+ * The presence API only distinguishes console generations ("Scarlett" covers
+ * both Series S and Series X). Unknown types are returned as-is so new
+ * platforms still show something meaningful.
+ */
+static const char *xbox_device_type_to_console_name(const char *device_type) {
+
+    if (!device_type || device_type[0] == '\0') {
+        return "Xbox";
+    }
+
+    static const struct {
+        const char *type;
+        const char *name;
+    } known_devices[] = {
+        {"Scarlett", "Xbox Series X|S"},
+        {"XboxOne", "Xbox One"},
+        {"Xbox360", "Xbox 360"},
+        {"WindowsOneCore", "PC"},
+        {"Win32", "PC"},
+        {"PC", "PC"},
+        {"iOS", "iOS"},
+        {"Android", "Android"},
+    };
+
+    for (size_t i = 0; i < sizeof(known_devices) / sizeof(known_devices[0]); i++) {
+        if (strcasecmp(device_type, known_devices[i].type) == 0) {
+            return known_devices[i].name;
+        }
+    }
+
+    return device_type;
+}
+
 char *xbox_get_game_cover(const game_t *game) {
 
     char            *display_image_url = NULL;
@@ -471,13 +507,21 @@ game_t *xbox_get_current_game(void) {
         goto cleanup;
     }
 
-    obs_log(LOG_INFO, "[XboxClient] Current game: %s (%s)", current_game_title, current_game_id);
+    cJSON      *device_type_value = cJSONUtils_GetPointer(presence_json, "/devices/0/type");
+    const char *device_type       = (device_type_value && (device_type_value->type & 0xFF) == cJSON_String)
+                                          ? device_type_value->valuestring
+                                          : NULL;
+
+    obs_log(LOG_INFO,
+            "[XboxClient] Current game: %s (%s) on device type %s",
+            current_game_title,
+            current_game_id,
+            device_type ? device_type : "(unknown)");
 
     game               = bzalloc(sizeof(game_t));
     game->id           = bstrdup(current_game_id);
     game->title        = bstrdup(current_game_title);
-    /* TODO Figure out if it is Xbox one, Xbox series S, Xbox series X */
-    game->console_name = bstrdup("xbox");
+    game->console_name = bstrdup(xbox_device_type_to_console_name(device_type));
 
 cleanup:
     free_json_memory((void **)&presence_json);
