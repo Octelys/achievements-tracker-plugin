@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,6 +61,25 @@ void cache_build_path(const char *type, const char *id, const char *source, char
  *         including when the OBS module cache directory cannot be resolved.
  */
 bool cache_download(const char *url, const char *type, const char *id, char *out_path, size_t path_size);
+
+/**
+ * @brief Download a remote resource to the local file cache, refreshing it when stale.
+ *
+ * Behaves like cache_download(), except that a cached file whose modification
+ * time is older than @p max_age_seconds is downloaded again and replaced. When
+ * the refresh fails, the stale file is kept so the caller can still use it.
+ *
+ * @param url              Remote URL to download from.
+ * @param type             Category suffix used for the cache path.
+ * @param id               Unique identifier used for the cache path.
+ * @param max_age_seconds  Maximum age of a cached file; 0 means it never expires.
+ * @param out_path         Optional destination buffer that receives the cache file path.
+ * @param path_size        Size of @p out_path in bytes (ignored when @p out_path is NULL).
+ *
+ * @return true if a new file was downloaded during this call; false otherwise.
+ */
+bool cache_download_with_max_age(const char *url, const char *type, const char *id, int64_t max_age_seconds,
+                                 char *out_path, size_t path_size);
 
 #ifdef __cplusplus
 }

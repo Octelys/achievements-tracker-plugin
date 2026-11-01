@@ -82,6 +82,9 @@ static on_monitoring_connection_changed_t g_connection_changed_callback = NULL;
 static identity_t *g_xbox_identity  = NULL;
 static identity_t *g_retro_identity = NULL;
 
+/** Time the Xbox avatar URL was last fetched, used to re-fetch it at most once a day. */
+static time_t g_xbox_avatar_fetched_at = 0;
+
 static game_t *g_xbox_game  = NULL;
 static game_t *g_retro_game = NULL;
 
@@ -270,6 +273,34 @@ static void refresh_xbox_score(identity_t *identity) {
     identity->score        = gs ? (uint32_t)gamerscore_compute(gs) : 0;
 }
 
+/**
+ * @brief Fetch the Xbox avatar URL and store it into @p identity.
+ *
+ * Replaces any previously stored URL, even when the fetch fails, so a stale
+ * avatar is never shown for a gamerpic that can no longer be resolved.
+ */
+static void fetch_xbox_avatar(identity_t *identity) {
+    free_memory((void **)&identity->avatar_url);
+    identity->avatar_url     = xbox_fetch_gamerpic();
+    g_xbox_avatar_fetched_at = now();
+}
+
+/**
+ * @brief Re-fetch the Xbox avatar URL when it is older than a day.
+ *
+ * Xbox Live gives every gamerpic its own URL, so this is how a gamerpic
+ * changed while OBS is running eventually reaches the gamerpic source.
+ */
+static void refresh_xbox_avatar_if_stale(void) {
+    if (!g_xbox_identity || now() - g_xbox_avatar_fetched_at < IDENTITY_AVATAR_MAX_AGE_SECONDS)
+        return;
+
+    fetch_xbox_avatar(g_xbox_identity);
+    obs_log(LOG_INFO,
+            "[MonitoringService] Xbox avatar refreshed: %s",
+            g_xbox_identity->avatar_url ? g_xbox_identity->avatar_url : "(none)");
+}
+
 static void on_xbox_connection_changed(bool connected, const char *error_message) {
     if (connected) {
         free_identity_t(&g_xbox_identity);
@@ -280,8 +311,7 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
             free_identity(&xbox);
 
             if (g_xbox_identity) {
-                free_memory((void **)&g_xbox_identity->avatar_url);
-                g_xbox_identity->avatar_url = xbox_fetch_gamerpic();
+                fetch_xbox_avatar(g_xbox_identity);
                 obs_log(LOG_INFO,
                         "[MonitoringService] Xbox identity cached: %s (score: %u, avatar: %s)",
                         g_xbox_identity->name,
@@ -384,6 +414,8 @@ static void on_xbox_game_played(const game_t *game) {
     obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game->title);
 
     g_last_game_source = IDENTITY_SOURCE_XBOX;
+
+    refresh_xbox_avatar_if_stale();
 
     /* Do NOT clear g_current_achievements here. on_xbox_session_ready() is the
      * sole owner of g_current_achievements updates for Xbox data. */

@@ -90,6 +90,9 @@ typedef struct image {
     /** Unique suffix for cache file naming (e.g., "gamerpic", "game_cover", "achievement_icon"). */
     char type[128];
 
+    /** Maximum age of the cached file in seconds before it is downloaded again. 0 means it never expires. */
+    int64_t max_age_seconds;
+
 } image_t;
 
 /**

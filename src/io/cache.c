@@ -25,6 +25,7 @@
 #include <net/http/http.h>
 
 #include "common/memory.h"
+#include "time/time.h"
 
 #define CACHE_DIRECTORY "cache"
 
@@ -90,6 +91,11 @@ void cache_build_path(const char *type, const char *id, const char *source, char
 }
 
 bool cache_download(const char *url, const char *type, const char *id, char *out_path, size_t path_size) {
+    return cache_download_with_max_age(url, type, id, 0, out_path, path_size);
+}
+
+bool cache_download_with_max_age(const char *url, const char *type, const char *id, int64_t max_age_seconds,
+                                 char *out_path, size_t path_size) {
 
     if (!url || url[0] == '\0') {
         return false;
@@ -118,6 +124,10 @@ bool cache_download(const char *url, const char *type, const char *id, char *out
                 obs_log(LOG_WARNING, "[Cache] Failed to delete zero-byte cached file '%s'", path_buf);
                 return false;
             }
+        } else if (max_age_seconds > 0 && (int64_t)(now() - st.st_mtime) >= max_age_seconds) {
+            /* Keep the stale file until the new download succeeds: the write
+             * below replaces it, and a failed download leaves it usable. */
+            obs_log(LOG_INFO, "[Cache] Expired: %s", path_buf);
         } else {
             obs_log(LOG_DEBUG, "[Cache] Hit: %s", path_buf);
             return false;
