@@ -90,8 +90,7 @@ class TwitchAccountDialog final : public QDialog {
         m_enabledCheck->setText("Post achievement unlocks to Twitch chat");
         m_onlyWhenLiveCheck->setText("Only when the channel is live");
 
-        m_templateEdit->setToolTip(
-            "Supports {name}, {value}, {gamertag}, {unlocked}, and {total} placeholders.");
+        m_templateEdit->setToolTip("Supports {name}, {value}, {gamertag}, {unlocked}, and {total} placeholders.");
 
         auto *templateHelp = new QLabel(this);
         templateHelp->setWordWrap(true);

@@ -42,15 +42,16 @@ typedef struct announce_ctx {
  * (game message already posted), or it parks the message for the game
  * announcement thread to send right after its own.
  */
-static pthread_mutex_t g_followup_mutex = PTHREAD_MUTEX_INITIALIZER;
-/** Bumped on every game change so a stale game thread never posts a newer game's follow-up. Guarded by g_followup_mutex. */
-static uint32_t        g_game_generation = 0;
+static pthread_mutex_t g_followup_mutex   = PTHREAD_MUTEX_INITIALIZER;
+/** Bumped on every game change so a stale game thread never posts a newer game's follow-up. Guarded by
+ * g_followup_mutex. */
+static uint32_t        g_game_generation  = 0;
 /** Whether the current game's announcement thread has finished. Guarded by g_followup_mutex. */
-static bool            g_game_post_done = false;
+static bool            g_game_post_done   = false;
 /** Follow-up parked for the game announcement thread to post. Guarded by g_followup_mutex. */
 static char           *g_followup_message = NULL;
 /** Whether the current game was announced and still awaits its unlock-count follow-up. Monitor thread only. */
-static bool            g_counts_pending = false;
+static bool            g_counts_pending   = false;
 
 /**
  * @brief Replace every occurrence of @p needle in @p input with @p replacement.
@@ -378,7 +379,7 @@ static void announce_mastery(void) {
     const game_t *game = monitoring_get_current_active_game();
 
     announce_ctx_t *ctx = bzalloc(sizeof(announce_ctx_t));
-    ctx->message = build_game_announcement_message(config->mastery_announcement_template, game);
+    ctx->message        = build_game_announcement_message(config->mastery_announcement_template, game);
     ctx->only_when_live = config->only_when_live;
 
     state_free_twitch_configuration(&config);

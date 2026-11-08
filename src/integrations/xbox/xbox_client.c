@@ -508,9 +508,8 @@ game_t *xbox_get_current_game(void) {
     }
 
     cJSON      *device_type_value = cJSONUtils_GetPointer(presence_json, "/devices/0/type");
-    const char *device_type       = (device_type_value && (device_type_value->type & 0xFF) == cJSON_String)
-                                          ? device_type_value->valuestring
-                                          : NULL;
+    const char *device_type =
+        (device_type_value && (device_type_value->type & 0xFF) == cJSON_String) ? device_type_value->valuestring : NULL;
 
     obs_log(LOG_INFO,
             "[XboxClient] Current game: %s (%s) on device type %s",
