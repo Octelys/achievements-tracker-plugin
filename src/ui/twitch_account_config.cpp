@@ -5,8 +5,6 @@
 #include <diagnostics/log.h>
 
 #include <QCheckBox>
-#include <QComboBox>
-#include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -17,33 +15,16 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QSizePolicy>
-#include <QSpinBox>
-#include <QStringList>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
 
 extern "C" {
 #include "integrations/twitch/account_manager.h"
-#include "integrations/twitch/speech_announcer.h"
-#include "integrations/speech/model_manager.h"
 #include "io/state.h"
 }
 
 namespace {
-
-bool collect_audio_source_name(void *param, obs_source_t *source) {
-    auto *names = static_cast<QStringList *>(param);
-
-    if (obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO) {
-        const char *name = obs_source_get_name(source);
-        if (name && name[0] != '\0') {
-            names->append(QString::fromUtf8(name));
-        }
-    }
-
-    return true;
-}
 
 class TwitchAccountDialog final : public QDialog {
     public:
@@ -62,13 +43,6 @@ class TwitchAccountDialog final : public QDialog {
           m_masteryTemplateEdit(new QLineEdit(this)),
           m_announceProgressCheck(new QCheckBox(this)),
           m_progressTemplateEdit(new QLineEdit(this)),
-          m_speechEnabledCheck(new QCheckBox(this)),
-          m_speechOnlyWhenLiveCheck(new QCheckBox(this)),
-          m_speechSourceCombo(new QComboBox(this)),
-          m_speechSilenceSpin(new QSpinBox(this)),
-          m_speechTemplateEdit(new QLineEdit(this)),
-          m_speechModelStatus(new QLabel(this)),
-          m_speechModelButton(new QPushButton("Download speech model", this)),
           m_refreshTimer(new QTimer(this)) {
         setWindowTitle("Twitch Account");
         setModal(false);
@@ -206,45 +180,6 @@ class TwitchAccountDialog final : public QDialog {
         rootLayout->addSpacing(4);
         rootLayout->addLayout(progressForm);
 
-        // ---- Voice to chat -------------------------------------------------------
-        auto *speechLabel = new QLabel("<b>Voice to Chat</b>", this);
-
-        auto *speechForm = new QFormLayout();
-        speechForm->setLabelAlignment(Qt::AlignLeft);
-        speechForm->setVerticalSpacing(6);
-        speechForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
-
-        m_speechEnabledCheck->setText("Transcribe speech and post it to Twitch chat");
-        m_speechOnlyWhenLiveCheck->setText("Only when the channel is live");
-        m_speechSourceCombo->setToolTip("The OBS audio source to listen to (e.g. your microphone).");
-        m_speechSilenceSpin->setRange(200, 5000);
-        m_speechSilenceSpin->setSingleStep(100);
-        m_speechSilenceSpin->setSuffix(" ms");
-        m_speechSilenceSpin->setToolTip("How long you need to pause before the sentence so far is posted.");
-        m_speechTemplateEdit->setToolTip("Supports the {text} placeholder (the transcribed sentence).");
-
-        auto *speechTemplateHelp = new QLabel(this);
-        speechTemplateHelp->setWordWrap(true);
-        speechTemplateHelp->setText("Placeholders: {text}");
-
-        auto *speechModelLayout = new QHBoxLayout();
-        speechModelLayout->addWidget(m_speechModelButton);
-        speechModelLayout->addWidget(m_speechModelStatus, 1);
-        speechModelLayout->setContentsMargins(0, 0, 0, 0);
-
-        speechForm->addRow(m_speechEnabledCheck);
-        speechForm->addRow(m_speechOnlyWhenLiveCheck);
-        speechForm->addRow("Audio source", m_speechSourceCombo);
-        speechForm->addRow("Pause before posting", m_speechSilenceSpin);
-        speechForm->addRow("Message template", m_speechTemplateEdit);
-        speechForm->addRow(speechTemplateHelp);
-        speechForm->addRow("Speech model", speechModelLayout);
-
-        rootLayout->addSpacing(8);
-        rootLayout->addWidget(speechLabel);
-        rootLayout->addSpacing(4);
-        rootLayout->addLayout(speechForm);
-
         // ---- Buttons -----------------------------------------------------------
         auto *buttonBox = new QDialogButtonBox(this);
         m_saveButton    = buttonBox->addButton("Save", QDialogButtonBox::AcceptRole);
@@ -258,10 +193,8 @@ class TwitchAccountDialog final : public QDialog {
         connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::close);
         connect(m_saveButton, &QPushButton::clicked, this, &TwitchAccountDialog::onSave);
         connect(m_accountButton, &QPushButton::clicked, this, &TwitchAccountDialog::onAccountButtonClicked);
-        connect(m_speechModelButton, &QPushButton::clicked, this, &TwitchAccountDialog::onDownloadModelClicked);
         connect(m_refreshTimer, &QTimer::timeout, this, &TwitchAccountDialog::refreshUi);
 
-        populateAudioSources();
         loadConfiguration();
 
         m_refreshTimer->start(1000);
@@ -270,47 +203,21 @@ class TwitchAccountDialog final : public QDialog {
 
     void loadConfiguration() {
         twitch_configuration_t *config = state_get_twitch_configuration();
-        if (config) {
-            m_enabledCheck->setChecked(config->enabled);
-            m_onlyWhenLiveCheck->setChecked(config->only_when_live);
-            m_templateEdit->setText(QString::fromUtf8(config->message_template));
-            m_announceGameChangesCheck->setChecked(config->announce_game_changes);
-            m_gameTemplateEdit->setText(QString::fromUtf8(config->game_announcement_template));
-            m_announceMasteryCheck->setChecked(config->announce_mastery);
-            m_masteryTemplateEdit->setText(QString::fromUtf8(config->mastery_announcement_template));
-            m_announceProgressCheck->setChecked(config->announce_progress);
-            m_progressTemplateEdit->setText(QString::fromUtf8(config->progress_announcement_template));
-
-            state_free_twitch_configuration(&config);
+        if (!config) {
+            return;
         }
 
-        speech_to_text_configuration_t *speechConfig = state_get_speech_to_text_configuration();
-        if (speechConfig) {
-            m_speechEnabledCheck->setChecked(speechConfig->enabled);
-            m_speechOnlyWhenLiveCheck->setChecked(speechConfig->only_when_live);
-            m_speechSilenceSpin->setValue(speechConfig->silence_duration_ms);
-            m_speechTemplateEdit->setText(QString::fromUtf8(speechConfig->message_template));
+        m_enabledCheck->setChecked(config->enabled);
+        m_onlyWhenLiveCheck->setChecked(config->only_when_live);
+        m_templateEdit->setText(QString::fromUtf8(config->message_template));
+        m_announceGameChangesCheck->setChecked(config->announce_game_changes);
+        m_gameTemplateEdit->setText(QString::fromUtf8(config->game_announcement_template));
+        m_announceMasteryCheck->setChecked(config->announce_mastery);
+        m_masteryTemplateEdit->setText(QString::fromUtf8(config->mastery_announcement_template));
+        m_announceProgressCheck->setChecked(config->announce_progress);
+        m_progressTemplateEdit->setText(QString::fromUtf8(config->progress_announcement_template));
 
-            int sourceIndex = m_speechSourceCombo->findText(QString::fromUtf8(speechConfig->audio_source_name));
-            m_speechSourceCombo->setCurrentIndex(sourceIndex >= 0 ? sourceIndex : -1);
-
-            state_free_speech_to_text_configuration(&speechConfig);
-        }
-
-        refreshSpeechModelStatus();
-    }
-
-    void populateAudioSources() {
-        QStringList names;
-        obs_enum_sources(&collect_audio_source_name, &names);
-
-        m_speechSourceCombo->clear();
-        m_speechSourceCombo->addItem("(none)");
-        m_speechSourceCombo->addItems(names);
-    }
-
-    void refreshSpeechModelStatus() {
-        m_speechModelStatus->setText(speech_model_is_downloaded() ? "Model downloaded" : "Model not downloaded");
+        state_free_twitch_configuration(&config);
     }
 
     void refreshUi() {
@@ -371,42 +278,6 @@ class TwitchAccountDialog final : public QDialog {
                 config.announce_mastery ? "true" : "false",
                 config.announce_progress ? "true" : "false",
                 config.only_when_live ? "true" : "false");
-
-        speech_to_text_configuration_t speechConfig;
-        speechConfig.enabled        = m_speechEnabledCheck->isChecked();
-        speechConfig.only_when_live = m_speechOnlyWhenLiveCheck->isChecked();
-        speechConfig.silence_duration_ms = m_speechSilenceSpin->value();
-
-        QByteArray sourceNameUtf8         = m_speechSourceCombo->currentIndex() > 0
-                                                 ? m_speechSourceCombo->currentText().toUtf8()
-                                                 : QByteArray();
-        QByteArray speechTemplateUtf8     = m_speechTemplateEdit->text().toUtf8();
-        speechConfig.audio_source_name    = sourceNameUtf8.data();
-        speechConfig.message_template     = speechTemplateUtf8.data();
-
-        state_set_speech_to_text_configuration(&speechConfig);
-        twitch_speech_announcer_start();
-
-        obs_log(LOG_INFO,
-                "Twitch Account: speech-to-chat configuration saved (enabled=%s, source='%s')",
-                speechConfig.enabled ? "true" : "false",
-                speechConfig.audio_source_name);
-    }
-
-    void onDownloadModelClicked() {
-        m_speechModelButton->setEnabled(false);
-        m_speechModelStatus->setText("Downloading...");
-        QCoreApplication::processEvents();
-
-        bool ok = speech_model_ensure_downloaded();
-
-        if (!ok) {
-            QMessageBox::warning(this, "Voice to Chat", "Failed to download the speech model. Check your network "
-                                                          "connection and try again.");
-        }
-
-        refreshSpeechModelStatus();
-        m_speechModelButton->setEnabled(true);
     }
 
     QLabel      *m_statusValue;
@@ -422,13 +293,6 @@ class TwitchAccountDialog final : public QDialog {
     QLineEdit   *m_masteryTemplateEdit;
     QCheckBox   *m_announceProgressCheck;
     QLineEdit   *m_progressTemplateEdit;
-    QCheckBox   *m_speechEnabledCheck;
-    QCheckBox   *m_speechOnlyWhenLiveCheck;
-    QComboBox   *m_speechSourceCombo;
-    QSpinBox    *m_speechSilenceSpin;
-    QLineEdit   *m_speechTemplateEdit;
-    QLabel      *m_speechModelStatus;
-    QPushButton *m_speechModelButton;
     QPushButton *m_saveButton;
     QTimer      *m_refreshTimer;
 };
@@ -443,7 +307,6 @@ void show_twitch_account_dialog(void *) {
         g_dialog->setAttribute(Qt::WA_DeleteOnClose, true);
     }
 
-    g_dialog->populateAudioSources();
     g_dialog->loadConfiguration();
     g_dialog->show();
     g_dialog->raise();

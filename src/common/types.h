@@ -329,32 +329,6 @@ typedef struct twitch_configuration {
     char *progress_announcement_template;
 } twitch_configuration_t;
 
-/** Default message template used to announce transcribed speech in Twitch chat. */
-#define SPEECH_TO_TEXT_DEFAULT_MESSAGE_TEMPLATE "{text}"
-
-/** Default silence gap (ms) that ends an utterance and triggers a chat post. */
-#define SPEECH_TO_TEXT_DEFAULT_SILENCE_DURATION_MS 800
-
-/**
- * @brief Configuration for transcribing microphone speech to Twitch chat.
- *
- * Ownership:
- * - @c audio_source_name and @c message_template are owned by this structure
- *   and must be freed with bfree().
- */
-typedef struct speech_to_text_configuration {
-    /** Whether speech is captured, transcribed, and posted to Twitch chat at all. */
-    bool  enabled;
-    /** When true, transcriptions are only posted while the channel is live. */
-    bool  only_when_live;
-    /** Name of the OBS audio source to capture speech from (e.g. a mic input). May be empty if unconfigured. */
-    char *audio_source_name;
-    /** Trailing silence (ms) after speech that ends an utterance and triggers transcription/posting. */
-    int   silence_duration_ms;
-    /** Message template supporting the {text} placeholder (the transcribed sentence). */
-    char *message_template;
-} speech_to_text_configuration_t;
-
 /** Default seconds for the auto-visibility show phase (shared across all sources). */
 #define AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION 30.0f
 /** Default seconds for the auto-visibility hide phase (shared across all sources). */
