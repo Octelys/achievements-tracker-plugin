@@ -90,11 +90,11 @@ class TwitchAccountDialog final : public QDialog {
         m_enabledCheck->setText("Post achievement unlocks to Twitch chat");
         m_onlyWhenLiveCheck->setText("Only when the channel is live");
 
-        m_templateEdit->setToolTip("Supports {name}, {value}, and {gamertag} placeholders.");
+        m_templateEdit->setToolTip("Supports {name}, {value}, {gamertag}, {unlocked}, and {total} placeholders.");
 
         auto *templateHelp = new QLabel(this);
         templateHelp->setWordWrap(true);
-        templateHelp->setText("Placeholders: {name}, {value}, {gamertag}");
+        templateHelp->setText("Placeholders: {name}, {value}, {gamertag}, {unlocked}, {total}");
 
         settingsForm->addRow(m_enabledCheck);
         settingsForm->addRow(m_onlyWhenLiveCheck);
@@ -115,11 +115,11 @@ class TwitchAccountDialog final : public QDialog {
         gameForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
         m_announceGameChangesCheck->setText("Announce game changes to Twitch chat");
-        m_gameTemplateEdit->setToolTip("Supports {game} and {gamertag} placeholders.");
+        m_gameTemplateEdit->setToolTip("Supports {game}, {console} and {gamertag} placeholders.");
 
         auto *gameTemplateHelp = new QLabel(this);
         gameTemplateHelp->setWordWrap(true);
-        gameTemplateHelp->setText("Placeholders: {game}, {gamertag}");
+        gameTemplateHelp->setText("Placeholders: {game}, {console}, {gamertag}");
 
         gameForm->addRow(m_announceGameChangesCheck);
         gameForm->addRow("Message template", m_gameTemplateEdit);
@@ -139,11 +139,11 @@ class TwitchAccountDialog final : public QDialog {
         masteryForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
         m_announceMasteryCheck->setText("Announce when the current game is mastered (100% unlocked)");
-        m_masteryTemplateEdit->setToolTip("Supports {game} and {gamertag} placeholders.");
+        m_masteryTemplateEdit->setToolTip("Supports {game}, {console} and {gamertag} placeholders.");
 
         auto *masteryTemplateHelp = new QLabel(this);
         masteryTemplateHelp->setWordWrap(true);
-        masteryTemplateHelp->setText("Placeholders: {game}, {gamertag}");
+        masteryTemplateHelp->setText("Placeholders: {game}, {console}, {gamertag}");
 
         masteryForm->addRow(m_announceMasteryCheck);
         masteryForm->addRow("Message template", m_masteryTemplateEdit);
@@ -163,11 +163,12 @@ class TwitchAccountDialog final : public QDialog {
         progressForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
 
         m_announceProgressCheck->setText("Announce achievement progress to Twitch chat");
-        m_progressTemplateEdit->setToolTip("Supports {name}, {progress}, and {gamertag} placeholders.");
+        m_progressTemplateEdit->setToolTip(
+            "Supports {name}, {progress}, {gamertag}, {unlocked}, and {total} placeholders.");
 
         auto *progressTemplateHelp = new QLabel(this);
         progressTemplateHelp->setWordWrap(true);
-        progressTemplateHelp->setText("Placeholders: {name}, {progress}, {gamertag}");
+        progressTemplateHelp->setText("Placeholders: {name}, {progress}, {gamertag}, {unlocked}, {total}");
 
         progressForm->addRow(m_announceProgressCheck);
         progressForm->addRow("Message template", m_progressTemplateEdit);

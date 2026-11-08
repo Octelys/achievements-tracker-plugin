@@ -15,7 +15,12 @@ void image_source_download(image_t *image) {
         return;
     }
 
-    cache_download(image->url, image->type, image->id, image->cache_path, sizeof(image->cache_path));
+    cache_download_with_max_age(image->url,
+                                image->type,
+                                image->id,
+                                image->max_age_seconds,
+                                image->cache_path,
+                                sizeof(image->cache_path));
 
     /* Schedule reload on the next render */
     image->must_reload = true;

@@ -287,7 +287,7 @@ typedef struct achievements_count_configuration {
 } achievements_count_configuration_t;
 
 /** Default message template used to announce an achievement unlock in Twitch chat. */
-#define TWITCH_DEFAULT_MESSAGE_TEMPLATE "\xF0\x9F\x8F\x86 Achievement unlocked: {name} ({value}G)"
+#define TWITCH_DEFAULT_MESSAGE_TEMPLATE "\xF0\x9F\x8F\x86 Achievement unlocked: {name} ({value}G) [{unlocked}/{total}]"
 
 /** Default message template used to announce a new game being played in Twitch chat. */
 #define TWITCH_DEFAULT_GAME_ANNOUNCEMENT_TEMPLATE "\xF0\x9F\x8E\xAE Now playing: {game}"
@@ -297,7 +297,7 @@ typedef struct achievements_count_configuration {
     "\xF0\x9F\x8E\x89 {gamertag} just mastered {game} \xE2\x80\x94 100% achievements unlocked!"
 
 /** Default message template used to announce achievement progress in Twitch chat. */
-#define TWITCH_DEFAULT_PROGRESS_ANNOUNCEMENT_TEMPLATE "\xE2\x8F\xB3 {name}: {progress}"
+#define TWITCH_DEFAULT_PROGRESS_ANNOUNCEMENT_TEMPLATE "\xE2\x8F\xB3 {name}: {progress} [{unlocked}/{total}]"
 
 /**
  * @brief Configuration for posting achievement-unlock, game-change, and mastery announcements to Twitch chat.
@@ -318,9 +318,9 @@ typedef struct twitch_configuration {
     bool  only_when_live;
     /** Message template supporting {name}, {value}, and {gamertag} placeholders. */
     char *message_template;
-    /** Message template supporting {game} and {gamertag} placeholders. */
+    /** Message template supporting {game}, {console} and {gamertag} placeholders. */
     char *game_announcement_template;
-    /** Message template supporting {game} and {gamertag} placeholders. */
+    /** Message template supporting {game}, {console} and {gamertag} placeholders. */
     char *mastery_announcement_template;
     /** Whether achievement progress updates (measured achievements) are announced to Twitch chat. Independent of @c
      * enabled. */

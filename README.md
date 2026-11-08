@@ -122,8 +122,10 @@ The same dialog configures chat announcements. Each announcement type has its ow
 | Announcement | Posted when | Default template | Placeholders |
 | --- | --- | --- | --- |
 | Achievement | An achievement is unlocked | `🏆 Achievement unlocked: {name} ({value}G)` | `{name}`, `{value}`, `{gamertag}` |
-| Game change | The current game changes | `🎮 Now playing: {game}` | `{game}`, `{gamertag}` |
-| Mastery | The current game reaches 100% unlocked achievements | `🎉 {gamertag} just mastered {game} — 100% achievements unlocked!` | `{game}`, `{gamertag}` |
+| Game change | The current game changes | `🎮 Now playing: {game}` | `{game}`, `{console}`, `{gamertag}` |
+| Mastery | The current game reaches 100% unlocked achievements | `🎉 {gamertag} just mastered {game} — 100% achievements unlocked!` | `{game}`, `{console}`, `{gamertag}` |
+
+Once the game's achievement list has loaded, the game change announcement is followed by the unlock count, e.g. `Achievements unlocked in F-Zero X: 12/74`.
 
 An **Only when the channel is live** option restricts achievement announcements to times when the Twitch channel is currently streaming. Click **Save** to persist the configuration. Sign-out is available from the same dialog once connected.
 

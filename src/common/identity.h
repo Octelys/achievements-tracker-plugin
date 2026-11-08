@@ -19,6 +19,15 @@ typedef enum {
 } identity_source_t;
 
 /**
+ * @brief Maximum age, in seconds, of a user's avatar before it is fetched again.
+ *
+ * Applies to both the avatar URL (re-queried from Xbox Live) and the cached
+ * avatar image (re-downloaded for every integration), so a changed avatar is
+ * picked up at most once a day without hammering the remote services.
+ */
+#define IDENTITY_AVATAR_MAX_AGE_SECONDS (24 * 60 * 60)
+
+/**
  * @file identity.h
  * @brief Source-agnostic user identity record.
  *

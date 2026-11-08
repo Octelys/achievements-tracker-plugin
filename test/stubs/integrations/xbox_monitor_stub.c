@@ -31,9 +31,11 @@ static on_xbox_achievements_progressed_t s_cb_achievements_progressed = NULL;
 static on_xbox_session_ready_t           s_cb_session_ready           = NULL;
 
 /* Identity returned by state_get_xbox_identity() */
-static xbox_identity_t    *s_xbox_identity     = NULL;
+static xbox_identity_t    *s_xbox_identity        = NULL;
 /* Achievements returned by get_current_game_achievements() */
-static xbox_achievement_t *s_xbox_achievements = NULL;
+static xbox_achievement_t *s_xbox_achievements    = NULL;
+/* Number of xbox_fetch_gamerpic() calls */
+static int                 s_gamerpic_fetch_count = 0;
 
 /* -------------------------------------------------------------------------
  * xbox_subscribe_* — called by monitoring_service during monitoring_start()
@@ -106,7 +108,12 @@ char *xbox_get_game_cover(const game_t *game) {
 }
 
 char *xbox_fetch_gamerpic(void) {
+    s_gamerpic_fetch_count++;
     return NULL;
+}
+
+int mock_xbox_monitor_gamerpic_fetch_count(void) {
+    return s_gamerpic_fetch_count;
 }
 
 /* -------------------------------------------------------------------------
@@ -165,4 +172,5 @@ void mock_xbox_monitor_reset(void) {
     s_cb_game_played             = NULL;
     s_cb_achievements_progressed = NULL;
     s_cb_session_ready           = NULL;
+    s_gamerpic_fetch_count       = 0;
 }

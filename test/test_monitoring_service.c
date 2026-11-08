@@ -45,12 +45,17 @@
  *  23. Xbox session_ready fires without an Xbox game → achievements NOT overwritten
  *  24. Xbox session_ready fires without an Xbox game → session_ready NOT re-fired
  *  25. Xbox session_ready fires with an Xbox game active → session_ready fired normally
+ *
+ *  Avatar refresh — Xbox:
+ *  31. Xbox game played less than a day after the avatar fetch → avatar not re-fetched
+ *  32. Xbox game played a day after the avatar fetch → avatar re-fetched
  */
 
 #include "unity.h"
 
 #include "test/stubs/integrations/xbox_monitor_stub.h"
 #include "test/stubs/integrations/retro_achievements_monitor_stub.h"
+#include "test/stubs/time/time_stub.h"
 
 #include "integrations/monitoring_service.h"
 #include "integrations/xbox/entities/xbox_identity.h"
@@ -189,6 +194,7 @@ void setUp(void) {
 
     mock_xbox_monitor_reset();
     mock_retro_monitor_reset();
+    mock_now(0);
 
     monitoring_start();
     monitoring_subscribe_active_identity(on_identity_changed);
@@ -913,6 +919,38 @@ static void monitoring_achievements__xbox_progress_update_no_identity__early_ret
     TEST_ASSERT_EQUAL_INT(0, s_session_ready_cb_count);
 }
 
+/* =========================================================================
+ * Avatar refresh tests
+ * ====================================================================== */
+
+/* 31. Xbox game played less than a day after the avatar fetch → avatar not re-fetched. */
+static void monitoring_avatar__xbox_game_played_within_a_day__avatar_not_refetched(void) {
+    mock_now(1000);
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    mock_now(1000 + IDENTITY_AVATAR_MAX_AGE_SECONDS - 1);
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    TEST_ASSERT_EQUAL_INT(1, mock_xbox_monitor_gamerpic_fetch_count());
+}
+
+/* 32. Xbox game played a day after the avatar fetch → avatar re-fetched. */
+static void monitoring_avatar__xbox_game_played_after_a_day__avatar_refetched(void) {
+    mock_now(1000);
+    mock_xbox_monitor_set_identity(make_xbox_identity("MasterChief"));
+    mock_xbox_monitor_fire_connection_changed(true, NULL);
+
+    mock_now(1000 + IDENTITY_AVATAR_MAX_AGE_SECONDS);
+    game_t *xbox_game = make_xbox_game("game-1", "Halo Infinite");
+    mock_xbox_monitor_fire_game_played(xbox_game);
+    free_game(&xbox_game);
+
+    TEST_ASSERT_EQUAL_INT(2, mock_xbox_monitor_gamerpic_fetch_count());
+}
+
 /* -------------------------------------------------------------------------
  * Test runner
  * ---------------------------------------------------------------------- */
@@ -963,6 +1001,10 @@ int main(void) {
     RUN_TEST(monitoring_achievements__xbox_progress_update_achieved__achievements_changed_fired);
     RUN_TEST(monitoring_achievements__xbox_progress_update_null__no_effect);
     RUN_TEST(monitoring_achievements__xbox_progress_update_no_identity__early_return);
+
+    /* Avatar refresh — Xbox */
+    RUN_TEST(monitoring_avatar__xbox_game_played_within_a_day__avatar_not_refetched);
+    RUN_TEST(monitoring_avatar__xbox_game_played_after_a_day__avatar_refetched);
 
     return UNITY_END();
 }

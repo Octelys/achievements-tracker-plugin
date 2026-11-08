@@ -67,6 +67,11 @@ void mock_xbox_monitor_fire_achievements_progressed(const gamerscore_t          
                                                     const xbox_achievement_progress_t *progress);
 
 /**
+ * @brief Number of times xbox_fetch_gamerpic() was called since the last reset.
+ */
+int mock_xbox_monitor_gamerpic_fetch_count(void);
+
+/**
  * @brief Reset all stub state (callbacks, stored identity, etc.).
  *
  * Call from tearDown() to prevent state leaking between tests.

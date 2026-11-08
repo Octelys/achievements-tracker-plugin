@@ -5,8 +5,10 @@
 
 #include "sources/common/image_source.h"
 #include "sources/common/visibility_cycle.h"
+#include "common/identity.h"
 #include "common/memory.h"
 #include "integrations/monitoring_service.h"
+#include "time/time.h"
 
 /**
  * @brief Global singleton gamerpic cache.
@@ -14,12 +16,15 @@
  * This source is implemented as a singleton that stores the current user gamerpic
  * in a global cache.
  */
-static image_t                  g_gamerpic;
-static auto_visibility_config_t g_auto_visibility = {
-    .enabled       = false,
-    .show_duration = AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION,
-    .hide_duration = AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION,
-    .fade_duration = AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION,
+static image_t g_gamerpic;
+
+/** Time of the last download attempt of @c g_gamerpic, used to refresh it at most once a day. */
+static time_t                   g_gamerpic_downloaded_at = 0;
+static auto_visibility_config_t g_auto_visibility        = {
+           .enabled       = false,
+           .show_duration = AUTO_VISIBILITY_DEFAULT_SHARED_SHOW_DURATION,
+           .hide_duration = AUTO_VISIBILITY_DEFAULT_SHARED_HIDE_DURATION,
+           .fade_duration = AUTO_VISIBILITY_DEFAULT_SHARED_FADE_DURATION,
 };
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -43,8 +48,16 @@ static void on_active_identity_changed(const identity_t *identity) {
                  sizeof(g_gamerpic.id),
                  "%s",
                  (identity->name && identity->name[0] != '\0') ? identity->name : "default");
-        image_source_download(&g_gamerpic);
+    } else if (now() - g_gamerpic_downloaded_at >= IDENTITY_AVATAR_MAX_AGE_SECONDS) {
+        /* Some avatar URLs (e.g. RetroAchievements) never change when the user
+         * picks a new picture, so the image itself must be refreshed. */
+        obs_log(LOG_DEBUG, "[Gamerpic] Avatar is stale - refreshing");
+    } else {
+        return;
     }
+
+    g_gamerpic_downloaded_at = now();
+    image_source_download(&g_gamerpic);
 }
 
 //  --------------------------------------------------------------------------------------------------------------------
@@ -193,6 +206,7 @@ void xbox_gamerpic_source_register(void) {
     snprintf(g_gamerpic.display_name, sizeof(g_gamerpic.display_name), "Gamerpic");
     snprintf(g_gamerpic.id, sizeof(g_gamerpic.id), "default");
     snprintf(g_gamerpic.type, sizeof(g_gamerpic.type), "gamerpic");
+    g_gamerpic.max_age_seconds = IDENTITY_AVATAR_MAX_AGE_SECONDS;
 
     obs_register_source(xbox_gamerpic_source_get());
 

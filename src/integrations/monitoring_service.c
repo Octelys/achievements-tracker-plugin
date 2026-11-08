@@ -82,6 +82,9 @@ static on_monitoring_connection_changed_t g_connection_changed_callback = NULL;
 static identity_t *g_xbox_identity  = NULL;
 static identity_t *g_retro_identity = NULL;
 
+/** Time the Xbox avatar URL was last fetched, used to re-fetch it at most once a day. */
+static time_t g_xbox_avatar_fetched_at = 0;
+
 static game_t *g_xbox_game  = NULL;
 static game_t *g_retro_game = NULL;
 
@@ -270,6 +273,34 @@ static void refresh_xbox_score(identity_t *identity) {
     identity->score        = gs ? (uint32_t)gamerscore_compute(gs) : 0;
 }
 
+/**
+ * @brief Fetch the Xbox avatar URL and store it into @p identity.
+ *
+ * Replaces any previously stored URL, even when the fetch fails, so a stale
+ * avatar is never shown for a gamerpic that can no longer be resolved.
+ */
+static void fetch_xbox_avatar(identity_t *identity) {
+    free_memory((void **)&identity->avatar_url);
+    identity->avatar_url     = xbox_fetch_gamerpic();
+    g_xbox_avatar_fetched_at = now();
+}
+
+/**
+ * @brief Re-fetch the Xbox avatar URL when it is older than a day.
+ *
+ * Xbox Live gives every gamerpic its own URL, so this is how a gamerpic
+ * changed while OBS is running eventually reaches the gamerpic source.
+ */
+static void refresh_xbox_avatar_if_stale(void) {
+    if (!g_xbox_identity || now() - g_xbox_avatar_fetched_at < IDENTITY_AVATAR_MAX_AGE_SECONDS)
+        return;
+
+    fetch_xbox_avatar(g_xbox_identity);
+    obs_log(LOG_INFO,
+            "[MonitoringService] Xbox avatar refreshed: %s",
+            g_xbox_identity->avatar_url ? g_xbox_identity->avatar_url : "(none)");
+}
+
 static void on_xbox_connection_changed(bool connected, const char *error_message) {
     if (connected) {
         free_identity_t(&g_xbox_identity);
@@ -280,8 +311,7 @@ static void on_xbox_connection_changed(bool connected, const char *error_message
             free_identity(&xbox);
 
             if (g_xbox_identity) {
-                free_memory((void **)&g_xbox_identity->avatar_url);
-                g_xbox_identity->avatar_url = xbox_fetch_gamerpic();
+                fetch_xbox_avatar(g_xbox_identity);
                 obs_log(LOG_INFO,
                         "[MonitoringService] Xbox identity cached: %s (score: %u, avatar: %s)",
                         g_xbox_identity->name,
@@ -384,6 +414,8 @@ static void on_xbox_game_played(const game_t *game) {
     obs_log(LOG_INFO, "[MonitoringService] Xbox game cached: %s", g_xbox_game->title);
 
     g_last_game_source = IDENTITY_SOURCE_XBOX;
+
+    refresh_xbox_avatar_if_stale();
 
     /* Do NOT clear g_current_achievements here. on_xbox_session_ready() is the
      * sole owner of g_current_achievements updates for Xbox data. */
@@ -513,6 +545,31 @@ static void on_retro_no_game(void) {
 }
 
 /**
+ * @brief Sum the points of achievements locked in @p previous but unlocked in @p current.
+ *
+ * Achievements absent from @p previous are ignored so that the first list of
+ * a game session (where @p previous is NULL) never counts as new unlocks.
+ */
+static uint32_t compute_newly_unlocked_points(const achievement_t *previous, const achievement_t *current) {
+    uint32_t points = 0;
+
+    for (const achievement_t *a = current; a != NULL; a = a->next) {
+        if (a->unlocked_timestamp == 0 || !a->id)
+            continue;
+
+        for (const achievement_t *p = previous; p != NULL; p = p->next) {
+            if (p->source == ACHIEVEMENT_SOURCE_RETRO && p->id && strcmp(p->id, a->id) == 0) {
+                if (p->unlocked_timestamp == 0 && a->value > 0)
+                    points += (uint32_t)a->value;
+                break;
+            }
+        }
+    }
+
+    return points;
+}
+
+/**
  * @brief RetroAchievements callback invoked when the achievements' list is received.
  *
  * Only fires notify_session_ready() when a game is actually active.
@@ -530,7 +587,23 @@ static void on_retro_no_game(void) {
  * non-empty so the cycle always starts with at least one achievement to show.
  */
 static void on_retro_achievements(const retro_achievement_t *achievements, size_t count) {
-    replace_current_achievements(retro_to_achievements(achievements, count));
+    achievement_t *new_achievements = retro_to_achievements(achievements, count);
+
+    /* RetroArch does not resend the user message after an unlock, so the
+     * score would stay frozen until the next reconnection. Add the points of
+     * newly unlocked achievements to the cached score instead; the next user
+     * message, if any, overwrites it with the authoritative value. */
+    const uint32_t gained = compute_newly_unlocked_points(g_current_achievements, new_achievements);
+
+    replace_current_achievements(new_achievements);
+
+    if (gained > 0 && g_retro_identity) {
+        g_retro_identity->score += gained;
+        obs_log(LOG_INFO, "[MonitoringService] Retro score updated: %u (+%u)", g_retro_identity->score, gained);
+
+        if (g_retro_game && g_last_game_source == IDENTITY_SOURCE_RETRO)
+            notify_active_identity(get_current_active_identity());
+    }
 
     if (g_retro_game && count > 0) {
         notify_session_ready();
