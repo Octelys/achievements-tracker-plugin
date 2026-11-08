@@ -1,0 +1,122 @@
+name: Set up Windows codesigning
+description: Prepares Authenticode signing inputs for Windows build and packaging steps
+inputs:
+  certificateBase64:
+    description: PKCS#12 / PFX certificate in base64 format
+    required: false
+    default: ''
+  certificatePassword:
+    description: Password for the PKCS#12 / PFX certificate
+    required: false
+    default: ''
+  certificateSha1:
+    description: Certificate thumbprint to use from the local certificate store
+    required: false
+    default: ''
+  certificateStore:
+    description: Optional certificate store name to use with certificateSha1
+    required: false
+    default: ''
+  timestampUrl:
+    description: RFC 3161 timestamp server URL
+    required: false
+    default: http://timestamp.digicert.com
+  fileDigest:
+    description: File digest algorithm to pass to signtool
+    required: false
+    default: SHA256
+  timestampDigest:
+    description: Timestamp digest algorithm to pass to signtool
+    required: false
+    default: SHA256
+  productDescription:
+    description: Friendly product description embedded in the signature
+    required: false
+    default: ''
+  descriptionUrl:
+    description: Product URL embedded in the signature
+    required: false
+    default: ''
+  signToolPath:
+    description: Optional full path to signtool.exe
+    required: false
+    default: ''
+outputs:
+  enabled:
+    description: True if Windows codesigning inputs were configured for the job
+    value: ${{ steps.codesign.outputs.enabled }}
+runs:
+  using: composite
+  steps:
+    - name: Check Runner Operating System 🏃‍♂️
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        : Check Runner Operating System 🏃‍♂️
+        echo "setup-windows-codesigning action requires a Windows-based runner."
+        exit 2
+
+    - name: Windows Codesigning ✍️
+      id: codesign
+      shell: pwsh
+      env:
+        WINDOWS_SIGNING_CERT_BASE64: ${{ inputs.certificateBase64 }}
+        WINDOWS_SIGNING_CERT_PASSWORD: ${{ inputs.certificatePassword }}
+        WINDOWS_SIGNING_CERT_SHA1: ${{ inputs.certificateSha1 }}
+        WINDOWS_SIGNING_CERT_STORE: ${{ inputs.certificateStore }}
+        WINDOWS_SIGNING_TIMESTAMP_URL: ${{ inputs.timestampUrl }}
+        WINDOWS_SIGNING_FILE_DIGEST: ${{ inputs.fileDigest }}
+        WINDOWS_SIGNING_TIMESTAMP_DIGEST: ${{ inputs.timestampDigest }}
+        WINDOWS_SIGNING_DESCRIPTION: ${{ inputs.productDescription }}
+        WINDOWS_SIGNING_DESCRIPTION_URL: ${{ inputs.descriptionUrl }}
+        WINDOWS_SIGNTOOL_PATH_INPUT: ${{ inputs.signToolPath }}
+      run: |
+        # Windows Codesigning ✍️
+        $ErrorActionPreference = 'Stop'
+
+        $enabled = $false
+
+        if ( $env:WINDOWS_SIGNING_CERT_BASE64 -ne '' ) {
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'windows-signing-cert.pfx'
+          [System.IO.File]::WriteAllBytes(
+            $certificatePath,
+            [System.Convert]::FromBase64String($env:WINDOWS_SIGNING_CERT_BASE64)
+          )
+
+          if ( $env:WINDOWS_SIGNING_CERT_PASSWORD -ne '' ) {
+            Write-Host "::add-mask::$($env:WINDOWS_SIGNING_CERT_PASSWORD)"
+            "WINDOWS_SIGN_CERT_PASSWORD=$($env:WINDOWS_SIGNING_CERT_PASSWORD)" >> $env:GITHUB_ENV
+          }
+
+          "WINDOWS_SIGN_CERT_FILE=$certificatePath" >> $env:GITHUB_ENV
+          $enabled = $true
+        } elseif ( $env:WINDOWS_SIGNING_CERT_SHA1 -ne '' ) {
+          Write-Host "::add-mask::$($env:WINDOWS_SIGNING_CERT_SHA1)"
+          "WINDOWS_SIGN_CERT_SHA1=$($env:WINDOWS_SIGNING_CERT_SHA1)" >> $env:GITHUB_ENV
+          if ( $env:WINDOWS_SIGNING_CERT_STORE -ne '' ) {
+            "WINDOWS_SIGN_CERT_STORE=$($env:WINDOWS_SIGNING_CERT_STORE)" >> $env:GITHUB_ENV
+          }
+          $enabled = $true
+        } else {
+          Write-Host '::notice::Windows codesigning disabled because no certificate input was provided.'
+        }
+
+        if ( $enabled ) {
+          "WINDOWS_SIGN_TIMESTAMP_URL=$($env:WINDOWS_SIGNING_TIMESTAMP_URL)" >> $env:GITHUB_ENV
+          "WINDOWS_SIGN_FILE_DIGEST=$($env:WINDOWS_SIGNING_FILE_DIGEST)" >> $env:GITHUB_ENV
+          "WINDOWS_SIGN_TIMESTAMP_DIGEST=$($env:WINDOWS_SIGNING_TIMESTAMP_DIGEST)" >> $env:GITHUB_ENV
+
+          if ( $env:WINDOWS_SIGNING_DESCRIPTION -ne '' ) {
+            "WINDOWS_SIGN_DESCRIPTION=$($env:WINDOWS_SIGNING_DESCRIPTION)" >> $env:GITHUB_ENV
+          }
+          if ( $env:WINDOWS_SIGNING_DESCRIPTION_URL -ne '' ) {
+            "WINDOWS_SIGN_DESCRIPTION_URL=$($env:WINDOWS_SIGNING_DESCRIPTION_URL)" >> $env:GITHUB_ENV
+          }
+          if ( $env:WINDOWS_SIGNTOOL_PATH_INPUT -ne '' ) {
+            "WINDOWS_SIGNTOOL_PATH=$($env:WINDOWS_SIGNTOOL_PATH_INPUT)" >> $env:GITHUB_ENV
+          }
+        }
+
+        "enabled=$($enabled.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+

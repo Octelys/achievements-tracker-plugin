@@ -22,6 +22,16 @@ function(set_target_properties_plugin target)
 
   set_target_properties(${target} PROPERTIES VERSION 0 SOVERSION ${PLUGIN_VERSION})
 
+  if(WINDOWS_CODESIGN)
+    windows_get_sign_file_script(_windows_sign_file_script)
+    set(_windows_sign_target_command
+      COMMAND
+        "${CMAKE_COMMAND}" -DSIGN_FILE_PATH=$<TARGET_FILE:${target}> -P "${_windows_sign_file_script}"
+    )
+  else()
+    set(_windows_sign_target_command "")
+  endif()
+
   install(TARGETS ${target} RUNTIME DESTINATION "${target}/bin/64bit" LIBRARY DESTINATION "${target}/bin/64bit")
 
   install(
@@ -38,6 +48,7 @@ function(set_target_properties_plugin target)
   add_custom_command(
     TARGET ${target}
     POST_BUILD
+    ${_windows_sign_target_command}
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/rundir/$<CONFIG>"
     COMMAND
       "${CMAKE_COMMAND}" -E copy_if_different "$<TARGET_FILE:${target}>"
