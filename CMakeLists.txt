@@ -110,9 +110,10 @@ if(Libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
   if(_lws_target)
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${_lws_target})
     # Static libwebsockets on Windows requires Winsock; link it explicitly since
-    # the imported target does not always propagate it as a dependency.
+    # the imported target does not always propagate it as a dependency. Its libuv
+    # dependency (1.53+) also needs Synchronization for WaitOnAddress/WakeByAddressSingle.
     if(WIN32)
-      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 dbghelp)
+      target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32 dbghelp synchronization)
     endif()
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HAVE_LIBWEBSOCKETS)
     set(LIBWEBSOCKETS_LINKED TRUE)
